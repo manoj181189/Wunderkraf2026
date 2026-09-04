@@ -1,0 +1,10 @@
+{
+  "name": "Wünderkraf Paperware ERP",
+  "description": "Master Factory ERP & Production Suite with Voice Audio Transcription, Paper Stock Analytics, and Google Drive Cloud Backup",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
