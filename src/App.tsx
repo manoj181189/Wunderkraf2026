@@ -38,13 +38,20 @@ import { StationDetailModal } from './components/StationDetailModal';
 import { BatchReportModal } from './components/BatchReportModal';
 import { MaterialRequisitionModal } from './components/MaterialRequisitionModal';
 
-export const App: React.FC = () => {
-  // User Authentication / Current Operator Desk
-  const [currentUser, setCurrentUser] = useState<{ username: string; perms: string[] }>({
-    username: 'admin',
-    perms: ['Admin', 'Marketing', 'Dispatch', 'Slitting', 'Cutting', 'Forming', 'QC', 'Packing', 'Maintenance', 'Purchase']
-  });
+// ऑपरेटर लिस्ट और उनके अधिकार (Rights)
+const OPERATORS_LIST = [
+  { username: 'admin', role: 'Super Admin (All Access)', perms: ['Admin', 'Marketing', 'Dispatch', 'Slitting', 'Cutting', 'Forming', 'QC', 'Packing', 'Maintenance', 'Purchase'] },
+  { username: 'slitting_op', role: 'Slitting Machine Desk', perms: ['Slitting'] },
+  { username: 'cutting_op', role: 'Die-Cutting Desk', perms: ['Cutting'] },
+  { username: 'forming_op', role: 'Thermo-Forming Desk', perms: ['Forming'] },
+  { username: 'qc_inspector', role: 'QC & Hygiene Audit', perms: ['QC'] },
+  { username: 'packing_op', role: 'Packing & Carton Tagging', perms: ['Packing'] },
+  { username: 'dispatch_mgr', role: 'Dispatch & Gatepass Desk', perms: ['Dispatch'] },
+  { username: 'maint_eng', role: 'Maintenance & Breakdown Desk', perms: ['Maintenance'] },
+  { username: 'purchase_mgr', role: 'Purchase & Requisition Desk', perms: ['Purchase'] },
+];
 
+export const App: React.FC = () => {
   // Load State from LocalStorage or Fallback to Initial Prototype State
   const [state, setState] = useState<FactoryState>(() => {
     try {
@@ -57,6 +64,20 @@ export const App: React.FC = () => {
     }
     return INITIAL_STATE;
   });
+
+  // User Authentication State (LocalStorage से याद रखेगा ताकि रिफ्रेश पर लॉगआउट न हो)
+  const [currentUser, setCurrentUser] = useState<{ username: string; perms: string[] } | null>(() => {
+    try {
+      const savedUser = localStorage.getItem('wunderkraf_logged_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [selectedUsername, setSelectedUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
   // Current active view
   const [currentView, setCurrentView] = useState<CurrentView>('HUB');
@@ -89,7 +110,7 @@ export const App: React.FC = () => {
   const [isRequisitionModalOpen, setIsRequisitionModalOpen] = useState(false);
   const [requisitionDefaultDept, setRequisitionDefaultDept] = useState<string | undefined>(undefined);
 
-  // Arrived goods notifications (requester alert: material store me aa gaya hai)
+  // Arrived goods notifications
   const arrivedRequisitions = (state.materialRequisitions || []).filter(
     (r) => r.status === 'RECEIVED' && !r.acknowledgedByRequester
   );
@@ -105,7 +126,38 @@ export const App: React.FC = () => {
     }
   };
 
-  // View Navigation with Password Protection for Admin
+  // Login Handler
+  const handleDoLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const op = OPERATORS_LIST.find((u) => u.username === selectedUsername);
+    if (!op) {
+      setLoginError('कृपया यूज़र / डेस्क चुनें!');
+      return;
+    }
+
+    if (op.username === 'admin') {
+      const correctPass = state.adminPassword || '1234';
+      if (loginPassword !== correctPass) {
+        setLoginError('गलत एडमिन पासवर्ड! (डिफ़ॉल्ट 1234)');
+        return;
+      }
+    }
+
+    const userData = { username: op.username, perms: op.perms };
+    setCurrentUser(userData);
+    localStorage.setItem('wunderkraf_logged_user', JSON.stringify(userData));
+    setLoginError('');
+    setLoginPassword('');
+  };
+
+  // Logout Handler
+  const handleDoLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('wunderkraf_logged_user');
+    setCurrentView('HUB');
+  };
+
+  // View Navigation with Protection
   const handleNavigate = (view: CurrentView) => {
     if (view === 'ADMIN') {
       setPendingProtectedView('ADMIN');
@@ -123,7 +175,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // Voice dictation opener for arbitrary inputs
   const handleOpenVoiceForTarget = (callback: (text: string) => void) => {
     setVoiceTargetCallback(() => callback);
     setIsVoiceOpen(true);
@@ -136,9 +187,72 @@ export const App: React.FC = () => {
     }
   };
 
+  // 1. अगर कोई यूज़र लॉगिन नहीं है तो सीधे लॉगिन स्क्रीन दिखाना
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-white">
+          <div className="text-center mb-6">
+            <div className="inline-block p-3 bg-slate-900 rounded-full mb-3 border border-slate-700">
+              <span className="text-3xl">🏭</span>
+            </div>
+            <h1 className="text-2xl font-black text-amber-400 tracking-wide">WÜNDERKRAF ERP</h1>
+            <p className="text-xs text-slate-400 mt-1">Shop Floor & Factory Station Access</p>
+          </div>
+
+          <form onSubmit={handleDoLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">डेस्क / ऑपरेटर चुनें (Select Desk):</label>
+              <select
+                value={selectedUsername}
+                onChange={(e) => {
+                  setSelectedUsername(e.target.value);
+                  setLoginError('');
+                }}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-amber-400"
+                required
+              >
+                <option value="">-- ऑपरेटर या डेस्क चुनें --</option>
+                {OPERATORS_LIST.map((u) => (
+                  <option key={u.username} value={u.username}>
+                    {u.role}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedUsername === 'admin' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Admin Password:</label>
+                <input
+                  type="password"
+                  placeholder="Enter admin password (Default: 1234)"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-amber-400"
+                  required
+                />
+              </div>
+            )}
+
+            {loginError && <p className="text-xs text-rose-400 font-bold bg-rose-950/50 p-2.5 rounded-lg border border-rose-800">{loginError}</p>}
+
+            <button
+              type="submit"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-lg transition shadow-lg cursor-pointer text-sm uppercase tracking-wider"
+            >
+              लॉगिन करें (Access Desk)
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. जब यूज़र लॉगिन हो, तब मेन फ़ैक्ट्री ऐप लोड होगी
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 selection:bg-blue-200">
-      {/* Universal Top Header */}
+      {/* Top Header */}
       <Header
         currentUser={currentUser}
         brandLogoBase64={state.brandLogoBase64}
@@ -157,7 +271,22 @@ export const App: React.FC = () => {
         onOpenAdmin={() => handleNavigate('ADMIN')}
       />
 
-      {/* Real-time Material Arrival Announcement Strip (मटेरियल फैक्ट्री स्टोर में आ गया) */}
+      {/* Logout Bar & User Details */}
+      <div className="bg-slate-800 text-slate-300 px-4 py-1.5 flex items-center justify-between text-xs border-b border-slate-700">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Logged Desk: <strong className="text-amber-400 font-bold uppercase">{currentUser.username}</strong></span>
+          <span className="text-slate-500 hidden sm:inline">| Rights: {currentUser.perms.join(', ')}</span>
+        </div>
+        <button
+          onClick={handleDoLogout}
+          className="bg-rose-600/80 hover:bg-rose-600 text-white font-bold px-2.5 py-0.5 rounded transition cursor-pointer"
+        >
+          Logout (बाहर निकलें)
+        </button>
+      </div>
+
+      {/* Real-time Material Arrival Announcement Strip */}
       {arrivedCount > 0 && (
         <div className="bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 text-white px-4 py-2.5 shadow-md flex items-center justify-between flex-wrap gap-2 text-xs">
           <div className="flex items-center gap-2 font-bold">
@@ -363,9 +492,7 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Universal Floating Modals */}
-
-      {/* Machine Ready Handover Notification Modal (User requested: मेंटेनेंस साइड से ओके होने पर पॉपअप) */}
+      {/* Floating Modals */}
       {state.machineReadyAlerts && state.machineReadyAlerts.length > 0 && (
         <MachineReadyNotificationModal
           isOpen={Boolean(state.machineReadyAlerts.find((a) => a.active))}
@@ -383,7 +510,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Gemini AI Voice Transcriber Modal */}
       <VoiceTranscriberModal
         isOpen={isVoiceOpen}
         onClose={() => {
@@ -393,13 +519,11 @@ export const App: React.FC = () => {
         onApplyTranscription={handleVoiceTranscribed}
       />
 
-      {/* Gemini AI Google Search Grounding Modal */}
       <SearchGroundingModal
         isOpen={isSearchGroundingOpen}
         onClose={() => setIsSearchGroundingOpen(false)}
       />
 
-      {/* Google Drive Real-Time Cloud Backup Modal */}
       <GoogleDriveModal
         isOpen={isDriveOpen}
         onClose={() => setIsDriveOpen(false)}
@@ -407,7 +531,6 @@ export const App: React.FC = () => {
         onRestoreState={handleSaveState}
       />
 
-      {/* Admin Password Gatekeeper Modal */}
       <PasswordModal
         isOpen={isPasswordModalOpen}
         correctPassword={state.adminPassword || '1234'}
@@ -418,7 +541,6 @@ export const App: React.FC = () => {
         onSuccess={handlePasswordSuccess}
       />
 
-      {/* Station Pause & Maintenance Reason Modal */}
       {holdModalStation && (
         <HoldModal
           isOpen={Boolean(holdModalStation)}
@@ -429,7 +551,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Printable Dispatch Challan & Gatepass Modal */}
       {activeChallanData && (
         <ChallanModal
           isOpen={Boolean(activeChallanData)}
@@ -438,7 +559,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Customer Packing Order Full Spec Sheet Modal */}
       {orderSpecId && (
         <OrderSpecModal
           isOpen={Boolean(orderSpecId)}
@@ -447,7 +567,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Stock Matrix Job Drilldown Modal */}
       {stockDetailParams && (
         <StockDetailModal
           isOpen={Boolean(stockDetailParams)}
@@ -458,7 +577,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Station Live History & Activity Audit Modal */}
       {stationDetailMachine && (
         <StationDetailModal
           isOpen={Boolean(stationDetailMachine)}
@@ -469,7 +587,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Batch Comprehensive Production Report & Certificate Modal */}
       {batchReportId && (
         <BatchReportModal
           isOpen={Boolean(batchReportId)}
@@ -479,7 +596,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Material Requisition & Indent Modal (Universal for all departments) */}
       <MaterialRequisitionModal
         isOpen={isRequisitionModalOpen}
         state={state}
