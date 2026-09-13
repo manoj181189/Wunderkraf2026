@@ -1,4 +1,19 @@
-import { FactoryState, Job, ProductionPlan, PackJob, LogEntry, MaterialRequisition, CustomerComplaint, ShiftHandoverRecord, MaintenanceIncident, FloorWorker, MaintenanceContact, CoordinationMatrixItem } from '../types';
+import {
+  FactoryState,
+  Job,
+  RunningBatch,
+  ProductionPlan,
+  PackJob,
+  LogEntry,
+  MaterialRequisition,
+  CustomerComplaint,
+  ShiftHandoverRecord,
+  MaintenanceIncident,
+  MotherReelItem,
+  SeriesConfig,
+  WhatsAppConfig,
+  ShiftConfig
+} from '../types';
 
 /**
  * Intelligently merges two FactoryState objects without losing any device's recorded production.
@@ -25,7 +40,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       jobMap.set(incJob.id, { ...incJob });
     } else {
       // Merge runningBatches by batchId
-      const batchMap = new Map<string, any>();
+      const batchMap = new Map<string, RunningBatch>();
       (existing.runningBatches || []).forEach((b) => {
         const key = b.batchId || `${b.stage}_${b.machine}_${b.startTime}`;
         batchMap.set(key, { ...b });
@@ -53,17 +68,6 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         }
       });
 
-      // Merge slices
-      const sliceMap = new Map<string, any>();
-      (existing.slices || []).forEach((s) => {
-        const key = s.sliceId || `${s.operator}_${s.handoverTime}`;
-        sliceMap.set(key, { ...s });
-      });
-      (incJob.slices || []).forEach((s) => {
-        const key = s.sliceId || `${s.operator}_${s.handoverTime}`;
-        sliceMap.set(key, { ...(sliceMap.get(key) || {}), ...s });
-      });
-
       // Stage progression priority
       const stagePriority: Record<string, number> = {
         'Slitting': 1,
@@ -81,16 +85,17 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         ...existing,
         ...incJob,
         stage: resolvedStage,
-        // Maximize known production counts so progress is never reduced by an older device
-        producedSlitRolls: Math.max(existing.producedSlitRolls || 0, incJob.producedSlitRolls || 0),
-        cutBlankPieces: Math.max(existing.cutBlankPieces || 0, incJob.cutBlankPieces || 0),
-        formedPieces: Math.max(existing.formedPieces || 0, incJob.formedPieces || 0),
-        qcApprovedPieces: Math.max(existing.qcApprovedPieces || 0, incJob.qcApprovedPieces || 0),
-        runningBatches: Array.from(batchMap.values()),
-        slices: Array.from(sliceMap.values()),
-        // If one device logged cutting / forming crates, preserve them
-        totalCutCrates: Math.max(existing.totalCutCrates || 0, incJob.totalCutCrates || 0),
-        totalFormedCrates: Math.max(existing.totalFormedCrates || 0, incJob.totalFormedCrates || 0)
+        availableRolls: Math.max(existing.availableRolls || 0, incJob.availableRolls || 0),
+        availableCuttingCrates: Math.max(existing.availableCuttingCrates || 0, incJob.availableCuttingCrates || 0),
+        availableFormingCrates: Math.max(existing.availableFormingCrates || 0, incJob.availableFormingCrates || 0),
+        availableQcCrates: Math.max(existing.availableQcCrates || 0, incJob.availableQcCrates || 0),
+        totalCutPieces: Math.max(existing.totalCutPieces || 0, incJob.totalCutPieces || 0),
+        totalFormedPieces: Math.max(existing.totalFormedPieces || 0, incJob.totalFormedPieces || 0),
+        totalQcPieces: Math.max(existing.totalQcPieces || 0, incJob.totalQcPieces || 0),
+        cuttingLoosePcs: Math.max(existing.cuttingLoosePcs || 0, incJob.cuttingLoosePcs || 0),
+        formingLoosePcs: Math.max(existing.formingLoosePcs || 0, incJob.formingLoosePcs || 0),
+        qcLoosePcs: Math.max(existing.qcLoosePcs || 0, incJob.qcLoosePcs || 0),
+        runningBatches: Array.from(batchMap.values())
       });
     }
   });
@@ -98,24 +103,24 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   // 2. Merge Production Plans
   const planMap = new Map<string, ProductionPlan>();
   (base.productionPlans || []).forEach((p) => {
-    if (p && (p.id || p.planNo)) {
-      planMap.set(p.id || p.planNo, { ...p });
+    if (p && p.id) {
+      planMap.set(p.id, { ...p });
     }
   });
   (incoming.productionPlans || []).forEach((p) => {
-    if (!p || (!p.id && !p.planNo)) return;
-    const key = p.id || p.planNo;
-    const existing = planMap.get(key);
+    if (!p || !p.id) return;
+    const existing = planMap.get(p.id);
     if (!existing) {
-      planMap.set(key, { ...p });
+      planMap.set(p.id, { ...p });
     } else {
       const isCompleted = p.status === 'Completed' || existing.status === 'Completed';
-      planMap.set(key, {
+      planMap.set(p.id, {
         ...existing,
         ...p,
         status: isCompleted ? 'Completed' : (p.status || existing.status),
-        producedQty: Math.max(existing.producedQty || 0, p.producedQty || 0),
-        producedCrates: Math.max(existing.producedCrates || 0, p.producedCrates || 0)
+        actualMetersSlit: Math.max(existing.actualMetersSlit || 0, p.actualMetersSlit || 0),
+        actualLayersUsed: Math.max(existing.actualLayersUsed || 0, p.actualLayersUsed || 0),
+        actualScrapKg: Math.max(existing.actualScrapKg || 0, p.actualScrapKg || 0)
       });
     }
   });
@@ -148,7 +153,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
 
   // 4. Merge Audit Logs
   const logMap = new Map<string, LogEntry>();
-  const makeLogKey = (l: LogEntry) => l.id || `${l.jobId}_${l.timestamp}_${l.action}_${l.stage}_${l.machine}`;
+  const makeLogKey = (l: LogEntry) => `${l.jobId || ''}_${l.timestamp}_${l.action}_${l.stage}_${l.machine}`;
   (base.logs || []).forEach((l) => {
     if (l) logMap.set(makeLogKey(l), l);
   });
@@ -182,11 +187,11 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   // 7. Merge Shift Handovers
   const handoverMap = new Map<string, ShiftHandoverRecord>();
   (base.shiftHandovers || []).forEach((h) => {
-    const key = h.id || `${h.department}_${h.shift}_${h.date}`;
+    const key = h.id || `${h.department}_${h.currentShift}_${h.date}`;
     handoverMap.set(key, { ...h });
   });
   (incoming.shiftHandovers || []).forEach((h) => {
-    const key = h.id || `${h.department}_${h.shift}_${h.date}`;
+    const key = h.id || `${h.department}_${h.currentShift}_${h.date}`;
     handoverMap.set(key, { ...(handoverMap.get(key) || {}), ...h });
   });
 
@@ -199,21 +204,16 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   });
 
   // 9. Merge Numbering Series Counters (Take MAXIMUM to avoid collisions across devices)
-  const mergedSeriesConfig = {
-    ...base.seriesConfig,
-    ...incoming.seriesConfig,
-    jobPrefix: incoming.seriesConfig?.jobPrefix || base.seriesConfig?.jobPrefix || 'WK-LOT',
-    currentJobSeq: Math.max(base.seriesConfig?.currentJobSeq || 1, incoming.seriesConfig?.currentJobSeq || 1),
-    nextLotNo: Math.max(base.seriesConfig?.nextLotNo || 101, incoming.seriesConfig?.nextLotNo || 101),
-    nextSlitNo: Math.max(base.seriesConfig?.nextSlitNo || 1, incoming.seriesConfig?.nextSlitNo || 1),
-    nextCutNo: Math.max(base.seriesConfig?.nextCutNo || 1, incoming.seriesConfig?.nextCutNo || 1),
-    nextQcNo: Math.max(base.seriesConfig?.nextQcNo || 1, incoming.seriesConfig?.nextQcNo || 1),
+  const mergedSeriesConfig: SeriesConfig = {
+    orderSeq: Math.max(base.seriesConfig?.orderSeq || 1, incoming.seriesConfig?.orderSeq || 1),
+    productSeqs: {
+      ...(base.seriesConfig?.productSeqs || {}),
+      ...(incoming.seriesConfig?.productSeqs || {})
+    },
     numberingMaster: {
-      ...(base.seriesConfig?.numberingMaster || {}),
-      ...(incoming.seriesConfig?.numberingMaster || {}),
       jobSeries: {
         prefix: incoming.seriesConfig?.numberingMaster?.jobSeries?.prefix || base.seriesConfig?.numberingMaster?.jobSeries?.prefix || 'WK-LOT',
-        paddingDigits: incoming.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits || 3,
+        paddingDigits: incoming.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits ?? base.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits ?? 3,
         nextSeq: Math.max(
           base.seriesConfig?.numberingMaster?.jobSeries?.nextSeq || 101,
           incoming.seriesConfig?.numberingMaster?.jobSeries?.nextSeq || 101
@@ -221,7 +221,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       },
       slitSeries: {
         prefix: incoming.seriesConfig?.numberingMaster?.slitSeries?.prefix || base.seriesConfig?.numberingMaster?.slitSeries?.prefix || 'SLIT',
-        paddingDigits: incoming.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits || 2,
+        paddingDigits: incoming.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits ?? base.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits ?? 2,
         nextSeq: Math.max(
           base.seriesConfig?.numberingMaster?.slitSeries?.nextSeq || 1,
           incoming.seriesConfig?.numberingMaster?.slitSeries?.nextSeq || 1
@@ -229,7 +229,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       },
       cutSeries: {
         prefix: incoming.seriesConfig?.numberingMaster?.cutSeries?.prefix || base.seriesConfig?.numberingMaster?.cutSeries?.prefix || 'CUT',
-        paddingDigits: incoming.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits || 2,
+        paddingDigits: incoming.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits ?? base.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits ?? 2,
         nextSeq: Math.max(
           base.seriesConfig?.numberingMaster?.cutSeries?.nextSeq || 1,
           incoming.seriesConfig?.numberingMaster?.cutSeries?.nextSeq || 1
@@ -237,22 +237,46 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       },
       qcSeries: {
         prefix: incoming.seriesConfig?.numberingMaster?.qcSeries?.prefix || base.seriesConfig?.numberingMaster?.qcSeries?.prefix || 'QC',
-        paddingDigits: incoming.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits || 2,
+        paddingDigits: incoming.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits ?? base.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits ?? 2,
         nextSeq: Math.max(
           base.seriesConfig?.numberingMaster?.qcSeries?.nextSeq || 1,
           incoming.seriesConfig?.numberingMaster?.qcSeries?.nextSeq || 1
         )
-      }
+      },
+      useGlobalJobPrefix: incoming.seriesConfig?.numberingMaster?.useGlobalJobPrefix ?? base.seriesConfig?.numberingMaster?.useGlobalJobPrefix
     }
   };
 
   // 10. Merge Mother Reel Inventory
-  const reelMap = new Map<string, any>();
-  (base.motherReelInventory || []).forEach((r) => { if (r && r.reelNo) reelMap.set(r.reelNo, { ...r }); });
+  const reelMap = new Map<string, MotherReelItem>();
+  (base.motherReelInventory || []).forEach((r) => { if (r && r.id) reelMap.set(r.id, { ...r }); });
   (incoming.motherReelInventory || []).forEach((r) => {
-    if (!r || !r.reelNo) return;
-    reelMap.set(r.reelNo, { ...(reelMap.get(r.reelNo) || {}), ...r });
+    if (!r || !r.id) return;
+    reelMap.set(r.id, { ...(reelMap.get(r.id) || {}), ...r });
   });
+
+  // 11. WhatsApp & Shift Configs
+  const mergedWhatsappConfig: WhatsAppConfig = {
+    phone: incoming.whatsappConfig?.phone || base.whatsappConfig?.phone || '',
+    apiKey: incoming.whatsappConfig?.apiKey || base.whatsappConfig?.apiKey || '',
+    autoSend: incoming.whatsappConfig?.autoSend ?? base.whatsappConfig?.autoSend ?? false,
+    lastSentKey: incoming.whatsappConfig?.lastSentKey || base.whatsappConfig?.lastSentKey,
+    webhookUrl: incoming.whatsappConfig?.webhookUrl || base.whatsappConfig?.webhookUrl,
+    customMessage: incoming.whatsappConfig?.customMessage || base.whatsappConfig?.customMessage,
+    dayShiftReportTime: incoming.whatsappConfig?.dayShiftReportTime || base.whatsappConfig?.dayShiftReportTime,
+    nightShiftReportTime: incoming.whatsappConfig?.nightShiftReportTime || base.whatsappConfig?.nightShiftReportTime,
+    autoSendShiftReportDay: incoming.whatsappConfig?.autoSendShiftReportDay ?? base.whatsappConfig?.autoSendShiftReportDay,
+    autoSendShiftReportNight: incoming.whatsappConfig?.autoSendShiftReportNight ?? base.whatsappConfig?.autoSendShiftReportNight,
+    lastSentDayDate: incoming.whatsappConfig?.lastSentDayDate || base.whatsappConfig?.lastSentDayDate,
+    lastSentNightDate: incoming.whatsappConfig?.lastSentNightDate || base.whatsappConfig?.lastSentNightDate
+  };
+
+  const mergedShiftConfig: ShiftConfig = {
+    dayStart: incoming.shiftConfig?.dayStart || base.shiftConfig?.dayStart || '08:00',
+    dayEnd: incoming.shiftConfig?.dayEnd || base.shiftConfig?.dayEnd || '20:00',
+    nightStart: incoming.shiftConfig?.nightStart || base.shiftConfig?.nightStart || '20:00',
+    nightEnd: incoming.shiftConfig?.nightEnd || base.shiftConfig?.nightEnd || '08:00'
+  };
 
   // Assemble final consolidated state
   const merged: FactoryState = {
@@ -268,6 +292,8 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     maintenanceIncidents: Array.from(incidentMap.values()),
     motherReelInventory: Array.from(reelMap.values()),
     seriesConfig: mergedSeriesConfig,
+    whatsappConfig: mergedWhatsappConfig,
+    shiftConfig: mergedShiftConfig,
     // Keep most recent user and master configuration lists
     users: { ...(base.users || {}), ...(incoming.users || {}) },
     floorWorkers: incoming.floorWorkers?.length ? incoming.floorWorkers : base.floorWorkers,
@@ -276,9 +302,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     departmentHeads: incoming.departmentHeads?.length ? incoming.departmentHeads : base.departmentHeads,
     maintenanceTechniciansMaster: incoming.maintenanceTechniciansMaster?.length ? incoming.maintenanceTechniciansMaster : base.maintenanceTechniciansMaster,
     maintenanceSparePartsMaster: incoming.maintenanceSparePartsMaster?.length ? incoming.maintenanceSparePartsMaster : base.maintenanceSparePartsMaster,
-    crateCapacityMaster: { ...(base.crateCapacityMaster || {}), ...(incoming.crateCapacityMaster || {}) },
-    whatsappConfig: { ...(base.whatsappConfig || {}), ...(incoming.whatsappConfig || {}) },
-    shiftConfig: { ...(base.shiftConfig || {}), ...(incoming.shiftConfig || {}) }
+    crateCapacityMaster: { ...(base.crateCapacityMaster || {}), ...(incoming.crateCapacityMaster || {}) }
   };
 
   return merged;
