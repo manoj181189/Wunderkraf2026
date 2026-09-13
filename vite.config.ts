@@ -5,7 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/Wunderkraf2026-V1/',
+    base: '/Wunderkraf2026/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
