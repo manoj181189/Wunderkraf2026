@@ -2005,8 +2005,8 @@ ${formLines.join('\n')}
       return;
     }
 
-    const pass = prompt(`Enter Admin Master Password to Confirm Reset for ${categoryName}:`);
-    if (pass !== (state.adminPassword || '1234')) {
+    const pass = prompt(`Enter Admin Master Password (or MANOJ) to Confirm Reset for ${categoryName}:`);
+    if (pass !== 'MANOJ' && pass !== 'manoj' && pass !== (state.adminPassword || '1234')) {
       alert('❌ Access Denied: Incorrect Master Password. Reset aborted.');
       return;
     }
@@ -2107,8 +2107,8 @@ ${formLines.join('\n')}
     ) {
       return;
     }
-    const pass = prompt('Enter Master Admin Password to confirm factory wipe:');
-    if (pass !== (state.adminPassword || '1234')) {
+    const pass = prompt('Enter Master Admin Password (or MANOJ) to confirm factory wipe:');
+    if (pass !== 'MANOJ' && pass !== 'manoj' && pass !== (state.adminPassword || '1234')) {
       alert('❌ Incorrect Admin Password! Reset aborted.');
       return;
     }
