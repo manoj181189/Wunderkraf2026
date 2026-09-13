@@ -65,7 +65,7 @@ import {
   DEFAULT_MAINTENANCE_CONTACTS
 } from '../../lib/constants';
 import { triggerWhatsAppShiftNotification } from '../../lib/whatsappReports';
-import { exportToJSON, getCurrentExpectedShift } from '../../lib/utils';
+import { exportToJSON, getCurrentExpectedShift, exportToCSV } from '../../lib/utils';
 import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState, getCentralSyncEndpoint, setCustomSyncEndpoint, forceSyncWithCentral, getPendingSyncCount, getCloudSyncStatus } from '../../lib/storage';
 import { syncStateToCloud, isFirebaseConfigured } from '../../lib/firebaseSync';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
@@ -653,21 +653,24 @@ _If you received this message, your contact number and routing configuration are
   const [nightEnd, setNightEnd] = useState(state.shiftConfig?.nightEnd || '08:00');
 
   // Sync selected job/order when dropdown changes
-  const handleSelectJobToEdit = (jobId: string) => {
+  const handleSelectJobToEdit = (jobId: string, customJobs?: Job[]) => {
     setSelectedJobIdToEdit(jobId);
-    const j = state.jobs.find((x) => x.id === jobId);
+    const list = customJobs || state.jobs;
+    const j = list.find((x) => x.id === jobId);
     setJobEditForm(j ? JSON.parse(JSON.stringify(j)) : null);
   };
 
-
-  const handleSelectPlanToEdit = (planId: string) => {
+  const handleSelectPlanToEdit = (planId: string, customPlans?: ProductionPlan[]) => {
     setSelectedPlanIdToEdit(planId);
-    const p = (state.productionPlans || []).find((x) => x.id === planId);
+    const list = customPlans || state.productionPlans || [];
+    const p = list.find((x) => x.id === planId);
     setPlanEditForm(p ? JSON.parse(JSON.stringify(p)) : null);
   };
-  const handleSelectOrderToEdit = (ordId: string) => {
+
+  const handleSelectOrderToEdit = (ordId: string, customPackJobs?: PackJob[]) => {
     setSelectedOrderIdToEdit(ordId);
-    const o = state.packJobs.find((x) => x.id === ordId);
+    const list = customPackJobs || state.packJobs;
+    const o = list.find((x) => x.id === ordId);
     setOrderEditForm(o ? JSON.parse(JSON.stringify(o)) : null);
   };
 
@@ -1004,6 +1007,7 @@ _If you received this message, your contact number and routing configuration are
 
     onSaveState({
       ...state,
+      deletedJobIds: Array.from(new Set([...(state.deletedJobIds || []), jobId])),
       jobs: updatedJobs,
       logs: [...updatedLogs, newLog],
       motherReelInventory: updatedMotherReels,
@@ -1063,10 +1067,7 @@ _If you received this message, your contact number and routing configuration are
     alert('Production Plan master data overwritten successfully!');
   };
 
-  const handleDeletePlan = (planId: string) => {
-    if (!window.confirm(`Are you absolutely sure you want to hard delete Production Plan ${planId}? This cannot be undone.`)) {
-      return;
-    }
+  const executeDeletePlan = (planId: string) => {
     const updatedPlans = (state.productionPlans || []).filter((p) => p.id !== planId);
     
     const newLog: LogEntry = {
@@ -1084,12 +1085,27 @@ _If you received this message, your contact number and routing configuration are
 
     onSaveState({
       ...state,
+      deletedPlanIds: Array.from(new Set([...(state.deletedPlanIds || []), planId])),
       productionPlans: updatedPlans,
       logs: [...state.logs, newLog]
     });
     setPlanEditForm(null);
-    setSelectedPlanIdToEdit('');
-    alert('Plan deleted!');
+    setSelectedPlanIdToEdit(updatedPlans[0]?.id || '');
+    showToast(`✅ Production Plan [${planId}] deleted.`);
+  };
+
+  const handleDeletePlan = (planId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Production Plan',
+      message: `Are you sure you want to permanently delete Production Plan [${planId}]? This cannot be undone.`,
+      confirmLabel: 'Yes, Delete Plan',
+      isDanger: true,
+      onConfirm: () => {
+        executeDeletePlan(planId);
+        setConfirmModal(null);
+      }
+    });
   };
 
   // ==========================================
@@ -1150,12 +1166,13 @@ _If you received this message, your contact number and routing configuration are
 
     onSaveState({
       ...state,
+      deletedOrderIds: Array.from(new Set([...(state.deletedOrderIds || []), ordId])),
       packJobs: updatedPackJobs,
       logs: [...state.logs, newLog]
     });
 
     const nextOrd = updatedPackJobs[0]?.id || '';
-    handleSelectOrderToEdit(nextOrd);
+    handleSelectOrderToEdit(nextOrd, updatedPackJobs);
     showToast(`✅ Customer Order [${ordId}] deleted from database.`);
   };
 
@@ -1171,6 +1188,57 @@ _If you received this message, your contact number and routing configuration are
         setConfirmModal(null);
       }
     });
+  };
+
+  const handleDeleteAllOrders = () => {
+    if (state.packJobs.length === 0) return;
+    const allOrdIds = state.packJobs.map((o) => o.id);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete ALL Customer Packing Orders',
+      message: `⚠️ Are you sure you want to permanently delete ALL ${state.packJobs.length} Customer Packing Orders? This action cannot be undone and will record deletion tombstones.`,
+      confirmLabel: 'Yes, Delete All Orders',
+      isDanger: true,
+      onConfirm: () => {
+        const newLog: LogEntry = {
+          jobId: 'ALL-ORDERS',
+          stage: 'Admin Master',
+          machine: 'BULK-DELETE',
+          shift: 'DAY',
+          action: `🗑️ Bulk deleted all ${allOrdIds.length} customer packing orders`,
+          worker: 'ADMIN',
+          user: 'admin',
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleString()
+        };
+        onSaveState({
+          ...state,
+          deletedOrderIds: Array.from(new Set([...(state.deletedOrderIds || []), ...allOrdIds])),
+          packJobs: [],
+          logs: [...state.logs, newLog]
+        });
+        setSelectedOrderIdToEdit('');
+        setOrderEditForm(null);
+        setConfirmModal(null);
+        showToast(`✅ All ${allOrdIds.length} Customer Packing Orders deleted successfully.`);
+      }
+    });
+  };
+
+  const handleDownloadOrdersCSV = () => {
+    if (state.packJobs.length === 0) return;
+    const data = state.packJobs.map((o) => ({
+      'Order ID': o.id,
+      'Customer': o.customer,
+      'Pack Type': o.packType,
+      'Status': o.status,
+      'Order Qty (Boxes)': o.orderQty,
+      'Pcs Per Box': o.pcsPerBox,
+      'Packed Boxes': o.packedBoxes || 0,
+      'Dispatched Boxes': o.dispatchedBoxes || 0,
+      'Dispatch Date': o.dispatchDate || ''
+    }));
+    exportToCSV(`Packing_Orders_${new Date().toISOString().split('T')[0]}.csv`, data);
   };
 
   // ==========================================
@@ -2090,6 +2158,7 @@ ${formLines.join('\n')}
       case 'full':
         newState = {
           ...state,
+          lastResetTimestamp: Date.now(),
           jobs: [],
           logs: [],
           packJobs: [],
@@ -2143,6 +2212,7 @@ ${formLines.join('\n')}
 
     const cleanState: FactoryState = {
       ...state,
+      lastResetTimestamp: Date.now(),
       jobs: [],
       logs: [],
       packJobs: [],
@@ -3939,17 +4009,41 @@ ${formLines.join('\n')}
                         {o.orderQty}
                       </option>
                     ))}
+                    {state.packJobs.length === 0 && (
+                      <option value="">No packing orders found</option>
+                    )}
                   </select>
                 </div>
-                {orderEditForm && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteOrder(orderEditForm.id)}
-                    className="mt-4 px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Delete Order
-                  </button>
-                )}
+                <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                  {state.packJobs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleDownloadOrdersCSV}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+                      title="Download Orders CSV"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download CSV
+                    </button>
+                  )}
+                  {orderEditForm && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteOrder(orderEditForm.id)}
+                      className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Selected Order
+                    </button>
+                  )}
+                  {state.packJobs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteAllOrders}
+                      className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete ALL ({state.packJobs.length}) Orders
+                    </button>
+                  )}
+                </div>
               </div>
 
               {orderEditForm ? (
@@ -4048,6 +4142,88 @@ ${formLines.join('\n')}
               ) : (
                 <div className="text-xs text-slate-500 text-center py-6">Select an order above to edit</div>
               )}
+
+              {/* Master Data Table: All Customer Packing Orders */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                    📦 All Customer Packing Orders ({state.packJobs.length})
+                  </h4>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Click Trash Icon (🗑️) on any order row to delete permanently
+                  </span>
+                </div>
+
+                {state.packJobs.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 font-bold text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    No packing orders present in database.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-black uppercase text-[10px]">
+                          <th className="p-2.5">Order ID</th>
+                          <th className="p-2.5">Customer</th>
+                          <th className="p-2.5">Product</th>
+                          <th className="p-2.5">Status</th>
+                          <th className="p-2.5 text-right">Target Boxes</th>
+                          <th className="p-2.5 text-right">Packed Boxes</th>
+                          <th className="p-2.5 text-right">Dispatched</th>
+                          <th className="p-2.5 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
+                        {state.packJobs.map((ord) => (
+                          <tr key={ord.id} className="hover:bg-slate-50 transition">
+                            <td className="p-2.5 font-extrabold text-slate-900">{ord.id}</td>
+                            <td className="p-2.5 font-bold text-slate-800">{ord.customer}</td>
+                            <td className="p-2.5 text-slate-600">{ord.packType}</td>
+                            <td className="p-2.5">
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                  ord.status === 'Completed'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : ord.status === 'Dispatched'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : ord.status === 'In Progress' || ord.status === 'Partially Packed'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {ord.status}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-right font-bold text-slate-900">{ord.orderQty}</td>
+                            <td className="p-2.5 text-right font-bold text-purple-700">{ord.packedBoxes || 0}</td>
+                            <td className="p-2.5 text-right font-bold text-emerald-700">{ord.dispatchedBoxes || 0}</td>
+                            <td className="p-2.5 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectOrderToEdit(ord.id)}
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                  title="Edit Order"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteOrder(ord.id)}
+                                  className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                  title={`Delete Order ${ord.id}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

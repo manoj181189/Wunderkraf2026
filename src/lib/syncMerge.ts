@@ -27,14 +27,28 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     return JSON.parse(JSON.stringify(base));
   }
 
+  const baseReset = base.lastResetTimestamp || 0;
+  const incReset = incoming.lastResetTimestamp || 0;
+  if (incReset > baseReset) {
+    return JSON.parse(JSON.stringify(incoming));
+  }
+  if (baseReset > incReset) {
+    return JSON.parse(JSON.stringify(base));
+  }
+
+  const deletedJobIds = Array.from(new Set([...(base.deletedJobIds || []), ...(incoming.deletedJobIds || [])]));
+  const deletedOrderIds = Array.from(new Set([...(base.deletedOrderIds || []), ...(incoming.deletedOrderIds || [])]));
+  const deletedLogIds = Array.from(new Set([...(base.deletedLogIds || []), ...(incoming.deletedLogIds || [])]));
+  const deletedPlanIds = Array.from(new Set([...(base.deletedPlanIds || []), ...(incoming.deletedPlanIds || [])]));
+
   // 1. Merge Production Jobs
   const jobMap = new Map<string, Job>();
   (base.jobs || []).forEach((j) => {
-    if (j && j.id) jobMap.set(j.id, { ...j });
+    if (j && j.id && !deletedJobIds.includes(j.id)) jobMap.set(j.id, { ...j });
   });
 
   (incoming.jobs || []).forEach((incJob) => {
-    if (!incJob || !incJob.id) return;
+    if (!incJob || !incJob.id || deletedJobIds.includes(incJob.id)) return;
     const existing = jobMap.get(incJob.id);
     if (!existing) {
       jobMap.set(incJob.id, { ...incJob });
@@ -103,12 +117,12 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   // 2. Merge Production Plans
   const planMap = new Map<string, ProductionPlan>();
   (base.productionPlans || []).forEach((p) => {
-    if (p && p.id) {
+    if (p && p.id && !deletedPlanIds.includes(p.id)) {
       planMap.set(p.id, { ...p });
     }
   });
   (incoming.productionPlans || []).forEach((p) => {
-    if (!p || !p.id) return;
+    if (!p || !p.id || deletedPlanIds.includes(p.id)) return;
     const existing = planMap.get(p.id);
     if (!existing) {
       planMap.set(p.id, { ...p });
@@ -128,10 +142,10 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   // 3. Merge Pack Jobs
   const packMap = new Map<string, PackJob>();
   (base.packJobs || []).forEach((pj) => {
-    if (pj && pj.id) packMap.set(pj.id, { ...pj });
+    if (pj && pj.id && !deletedOrderIds.includes(pj.id)) packMap.set(pj.id, { ...pj });
   });
   (incoming.packJobs || []).forEach((pj) => {
-    if (!pj || !pj.id) return;
+    if (!pj || !pj.id || deletedOrderIds.includes(pj.id)) return;
     const existing = packMap.get(pj.id);
     if (!existing) {
       packMap.set(pj.id, { ...pj });

@@ -483,6 +483,11 @@ export interface CustomerComplaint {
 }
 
 export interface FactoryState {
+  lastResetTimestamp?: number;
+  deletedJobIds?: string[];
+  deletedOrderIds?: string[];
+  deletedLogIds?: string[];
+  deletedPlanIds?: string[];
   jobs: Job[];
   logs: LogEntry[];
   packJobs: PackJob[];

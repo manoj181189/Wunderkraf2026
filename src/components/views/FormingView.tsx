@@ -158,6 +158,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
       const master = getNumberingMaster(state.seriesConfig);
       const batchId = generateFormingBatchId(job.id, job.runningBatches || [], master);
       const upstreamBatchId = job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
+      const cutCrateCap = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 8000;
       const newBatch: RunningBatch = {
         batchId,
         stage: 'Forming',
@@ -168,6 +169,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
         parentBatchId: upstreamBatchId,
         issuedQty: cratesCount,
         producedQty: 0,
+        pcsPerCrate: cutCrateCap,
         worker: operatorName.trim().toUpperCase(),
         user: 'form_user'
       };
@@ -566,15 +568,41 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const { job, batch } = activeBatchObj;
 
     // Dynamic conversion standards
-    const standardCutPcs = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 10000;
+    const cutCrateCap = batch.pcsPerCrate || job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 8000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * standardCutPcs;
+    const totalInputPieces = inputCrates * cutCrateCap;
 
     const currentOutputPieces = Math.round(cratesDone * effectiveFormPcs) + looseDone;
     const prevProducedPieces = batch.producedPieces || 0;
     const prevProducedCrates = batch.producedQty || 0;
     const cumulativeOutputPieces = prevProducedPieces + currentOutputPieces;
     const cumulativeOutputCrates = prevProducedCrates + cratesDone;
+
+    // Zero Tolerance / Hard Block Audit Check 0: Output crates > Input crates
+    if (inputCrates > 0 && cumulativeOutputCrates > inputCrates) {
+      setAuditMismatchError({
+        outputPcs: cumulativeOutputPieces,
+        outputCrates: cumulativeOutputCrates,
+        inputPcs: totalInputPieces,
+        inputCrates,
+        scrapPcs: scrapPcsVal,
+        details: `Audit Mismatch: Output crates (${cumulativeOutputCrates} crates) exceeds issued cutting input crates (${inputCrates} crates). Entry blocked.`
+      });
+      return;
+    }
+
+    // Zero Tolerance / Hard Block Audit Check 0b: Single crate output > single crate capacity / issued pcs
+    if (inputCrates === 1 && currentOutputPieces > cutCrateCap) {
+      setAuditMismatchError({
+        outputPcs: currentOutputPieces,
+        outputCrates: cratesDone,
+        inputPcs: cutCrateCap,
+        inputCrates: 1,
+        scrapPcs: scrapPcsVal,
+        details: `Audit Mismatch: Output quantity (${currentOutputPieces.toLocaleString()} pcs across ${cratesDone} crate + ${looseDone} loose) exceeds issued single crate capacity (${cutCrateCap.toLocaleString()} pcs). Entry blocked.`
+      });
+      return;
+    }
 
     // Zero Tolerance / Hard Block Audit Check 1: Output > Input
     if (cumulativeOutputPieces > totalInputPieces) {

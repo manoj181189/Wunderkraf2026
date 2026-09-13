@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowLeft, SearchCheck, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, PlusCircle, Users, Box, Search, ShieldCheck, Calendar, Clock } from 'lucide-react';
+import { ArrowLeft, SearchCheck, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, PlusCircle, Users, Box, Search, ShieldCheck, Calendar, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { FactoryState, Job, ProductType, RunningBatch } from '../../types';
-import { PRODUCTS, DEPT_WORKERS } from '../../lib/constants';
+import { PRODUCTS, DEPT_WORKERS, DEFAULT_PCS_PER_KG_MAP } from '../../lib/constants';
 import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms } from '../../lib/utils';
 import { getNumberingMaster, generateQCInspectionBatchId } from '../../lib/numberingMaster';
 import { LotGenealogyModal } from '../LotGenealogyModal';
@@ -59,6 +59,16 @@ export const QCView: React.FC<QCViewProps> = ({
   // Top-up Modal state for adding more crates to existing inspector/batch
   const [isTopupModalOpen, setIsTopupModalOpen] = useState(false);
   const [topupQtyInput, setTopupQtyInput] = useState('2');
+
+  // Audit Mismatch Error Modal state
+  const [auditMismatchError, setAuditMismatchError] = useState<{
+    outputPcs: number;
+    outputCrates: number;
+    inputPcs: number;
+    inputCrates: number;
+    scrapPcs?: number;
+    details: string;
+  } | null>(null);
 
   // Genealogy Modal state
   const [genealogyModalJob, setGenealogyModalJob] = useState<Job | null>(null);
@@ -467,7 +477,69 @@ export const QCView: React.FC<QCViewProps> = ({
     const scrap = parseFloat(scrapKg) || 0;
 
     const { job, batch } = activeBatchObj;
+    const inputCrates = batch.issuedQty || 0;
+    const totalInputPieces = inputCrates * effectiveQcPcs;
+
     const totalQcPcs = cratesDone * effectiveQcPcs + looseDone;
+    const prevProducedPieces = batch.producedPieces || 0;
+    const prevProducedCrates = batch.producedQty || 0;
+    const cumulativeOutputPieces = prevProducedPieces + totalQcPcs;
+    const cumulativeOutputCrates = prevProducedCrates + cratesDone;
+    const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[job.product] || 450;
+    const scrapPcs = Math.round(scrap * pcsPerKg);
+
+    // Hard Audit Check 1: Approved output crates > issued crates
+    if (inputCrates > 0 && cumulativeOutputCrates > inputCrates) {
+      setAuditMismatchError({
+        outputPcs: cumulativeOutputPieces,
+        outputCrates: cumulativeOutputCrates,
+        inputPcs: totalInputPieces,
+        inputCrates,
+        scrapPcs,
+        details: `Audit Block: Approved QC crates (${cumulativeOutputCrates} crates) exceeds issued formed input crates (${inputCrates} crates). Entry blocked.`
+      });
+      return;
+    }
+
+    // Hard Audit Check 2: Single crate output > crate capacity limit (e.g. 8,800 pcs when 1 crate of 8,000 pcs was issued)
+    if (inputCrates === 1 && totalQcPcs > effectiveQcPcs) {
+      setAuditMismatchError({
+        outputPcs: totalQcPcs,
+        outputCrates: cratesDone,
+        inputPcs: effectiveQcPcs,
+        inputCrates: 1,
+        scrapPcs,
+        details: `Audit Block: Approved QC quantity (${totalQcPcs.toLocaleString()} pcs across ${cratesDone} crate + ${looseDone} loose) exceeds single crate capacity limit (${effectiveQcPcs.toLocaleString()} pcs). Entry blocked.`
+      });
+      return;
+    }
+
+    // Hard Audit Check 3: Cumulative approved pieces > issued input pieces
+    if (inputCrates > 0 && cumulativeOutputPieces > totalInputPieces) {
+      setAuditMismatchError({
+        outputPcs: cumulativeOutputPieces,
+        outputCrates: cumulativeOutputCrates,
+        inputPcs: totalInputPieces,
+        inputCrates,
+        scrapPcs,
+        details: `Audit Block: Approved QC quantity (${cumulativeOutputPieces.toLocaleString()} pcs across ${cumulativeOutputCrates} crates) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+      });
+      return;
+    }
+
+    // Hard Audit Check 4: Output + Scrap > Input pieces
+    if (inputCrates > 0 && (cumulativeOutputPieces + scrapPcs) > totalInputPieces) {
+      setAuditMismatchError({
+        outputPcs: cumulativeOutputPieces,
+        outputCrates: cumulativeOutputCrates,
+        inputPcs: totalInputPieces,
+        inputCrates,
+        scrapPcs,
+        details: `Audit Block: Total QC approved quantity (${cumulativeOutputPieces.toLocaleString()} pcs) plus scrap (${scrapPcs.toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+      });
+      return;
+    }
+
     const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const updatedJobs = jobs.map((j) => {
@@ -1795,6 +1867,55 @@ export const QCView: React.FC<QCViewProps> = ({
           </div>
         </div>
       )}
+      {/* Zero Tolerance Audit Mismatch Error Modal */}
+      {auditMismatchError && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border-2 border-rose-500 animate-in fade-in duration-150">
+            <div className="flex items-center gap-3 text-rose-600 border-b border-rose-100 pb-3">
+              <AlertTriangle className="w-7 h-7 shrink-0" />
+              <div>
+                <h3 className="text-base font-black text-rose-950 uppercase tracking-wide m-0">
+                  🚫 ZERO TOLERANCE AUDIT BLOCK!
+                </h3>
+                <p className="text-xs font-bold text-rose-700 m-0">QC Quantity Overload Detected</p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-xs space-y-2 text-rose-950">
+              <div className="font-extrabold text-sm text-rose-900 leading-snug">
+                {auditMismatchError.details}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-rose-200/80 font-bold">
+                <div className="bg-white p-2.5 rounded-lg border border-rose-200">
+                  <span className="text-slate-500 block text-[10px] uppercase">Issued Input:</span>
+                  <span className="text-slate-900 font-black text-sm">
+                    {auditMismatchError.inputCrates} Crates ({auditMismatchError.inputPcs.toLocaleString()} Pcs)
+                  </span>
+                </div>
+                <div className="bg-white p-2.5 rounded-lg border border-rose-200">
+                  <span className="text-rose-600 block text-[10px] uppercase">Attempted Output:</span>
+                  <span className="text-rose-700 font-black text-sm">
+                    {auditMismatchError.outputCrates} Crates ({auditMismatchError.outputPcs.toLocaleString()} Pcs)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setAuditMismatchError(null)}
+                className="w-full sm:w-auto px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Acknowledge & Correct Quantities</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lot Genealogy Modal */}
       <LotGenealogyModal
         isOpen={!!genealogyModalJob}

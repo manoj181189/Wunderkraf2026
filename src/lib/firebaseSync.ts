@@ -83,7 +83,7 @@ export async function syncStateToCloud(state: FactoryState): Promise<boolean> {
       updatedAt: new Date().toISOString(),
       timestamp: Date.now(),
       deviceId: LOCAL_DEVICE_ID
-    }, { merge: true });
+    });
 
     return true;
   } catch (err: any) {
