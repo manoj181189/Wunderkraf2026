@@ -2088,7 +2088,21 @@ ${formLines.join('\n')}
         break;
       case 'full':
         newState = {
-          ...INITIAL_STATE,
+          ...state,
+          jobs: [],
+          logs: [],
+          packJobs: [],
+          scrapSales: [],
+          maintenanceIncidents: [],
+          machineReadyAlerts: [],
+          customerComplaints: [],
+          materialRequisitions: [],
+          archivedJobs: [],
+          archivedLogs: [],
+          glueUsageLogs: [],
+          productionPlans: [],
+          motherReelInventory: [],
+          shiftHandovers: [],
           users: state.users,
           adminPassword: state.adminPassword
         };
@@ -2096,13 +2110,13 @@ ${formLines.join('\n')}
     }
 
     onSaveState(newState);
-    alert(`✅ ${categoryName} reset successfully. Backup saved in Downloads.`);
+    alert(`✅ ${categoryName} reset successfully. All transactional entries wiped clean. Backup saved in Downloads.`);
   };
 
   const handleHardReset = () => {
     if (
       !confirm(
-        '⚠️ CRITICAL WARNING: This will completely wipe all current factory jobs, orders, and logs and restore clean default initial state!\nAre you sure you want to proceed?'
+        '⚠️ CRITICAL WARNING: This will completely wipe all current factory jobs, orders, and logs and restore clean empty factory state!\nAre you sure you want to proceed?'
       )
     ) {
       return;
@@ -2113,8 +2127,28 @@ ${formLines.join('\n')}
       return;
     }
 
-    onSaveState(INITIAL_STATE);
-    alert('✅ Factory database has been reset to clean default initial state.');
+    const cleanState: FactoryState = {
+      ...state,
+      jobs: [],
+      logs: [],
+      packJobs: [],
+      scrapSales: [],
+      maintenanceIncidents: [],
+      machineReadyAlerts: [],
+      customerComplaints: [],
+      materialRequisitions: [],
+      archivedJobs: [],
+      archivedLogs: [],
+      glueUsageLogs: [],
+      productionPlans: [],
+      motherReelInventory: [],
+      shiftHandovers: [],
+      users: state.users,
+      adminPassword: state.adminPassword
+    };
+
+    onSaveState(cleanState);
+    alert('✅ Factory database has been completely wiped clean of all entries.');
   };
 
   const AVAILABLE_PERMS = [
