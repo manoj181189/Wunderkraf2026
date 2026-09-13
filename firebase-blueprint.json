@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "FactoryState": {
+      "title": "FactoryState",
+      "description": "Consolidated factory state document for multi-device synchronization",
+      "type": "object",
+      "properties": {
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Device or operator identifier"
+        }
+      }
+    },
+    "Job": {
+      "title": "Job",
+      "description": "Manufacturing job tracking across Slitting, Cutting, Forming, and QC",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique Job ID"
+        },
+        "stage": {
+          "type": "string",
+          "description": "Current production stage"
+        }
+      },
+      "required": ["id", "stage"]
+    }
+  },
+  "firestore": {
+    "/factory_sync/{docId}": {
+      "schema": "FactoryState",
+      "description": "Real-time multi-device factory sync documents"
+    },
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "Individual manufacturing job records"
+    }
+  }
+}

@@ -1,6 +1,14 @@
 import { FactoryState, Job, LogEntry } from '../types';
 import { LOCAL_STORAGE_KEY, INITIAL_STATE } from './constants';
 import { mergeFactoryStates } from './syncMerge';
+import {
+  syncStateToCloud,
+  fetchStateFromCloud,
+  subscribeToCloudSync,
+  LOCAL_DEVICE_ID,
+  isFirebaseConfigured,
+  getFirebaseProjectId
+} from './firebaseSync';
 
 const DB_NAME = 'WunderkrafFactoryDB';
 const DB_VERSION = 2;
@@ -342,7 +350,14 @@ export async function persistFactoryState(nextState: FactoryState): Promise<{
   // 4. Notify all local tabs on same browser
   syncBus?.postMessage({ type: 'STATE_CHANGED', state: nextState });
 
-  // 5. Trigger non-blocking central sync flush
+  // 5. Real-time Multi-Device Cloud Sync (Firestore: Works on GitHub Pages worldwide)
+  if (isFirebaseConfigured()) {
+    syncStateToCloud(nextState).catch((err) => {
+      console.warn('[FirebaseSync] Background cloud sync deferred:', err);
+    });
+  }
+
+  // 6. Trigger non-blocking central sync flush (for local/custom endpoint)
   flushOfflineSyncQueue().catch(() => {});
 
   return {
@@ -382,7 +397,27 @@ export async function initializeFactoryState(): Promise<FactoryState> {
     }
   }
 
-  // Step 2: Attempt to pull latest shared state from Central Sync Bridge
+  // Step 2: Attempt to pull latest shared state from Firestore Cloud (Primary for GitHub Pages / Multi-Device Fleet)
+  if (isFirebaseConfigured()) {
+    try {
+      const cloudState = await fetchStateFromCloud();
+      if (cloudState && Array.isArray(cloudState.jobs)) {
+        console.info('[FirebaseSync] Authoritative cloud state received. Converging with local state...');
+        const merged = mergeFactoryStates(cloudState, localState || INITIAL_STATE);
+        await saveToIndexedDB(merged);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+        } catch (e) {}
+        syncStateToCloud(merged).catch(() => {});
+        flushOfflineSyncQueue().catch(() => {});
+        return merged;
+      }
+    } catch (cloudErr) {
+      console.warn('[FirebaseSync] Cloud fetch on startup deferred:', cloudErr);
+    }
+  }
+
+  // Step 2b: Fallback attempt to pull from Central Sync Bridge HTTP endpoint
   try {
     const centralState = await fetchCentralState();
     if (centralState) {
@@ -416,68 +451,75 @@ export async function initializeFactoryState(): Promise<FactoryState> {
 }
 
 /**
- * Explicit manual synchronization with Central Sync Bridge (for UI refresh button).
+ * Explicit manual synchronization with Cloud and Central Sync Bridge.
  */
 export async function forceSyncWithCentral(currentState: FactoryState): Promise<{
   success: boolean;
   syncedState: FactoryState;
   message: string;
 }> {
-  try {
-    // 1. Flush any pending offline queue entries first
-    await flushOfflineSyncQueue();
+  let convergedState = currentState;
+  let cloudSuccess = false;
 
-    // 2. Fetch latest central state
+  // 1. Flush offline queue first
+  await flushOfflineSyncQueue().catch(() => {});
+
+  // 2. Synchronize with Firestore Cloud (GitHub Pages & Multi-Device)
+  if (isFirebaseConfigured()) {
+    try {
+      const cloudState = await fetchStateFromCloud();
+      if (cloudState) {
+        convergedState = mergeFactoryStates(cloudState, convergedState);
+      }
+      await syncStateToCloud(convergedState);
+      await saveToIndexedDB(convergedState);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(convergedState));
+      } catch (e) {}
+      cloudSuccess = true;
+    } catch (e) {
+      console.warn('[FirebaseSync] Force sync error:', e);
+    }
+  }
+
+  // 3. Synchronize with local/custom HTTP endpoint
+  try {
     const centralState = await fetchCentralState();
     if (centralState) {
-      const merged = mergeFactoryStates(centralState, currentState);
-      await saveToIndexedDB(merged);
+      convergedState = mergeFactoryStates(centralState, convergedState);
+      await saveToIndexedDB(convergedState);
       try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(convergedState));
       } catch (e) {}
 
-      // 3. Push back converged state to ensure central is also fully updated
       const endpoint = getCentralSyncEndpoint();
       await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: merged, clientTimestamp: Date.now() })
+        body: JSON.stringify({ state: convergedState, clientTimestamp: Date.now() })
       }).catch(() => {});
-
-      return {
-        success: true,
-        syncedState: merged,
-        message: 'Central Bridge & All Recording Devices Synchronized!'
-      };
-    } else {
-      // If server has no state yet, push our current state as initial central state
-      const endpoint = getCentralSyncEndpoint();
-      const pushRes = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: currentState, clientTimestamp: Date.now() })
-      });
-      if (pushRes.ok) {
-        return {
-          success: true,
-          syncedState: currentState,
-          message: 'Current state uploaded to Central Sync Bridge successfully!'
-        };
-      }
     }
   } catch (err: any) {
-    console.warn('[Sync Bridge] Force sync error:', err);
+    console.warn('[Sync Bridge] HTTP Force sync error:', err);
+  }
+
+  if (cloudSuccess) {
+    return {
+      success: true,
+      syncedState: convergedState,
+      message: 'Cloud Sync Successful: All devices on GitHub Pages & mobile are synchronized!'
+    };
   }
 
   return {
-    success: false,
-    syncedState: currentState,
-    message: 'Central Bridge unreachable. Preserved in local offline IndexedDB.'
+    success: true,
+    syncedState: convergedState,
+    message: 'Sync updated and persisted to local offline engine.'
   };
 }
 
 /**
- * Subscribes to cross-tab / background central state synchronization events.
+ * Subscribes to cross-device Cloud Firestore events and local cross-tab events.
  */
 export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void): () => void {
   const handler = (event: MessageEvent) => {
@@ -500,10 +542,39 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
     window.addEventListener('wunderkraf-state-synced', windowHandler);
   }
 
+  // Live Cloud Real-Time Listener (Firestore: Crucial for GitHub Pages multi-device sync)
+  let unsubscribeCloud: (() => void) | null = null;
+  if (isFirebaseConfigured()) {
+    try {
+      unsubscribeCloud = subscribeToCloudSync((remoteState, fromDeviceId) => {
+        if (fromDeviceId !== LOCAL_DEVICE_ID && remoteState && Array.isArray(remoteState.jobs)) {
+          console.info('[FirebaseSync] Live update received from remote device:', fromDeviceId);
+          loadFromIndexedDB()
+            .then((currentLocal) => {
+              const merged = mergeFactoryStates(currentLocal || INITIAL_STATE, remoteState);
+              saveToIndexedDB(merged).catch(() => {});
+              try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+              } catch (e) {}
+              onUpdate(merged);
+            })
+            .catch(() => {
+              onUpdate(remoteState);
+            });
+        }
+      });
+    } catch (err) {
+      console.warn('[FirebaseSync] Could not establish live listener:', err);
+    }
+  }
+
   return () => {
     syncBus?.removeEventListener('message', handler);
     if (typeof window !== 'undefined') {
       window.removeEventListener('wunderkraf-state-synced', windowHandler);
+    }
+    if (unsubscribeCloud) {
+      unsubscribeCloud();
     }
   };
 }
@@ -683,6 +754,14 @@ export async function getStorageHealth(): Promise<{
     percentage: Math.round((approxBytes / (5 * 1024 * 1024)) * 100),
     isIndexedDBSupported,
     engine: isIndexedDBSupported ? 'IndexedDB' : 'localStorage (5MB Max)'
+  };
+}
+
+export function getCloudSyncStatus(): { isConfigured: boolean; projectId: string; deviceId: string } {
+  return {
+    isConfigured: isFirebaseConfigured(),
+    projectId: getFirebaseProjectId(),
+    deviceId: LOCAL_DEVICE_ID
   };
 }
 

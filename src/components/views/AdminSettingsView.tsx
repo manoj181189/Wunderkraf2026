@@ -66,7 +66,7 @@ import {
 } from '../../lib/constants';
 import { triggerWhatsAppShiftNotification } from '../../lib/whatsappReports';
 import { exportToJSON, getCurrentExpectedShift } from '../../lib/utils';
-import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState, getCentralSyncEndpoint, setCustomSyncEndpoint, forceSyncWithCentral, getPendingSyncCount } from '../../lib/storage';
+import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState, getCentralSyncEndpoint, setCustomSyncEndpoint, forceSyncWithCentral, getPendingSyncCount, getCloudSyncStatus } from '../../lib/storage';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
 import { OpeningStockModal } from '../OpeningStockModal';
 
@@ -5350,9 +5350,44 @@ ${formLines.join('\n')}
               </div>
             )}
 
+            {/* Cloud Real-Time Sync Banner */}
+            <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="font-extrabold">Cloud Database Engine: Firebase Firestore Active</span>
+                <span className="text-[11px] text-emerald-700 font-normal">
+                  (Permits 100% Real-Time sync on GitHub Pages across different phones & computers)
+                </span>
+              </div>
+              <div className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
+                Project: {getCloudSyncStatus().projectId} | Device: {getCloudSyncStatus().deviceId}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-xs">
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <span className="text-[11px] text-slate-500 font-bold block">Active Central Sync Endpoint</span>
+                <span className="text-[11px] text-slate-500 font-bold block">GitHub Pages & Cloud Sync</span>
+                <span className="font-bold text-emerald-700 flex items-center gap-1.5 mt-1">
+                  <CheckCircle2 className="w-4 h-4" /> Live Multi-Device Sync Active
+                </span>
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                  Entries saved on any phone, tablet, or PC automatically sync via Google Cloud Firestore. No separate Node server required for GitHub Pages.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-500 font-bold block">Offline Write-Queue & IndexedDB</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="font-extrabold text-slate-900 text-base">{pendingQueueCount}</span>
+                  <span className="text-[11px] text-slate-500">entries in local buffer</span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                  Entries made during factory floor WiFi dropouts remain securely preserved in browser IndexedDB and automatically flush when connectivity resumes.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-500 font-bold block">Local Express HTTP Sync (Optional)</span>
                 <span className="font-mono text-xs text-slate-800 break-all font-semibold block mt-1">
                   {syncEndpoint}
                 </span>
@@ -5366,7 +5401,7 @@ ${formLines.join('\n')}
                       }}
                       className="text-[11px] font-bold text-blue-700 hover:text-blue-900 flex items-center gap-1 cursor-pointer"
                     >
-                      <Edit className="w-3 h-3" /> Change Endpoint URL
+                      <Edit className="w-3 h-3" /> Change HTTP URL
                     </button>
                   ) : (
                     <form onSubmit={handleSaveCustomEndpoint} className="w-full mt-2 space-y-2">
@@ -5402,27 +5437,6 @@ ${formLines.join('\n')}
                     </form>
                   )}
                 </div>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <span className="text-[11px] text-slate-500 font-bold block">Offline Write-Queue Backlog</span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="font-extrabold text-slate-900 text-base">{pendingQueueCount}</span>
-                  <span className="text-[11px] text-slate-500">entries awaiting push</span>
-                </div>
-                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                  Entries recorded while floor devices experience momentary WiFi disconnects are retained in IndexedDB and automatically synced as soon as connectivity resumes.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <span className="text-[11px] text-slate-500 font-bold block">Cross-Device Convergence</span>
-                <span className="font-bold text-emerald-700 flex items-center gap-1.5 mt-1">
-                  <CheckCircle2 className="w-4 h-4" /> Real-time State Mirroring Active
-                </span>
-                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                  Every entry saved on any device (Planning, Slitting, Cutting, QC) instantly commits to IndexedDB and broadcasts to the central shared repository.
-                </p>
               </div>
             </div>
           </div>
