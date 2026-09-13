@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { FactoryState } from '../types';
 import { mergeFactoryStates } from './syncMerge';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { firebaseConfig } from './firebaseConfig';
 
 // Unique persistent device identifier to identify origin across multi-device fleet
 export const LOCAL_DEVICE_ID = (() => {
@@ -152,5 +152,32 @@ export function subscribeToCloudSync(
   } catch (err) {
     console.error('[FirebaseSync] Failed to subscribe to Firestore cloud sync:', err);
     return null;
+  }
+}
+
+/**
+ * Verifies live Firestore connectivity to ensure the cloud synchronization
+ * is functioning reliably on GitHub Pages, mobile, and desktop.
+ */
+export async function testFirestoreConnection(): Promise<{ connected: boolean; message: string }> {
+  const database = getFirebaseDb();
+  if (!database) {
+    return { connected: false, message: 'Firebase not initialized. Check firebaseConfig.ts' };
+  }
+
+  try {
+    const docRef = doc(database, 'factory_sync', 'current_state');
+    const snap = await getDoc(docRef);
+    return {
+      connected: true,
+      message: snap.exists()
+        ? `Firestore live & connected (last synced: ${snap.data()?.updatedAt || 'active'})`
+        : 'Firestore connected and ready for initial state upload'
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      message: err?.message || 'Unable to connect to Firestore'
+    };
   }
 }

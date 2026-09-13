@@ -7,7 +7,8 @@ import {
   subscribeToCloudSync,
   LOCAL_DEVICE_ID,
   isFirebaseConfigured,
-  getFirebaseProjectId
+  getFirebaseProjectId,
+  testFirestoreConnection
 } from './firebaseSync';
 
 const DB_NAME = 'WunderkrafFactoryDB';
@@ -764,6 +765,8 @@ export function getCloudSyncStatus(): { isConfigured: boolean; projectId: string
     deviceId: LOCAL_DEVICE_ID
   };
 }
+
+export { testFirestoreConnection };
 
 // Attach automatic background sync triggers in browser environment
 if (typeof window !== 'undefined') {
