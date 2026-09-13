@@ -67,6 +67,7 @@ import {
 import { triggerWhatsAppShiftNotification } from '../../lib/whatsappReports';
 import { exportToJSON, getCurrentExpectedShift } from '../../lib/utils';
 import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState, getCentralSyncEndpoint, setCustomSyncEndpoint, forceSyncWithCentral, getPendingSyncCount, getCloudSyncStatus } from '../../lib/storage';
+import { syncStateToCloud, isFirebaseConfigured } from '../../lib/firebaseSync';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
 import { OpeningStockModal } from '../OpeningStockModal';
 
@@ -2110,6 +2111,19 @@ ${formLines.join('\n')}
     }
 
     onSaveState(newState);
+    if (categoryId === 'full') {
+      if (isFirebaseConfigured()) {
+        syncStateToCloud(newState).catch(() => {});
+      }
+      try {
+        const endpoint = getCentralSyncEndpoint();
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: newState, clientTimestamp: Date.now() })
+        }).catch(() => {});
+      } catch (e) {}
+    }
     alert(`✅ ${categoryName} reset successfully. All transactional entries wiped clean. Backup saved in Downloads.`);
   };
 
@@ -2148,6 +2162,18 @@ ${formLines.join('\n')}
     };
 
     onSaveState(cleanState);
+    if (isFirebaseConfigured()) {
+      syncStateToCloud(cleanState).catch(() => {});
+    }
+    try {
+      const endpoint = getCentralSyncEndpoint();
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: cleanState, clientTimestamp: Date.now() })
+      }).catch(() => {});
+    } catch (e) {}
+
     alert('✅ Factory database has been completely wiped clean of all entries.');
   };
 
