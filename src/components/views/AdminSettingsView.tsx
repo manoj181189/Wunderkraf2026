@@ -1999,13 +1999,13 @@ ${formLines.join('\n')}
       return;
     }
 
-    const confirmText = prompt(`Safety Backup Downloaded to your device!\n\nType 'CONFIRM RESET' to wipe ${categoryName}.`);
-    if (confirmText !== 'CONFIRM RESET') {
+    const confirmText = prompt(`Safety Backup Downloaded to your device!\n\nType 'MANOJ' (or 'CONFIRM RESET') to wipe ${categoryName}.`);
+    if (confirmText !== 'CONFIRM RESET' && confirmText !== 'MANOJ' && confirmText !== 'manoj') {
       alert('❌ Reset confirmation failed. Aborted.');
       return;
     }
 
-    const pass = prompt(`Enter Admin Master Password (or MANOJ) to Confirm Reset for ${categoryName}:`);
+    const pass = prompt(`Enter Master Password (MANOJ) to Confirm Reset for ${categoryName}:`);
     if (pass !== 'MANOJ' && pass !== 'manoj' && pass !== (state.adminPassword || '1234')) {
       alert('❌ Access Denied: Incorrect Master Password. Reset aborted.');
       return;
