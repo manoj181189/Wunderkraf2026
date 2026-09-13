@@ -86,8 +86,12 @@ export async function syncStateToCloud(state: FactoryState): Promise<boolean> {
     }, { merge: true });
 
     return true;
-  } catch (err) {
-    console.error('[FirebaseSync] Error syncing state to Firestore cloud:', err);
+  } catch (err: any) {
+    if (err?.message?.includes('offline') || err?.code === 'unavailable') {
+      console.info('[FirebaseSync] Offline mode: State queued in local cache.');
+    } else {
+      console.warn('[FirebaseSync] Cloud sync notice:', err?.message || err);
+    }
     return false;
   }
 }
@@ -110,8 +114,12 @@ export async function fetchStateFromCloud(): Promise<FactoryState | null> {
       }
     }
     return null;
-  } catch (err) {
-    console.error('[FirebaseSync] Error fetching state from Firestore cloud:', err);
+  } catch (err: any) {
+    if (err?.message?.includes('offline') || err?.code === 'unavailable') {
+      console.info('[FirebaseSync] Client is offline - using local IndexedDB cache.');
+    } else {
+      console.warn('[FirebaseSync] Fetch state notice:', err?.message || err);
+    }
     return null;
   }
 }
@@ -175,9 +183,11 @@ export async function testFirestoreConnection(): Promise<{ connected: boolean; m
         : 'Firestore connected and ready for initial state upload'
     };
   } catch (err: any) {
+    const msg = err?.message || 'Unable to connect to Firestore';
+    const isOffline = msg.includes('offline') || err?.code === 'unavailable';
     return {
       connected: false,
-      message: err?.message || 'Unable to connect to Firestore'
+      message: isOffline ? 'Client is offline. Operating in resilient offline IndexedDB mode.' : msg
     };
   }
 }
