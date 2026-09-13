@@ -1,0 +1,816 @@
+src/lib/whatsappReports.ts:8:  const shiftTitle = targetShift === 'DAY' ? '☀️ DAY SHIFT (डे शिफ्ट)' : '🌙 NIGHT SHIFT (नाईट शिफ्ट)';
+src/lib/productionAudit.ts:335:    machineName: selectedMachine === 'ALL' ? 'All Factory Machines (संपूर्ण फ्लीट)' : selectedMachine,
+src/lib/productionAudit.ts:468:    operatorName: selectedOperator === 'ALL' ? 'All Operators (सभी ऑपरेटर)' : selectedOperator,
+src/components/views/SlittingView.tsx:196:        `⚠️ सिंगल एक्टिव जॉब प्रतिबंध (Single Active Job Constraint):\n\nमशीन [Slitting-1] पर पहले से जॉब [${currentRunningBatch.job.id}] (रील: ${currentRunningBatch.batch.reelNo || currentRunningBatch.job.reelNo}) रनिंग स्थिति में है!\n\nएक मशीन पर एक समय में केवल एक ही एक्टिव जॉब चल सकता है। जब तक वर्तमान जॉब को 'Hold' या 'Complete' नहीं किया जाता, तब तक उसी मशीन पर कोई भी नया जॉब स्टार्ट (Run) नहीं होना चाहिए।\n\n👉 अगर इसी जॉब में अतिरिक्त रील जोड़नी है, तो 'Add Reel to Running Job' विकल्प का उपयोग करें (बिना जॉब रोके/होल्ड किए)।`
+src/components/views/SlittingView.tsx:377:        `⚠️ सिंगल एक्टिव जॉब प्रतिबंध (Single Active Job Constraint):\n\nमशीन [Slitting-1] पर अभी जॉब [${currentRunningBatch.job.id}] रनिंग है! आप केवल इसी एक्टिव जॉब [${currentRunningBatch.job.id}] में अतिरिक्त रील Add-on कर सकते हैं।\n\nकिसी अन्य जॉब [${targetJob.id}] को रन करने के लिए पहले वर्तमान जॉब को 'Hold' या 'Complete' करें!`
+src/components/views/SlittingView.tsx:510:        `⚠️ सिंगल एक्टिव जॉब प्रतिबंध (Single Active Job Constraint):\n\nमशीन [Slitting-1] पर पहले से जॉब [${otherRunning.job.id}] (रील: ${otherRunning.batch.reelNo || otherRunning.job.reelNo}) रनिंग स्थिति में है!\n\nएक समय में केवल एक ही जॉब रन हो सकता है। कृपया पहले जॉब [${otherRunning.job.id}] को Hold या Finish करें!`
+src/components/views/SlittingView.tsx:665:        `⛔ भौतिक रूप से असंभव (Physical Impossibility Error)!\n\n` +
+src/components/views/SlittingView.tsx:666:        `• जंबो रील इनपुट वजन: ${inputWeight} KG\n` +
+src/components/views/SlittingView.tsx:667:        `• दर्ज किया गया आउटपुट वजन: ${weightKg} KG\n\n` +
+src/components/views/SlittingView.tsx:668:        `200 KG रॉ मटेरियल दिया तो 210 KG आउटपुट कैसे बन सकता है? आउटपुट वजन कभी भी इनपुट वजन (${inputWeight} KG) से अधिक नहीं हो सकता। कम हो सकता है वेस्टेज होके।\n\n` +
+src/components/views/SlittingView.tsx:669:        `कृपया कांटे का सही वजन देखकर दर्ज करें!`
+src/components/views/SlittingView.tsx:679:        `⛔ वजन असंतुलन (Weight Balance Error)!\n\n` +
+src/components/views/SlittingView.tsx:680:        `आउटपुट वजन (${weightKg} KG) + वेस्टेज स्क्रैप (${finalScrapKg} KG) = ${(weightKg + finalScrapKg).toFixed(1)} KG\n` +
+src/components/views/SlittingView.tsx:681:        `यह कुल इनपुट वजन (${inputWeight} KG) से अधिक है!\n\n` +
+src/components/views/SlittingView.tsx:682:        `कृपया सही आउटपुट और स्क्रैप वजन दर्ज करें!`
+src/components/views/SlittingView.tsx:982:                      <span>प्रिंटेड रील: {activeBatchObj.job.printedRollDesign}</span>
+src/components/views/SlittingView.tsx:1025:                    Output Slit Rolls Count (रोल संख्या):
+src/components/views/SlittingView.tsx:1052:                      Trim / Scrap (KG) (ऑटो वेस्टेज):
+src/components/views/SlittingView.tsx:1093:                      ⛔ भौतिक रूप से असंभव (Physical Impossibility Error):
+src/components/views/SlittingView.tsx:1096:                      आउटपुट रोल वजन (<b>{parsedOutWeight} KG</b>) इनपुट जंबो रील (<b>{activeInputWeight} KG</b>) से अधिक है! 200 किलो रॉ मटेरियल से 210 किलो माल नहीं निकल सकता। यह एंट्री सेव नहीं हो सकती। कृपया सही कांटा वजन दर्ज करें।
+src/components/views/SlittingView.tsx:1165:                  title={parsedOutWeight > activeInputWeight ? 'भौतिक रूप से असंभव: आउटपुट वजन इनपुट से अधिक है!' : 'Finish and record slit rolls'}
+src/components/views/SlittingView.tsx:1195:                  🔒 Single Active Job Policy (सिंगल एक्टिव जॉब प्रतिबंध):
+src/components/views/SlittingView.tsx:1206:              मशीन <b>Slitting-1</b> पर वर्तमान में जॉब <b>[{currentRunningBatch.job.id}]</b> एक्टिव रनिंग है। एक समय में केवल एक ही जॉब रन हो सकता है। नया जॉब शुरू करने से पहले वर्तमान जॉब को 'Hold' या 'Complete' करें, अथवा <b>बिना जॉब रोके</b> इसी एक्टिव जॉब में नया रील Add-on करें:
+src/components/views/SlittingView.tsx:1240:            <span>Link Production Plan (PPC) & Mother Reel (प्लान व मदर रील लिंक करें)</span>
+src/components/views/SlittingView.tsx:1315:                Allocate Mother Jumbo Reel (कच्ची रील स्टॉक):
+src/components/views/SlittingView.tsx:1361:                Roll Print Option (रील प्रिंट प्रकार):
+src/components/views/SlittingView.tsx:1376:                  Without Printed (प्लेन रील)
+src/components/views/SlittingView.tsx:1399:                  Printed Roll (प्रिंटेड रील)
+src/components/views/SlittingView.tsx:1408:                    Printed Brand / Design (प्रिंटेड डिज़ाइन नाम):
+src/components/views/SlittingView.tsx:1420:                    Display Icon (आइकॉन):
+src/components/views/SlittingView.tsx:1584:                Reel Number (रील नंबर):
+src/components/views/SlittingView.tsx:1602:              placeholder="उदा. RL-ITC-1024 या बारकोड"
+src/components/views/SlittingView.tsx:1609:              GSM (जीएसएम थिकनेस):
+src/components/views/SlittingView.tsx:1637:              Reel Remarks / Lot Note (रिमार्क):
+src/components/views/SlittingView.tsx:1643:              placeholder="उदा. Special Export Lot #992"
+src/components/views/SlittingView.tsx:1660:                ? `मशीन Slitting-1 पर जॉब [${currentRunningBatch.job.id}] रनिंग है। एक समय में केवल एक जॉब रन हो सकता है।`
+src/components/views/SlittingView.tsx:1701:              <span>Slitting Reels & Traceability Register (स्लिटिंग रील व जॉब आईडी रजिस्टर)</span>
+src/components/views/SlittingView.tsx:1704:              हर जॉब आईडी में प्रयुक्त रील नंबर, जीएसएम व आगे की स्टेज की ट्रेसेबिलिटी स्थिति
+src/components/views/SlittingView.tsx:1724:                <th className="p-2.5 text-indigo-900">Date (तारीख)</th>
+src/components/views/SlittingView.tsx:1725:                <th className="p-2.5 text-blue-900">Reel No. (रील नंबर)</th>
+src/components/views/SlittingView.tsx:1726:                <th className="p-2.5 text-amber-900">GSM (जीएसएम)</th>
+src/components/views/SlittingView.tsx:1733:                <th className="p-2.5 text-center">Traceability (ट्रेसेबिलिटी)</th>
+src/components/views/SlittingView.tsx:1844:                          title="ट्रेसेबिलिटी में देखें कि यह रील कहाँ-कहाँ पहुँची"
+src/components/views/SlittingView.tsx:1898:                  ⚠️ <b>सिंगल एक्टिव जॉब सूचना:</b> मशीन Slitting-1 पर अभी जॉब <b>{currentRunningBatch.job.id}</b> रनिंग स्थिति में है। जब तक वह Hold या Complete नहीं होता, तब तक केवल उसी एक्टिव जॉब <b>{currentRunningBatch.job.id}</b> में नई रील/एंट्री ऐड-ऑन की जा सकती है।
+src/components/views/SlittingView.tsx:1941:                      💡 यदि आप अलग GSM (उदा. 300 GSM) की रील जोड़ रहे हैं, तो नीचे GSM फील्ड में नया GSM लिखें। जॉब कार्ड में दोनों GSM अलग-अलग सुरक्षित रहेंगे और आगे कटिंग व फॉर्मिंग में दिखेंगे!
+src/components/views/QCView.tsx:151:        `✅ क्रेट्स टॉप-अप सफल (Crate Top-up Successful)!\n\n` +
+src/components/views/QCView.tsx:152:        `• इंस्पेक्टर: ${cleanInspector}\n` +
+src/components/views/QCView.tsx:153:        `• जॉब: ${job.id} (${job.product})\n` +
+src/components/views/QCView.tsx:154:        `• पहले थे: ${prevQty} क्रेट्स\n` +
+src/components/views/QCView.tsx:155:        `• नए दिए: +${cratesCount} क्रेट्स\n` +
+src/components/views/QCView.tsx:156:        `• कुल हाथ में क्रेट्स (Total in Hand): ${newTotalQty} क्रेट्स\n\n` +
+src/components/views/QCView.tsx:157:        `सेम प्रोडक्ट होने के कारण अलग से डुप्लीकेट एंट्री नहीं बनी है, उसी रिकॉर्ड में संख्या अपडेट हो गई है।`
+src/components/views/QCView.tsx:330:      `✅ क्रेट्स टॉप-अप सफल (Crate Top-up Successful)!\n\n` +
+src/components/views/QCView.tsx:331:      `• इंस्पेक्टर: ${batch.worker}\n` +
+src/components/views/QCView.tsx:332:      `• जॉब: ${job.id} (${job.product})\n` +
+src/components/views/QCView.tsx:333:      `• जोड़े गए: +${addCount} क्रेट्स\n` +
+src/components/views/QCView.tsx:334:      `• अब कुल हाथ में क्रेट्स (Total in Hand): ${newTotal} क्रेट्स\n\n` +
+src/components/views/QCView.tsx:335:      `अलग से नई एंट्री नहीं बनी है, रिकॉर्ड में कुल क्रेट्स ${newTotal} अपडेट हो गए हैं।`
+src/components/views/QCView.tsx:572:            Active QC Inspection Lots (निरीक्षण लॉट्स):
+src/components/views/QCView.tsx:635:      {/* INSPECTOR / WORKER CRATE BALANCE TRACKING (रमेश भाई व इंस्पेक्टर्स के पास क्रेट्स का हिसाब) */}
+src/components/views/QCView.tsx:642:              Inspector Crates Live Balance (इंस्पेक्टर के पास कितने क्रेट्स हैं):
+src/components/views/QCView.tsx:645:              Same Job = Merged Balance (अलग एंट्री नहीं बढ़ती)
+src/components/views/QCView.tsx:653:                  <th className="px-3 py-2">Inspector (आदमी का नाम)</th>
+src/components/views/QCView.tsx:654:                  <th className="px-3 py-2">Date & Shift (तारीख व शिफ्ट)</th>
+src/components/views/QCView.tsx:656:                  <th className="px-3 py-2">Current in Hand (हाथ में क्रेट्स)</th>
+src/components/views/QCView.tsx:658:                  <th className="px-3 py-2 text-right">Quick Top-up (+ और क्रेट्स दें)</th>
+src/components/views/QCView.tsx:789:                {effectiveQcPcs.toLocaleString()} Pieces / Crate (नंग प्रति क्रेट)
+src/components/views/QCView.tsx:800:                  = {((parseInt(outputApprovedCrates, 10) || 0) * effectiveQcPcs + (parseInt(loosePiecesInput, 10) || 0)).toLocaleString()} Finished Pieces (कुल पास नंग)
+src/components/views/QCView.tsx:811:                  Passed / Approved QC Crates Output (पास क्रेट्स):
+src/components/views/QCView.tsx:823:                  Loose Passed Pcs (अतिरिक्त खुले पास नंग):
+src/components/views/QCView.tsx:835:                  Rejected Scrap (KG) (रिजेक्ट स्क्रैप वजन):
+src/components/views/QCView.tsx:1007:                Enter Formed Crates to Inspect (इश्यू क्रेट्स) *:
+src/components/views/QCView.tsx:1071:              <span>QC Reels & Traceability Register (क्यूसी रील व जॉब आईडी रजिस्टर)</span>
+src/components/views/QCView.tsx:1074:              हर जॉब आईडी में प्रयुक्त रील नंबर, जीएसएम व आगे की स्टेज की ट्रेसेबिलिटी स्थिति
+src/components/views/QCView.tsx:1094:                <th className="p-3 text-indigo-900">Date (तारीख)</th>
+src/components/views/QCView.tsx:1095:                <th className="p-3 text-blue-900">Reel No. (रील नंबर)</th>
+src/components/views/QCView.tsx:1096:                <th className="p-3 text-amber-900">GSM (जीएसएम)</th>
+src/components/views/QCView.tsx:1103:                <th className="p-3 text-center">Traceability (ट्रेसेबिलिटी)</th>
+src/components/views/QCView.tsx:1236:                          title="ट्रेसेबिलिटी में देखें कि यह रील/लॉट कहाँ-कहाँ पहुँची"
+src/components/views/QCView.tsx:1404:                <h3 className="text-sm font-extrabold text-slate-900 m-0">Top-up Crates to Inspector (और क्रेट्स दें)</h3>
+src/components/views/QCView.tsx:1420:                Enter Additional Crates to Give (अतिरिक्त क्रेट्स संख्या):
+src/components/views/AnalyticsView.tsx:268:              मशीन व ऑपरेटर उत्पादन रिपोर्ट (8-दिन मशीन ऑडिट, 5-दिन/1-माह/6-माह ऑपरेटर परफ़ॉर्मेंस)
+src/components/views/AnalyticsView.tsx:305:          <span>🏭 Machine Performance (मशीन 8-दिन ऑडिट)</span>
+src/components/views/AnalyticsView.tsx:317:          <span>👷 Operator Productivity (ऑपरेटर 5-दिन / 1-माह / 6-माह)</span>
+src/components/views/AnalyticsView.tsx:329:          <span>🏆 Operator Leaderboard (रैंकिंग तालिका)</span>
+src/components/views/AnalyticsView.tsx:341:          <span>♻️ Scrap Recycling Desk (स्क्रैप रीसाइक्लिंग)</span>
+src/components/views/AnalyticsView.tsx:368:                  <Filter className="w-4 h-4 text-blue-700" /> Select Machine (मशीन चुनें):
+src/components/views/AnalyticsView.tsx:375:                  <option value="ALL">All Machines (संपूर्ण फैक्ट्री मशीनें)</option>
+src/components/views/AnalyticsView.tsx:408:                  ⚡ 8 Days Output (8 दिन का प्रोडक्शन)
+src/components/views/AnalyticsView.tsx:515:                Total Pieces Produced (कुल नंग)
+src/components/views/AnalyticsView.tsx:528:                Total Crates / Units (कुल कैरेट)
+src/components/views/AnalyticsView.tsx:541:                Machine Scrap & Defects (स्क्रैप)
+src/components/views/AnalyticsView.tsx:784:                  <UserCheck className="w-4 h-4 text-violet-700" /> Select Operator (ऑपरेटर चुनें):
+src/components/views/AnalyticsView.tsx:791:                  <option value="ALL">All Operators (सभी ऑपरेटर)</option>
+src/components/views/AnalyticsView.tsx:827:                  ⚡ 5 Days (5 दिन का उत्पादन)
+src/components/views/AnalyticsView.tsx:850:                  📅 1 Month (महीने दिन)
+src/components/views/AnalyticsView.tsx:862:                  📅 6 Months (छह महीने)
+src/components/views/AnalyticsView.tsx:914:                Total Operator Output (कुल उत्पादन)
+src/components/views/AnalyticsView.tsx:1134:                <span>Operator Productivity & Yield Leaderboard (ऑपरेटर रैंकिंग व उत्पादकता स्कोर)</span>
+src/components/views/AnalyticsView.tsx:1233:                Paper Scrap Management & Recycling Sales (स्क्रैप रीसाइक्लिंग व बिक्री)
+src/components/views/StockMatrixView.tsx:100:          <span>मुख्य मेनू (Back to Menu)</span>
+src/components/views/StockMatrixView.tsx:110:                लाइव फैक्ट्री स्टॉक मैट्रिक्स (Live Factory Stock Matrix)
+src/components/views/StockMatrixView.tsx:113:                स्टेज-वाइज व जॉब-वाइज उपलब्ध माल की सटीक सूची
+src/components/views/StockMatrixView.tsx:126:              <span>⚡ Quick Opening Stock (ओपनिंग स्टॉक दर्ज करें)</span>
+src/components/views/StockMatrixView.tsx:154:          <span className="text-[10px] text-indigo-700 font-medium">स्लिटिंग रोल स्टॉक</span>
+src/components/views/StockMatrixView.tsx:165:          <span className="text-[10px] text-purple-700 font-medium">कटिंग ब्लैंक क्रेट्स</span>
+src/components/views/StockMatrixView.tsx:176:          <span className="text-[10px] text-amber-700 font-medium">फॉर्मिंग प्रेस क्रेट्स</span>
+src/components/views/StockMatrixView.tsx:187:          <span className="text-[10px] text-emerald-700 font-medium">पैकिंग हेतु तैयार क्रेट्स</span>
+src/components/views/StockMatrixView.tsx:198:          <span className="text-[10px] text-blue-700 font-medium">डिस्पैच रेडी माल</span>
+src/components/views/StockMatrixView.tsx:207:            <b>निर्देश:</b> किसी भी संख्या/बटन पर क्लिक करें — उस प्रोडक्ट के <b>जॉब नंबर (Job ID)</b>,{' '}
+src/components/views/StockMatrixView.tsx:208:            <b>मदर रील नंबर</b>, <b>GSM</b> और <b>पेपर मिल</b> के अनुसार कितनी-कितनी मात्रा स्टॉक में
+src/components/views/StockMatrixView.tsx:209:            है, पूरी हिस्ट्री व स्पेसिफिकेशन तालिका खुल जाएगी।
+src/components/views/StockMatrixView.tsx:220:            placeholder="Search Product (उत्पाद खोजें)..."
+src/components/views/StockMatrixView.tsx:430:                Total Factory Inventory (कुल स्टॉक):
+src/components/views/StockMatrixView.tsx:457:            <b>Real-time Material Balance:</b> हर स्टेज पर क्रेट्स व रोल्स का हिसाब अलग-अलग जॉब लॉट्स
+src/components/views/StockMatrixView.tsx:458:            में सुरक्षित और ट्रेस करने योग्य है।
+src/components/views/PlanningDeskView.tsx:319:              <span>Create Scheduled Plan (नया प्लान)</span>
+src/components/views/PlanningDeskView.tsx:401:                Plan vs Actual Tracking Matrix (योजना बनाम वास्तविक तुलना)
+src/components/views/PlanningDeskView.tsx:606:                Warehouse Mother Reel Inventory (कच्ची जंबो रील स्टॉक)
+src/components/views/PlanningDeskView.tsx:782:                    Require Printed Roll (प्रिंटेड रील की आवश्यकता है)
+src/components/views/PurchaseView.tsx:129:      alert('कृपया वेंडर का नाम दर्ज करें (Vendor name required)');
+src/components/views/PurchaseView.tsx:170:  // Open Goods Received Modal (जब माल आ गया है)
+src/components/views/PurchaseView.tsx:179:  // Submit Goods Received (माल आ गया है)
+src/components/views/PurchaseView.tsx:221:      `🎉 माल प्राप्ति दर्ज! [${receiveModalReq.id}] ${receiveModalReq.itemName} का स्टेटस अब 'RECEIVED' है और संबंधित डिपार्टमेंट को सूचना मिल गई है!`
+src/components/views/PurchaseView.tsx:229:      `नमस्ते ${req.requestedBy},\n` +
+src/components/views/PurchaseView.tsx:230:      `आपके डिपार्टमेंट (${req.department}) द्वारा मांगा गया मटेरियल फैक्ट्री स्टोर में आ चुका है:\n\n` +
+src/components/views/PurchaseView.tsx:231:      `📦 *मटेरियल:* ${req.itemName}\n` +
+src/components/views/PurchaseView.tsx:232:      `🔢 *मात्रा:* ${req.receivedQty || req.quantity} ${req.unit}\n` +
+src/components/views/PurchaseView.tsx:233:      `🔖 *इंडेन्ट ID:* ${req.id}\n` +
+src/components/views/PurchaseView.tsx:234:      `📍 *स्टोर लोकेशन:* ${req.storageLocationOrBin || 'Main Factory Store'}\n` +
+src/components/views/PurchaseView.tsx:235:      `📄 *GRN / बिल नं:* ${req.grnOrBillNo || 'N/A'}\n` +
+src/components/views/PurchaseView.tsx:236:      `📅 *प्राप्ति तिथि:* ${req.receivedDate || 'Today'}\n\n` +
+src/components/views/PurchaseView.tsx:237:      `कृपया फैक्ट्री स्टोर से सामग्री प्राप्त कर अपने डेस्क पर 'Acknowledge Receipt' मार्क करें।\n` +
+src/components/views/PurchaseView.tsx:361:            placeholder="मटेरियल, इंडेन्ट ID, वेंडर, PO नंबर या डिपार्टमेंट से खोजें..."
+src/components/views/PurchaseView.tsx:382:            <option value="ALL">सभी डिपार्टमेंट (All Depts)</option>
+src/components/views/PurchaseView.tsx:397:            <option value="ALL">सभी स्टेटस (All Status)</option>
+src/components/views/PurchaseView.tsx:398:            <option value="PENDING">⏳ Pending Review (पेंडिंग)</option>
+src/components/views/PurchaseView.tsx:399:            <option value="PO_ISSUED">🚚 PO Issued / Ordered (ऑर्डर किया)</option>
+src/components/views/PurchaseView.tsx:400:            <option value="RECEIVED">✅ Arrived at Store (माल आ गया)</option>
+src/components/views/PurchaseView.tsx:409:            <option value="ALL">सभी प्राथमिकताएं</option>
+src/components/views/PurchaseView.tsx:420:          कोई रिक्विजिशन नहीं मिला। आप "+ नया इंडेन्ट भरें" से नई मांग दर्ज कर सकते हैं।
+src/components/views/PurchaseView.tsx:451:                      दिनांक: {req.requestedDate} {req.requestedTime || ''}
+src/components/views/PurchaseView.tsx:466:                        <span>माल फैक्ट्री स्टोर में आ गया है (Received)</span>
+src/components/views/PurchaseView.tsx:472:                        <span>PO जारी / वेंडर को ऑर्डर भेजा</span>
+src/components/views/PurchaseView.tsx:478:                        <span>जांच में लंबित (Awaiting PO)</span>
+src/components/views/PurchaseView.tsx:489:                      मटेरियल / स्पेयर पार्ट
+src/components/views/PurchaseView.tsx:500:                      कैटेगरी: <span className="font-semibold text-slate-800">{req.itemCategory}</span>
+src/components/views/PurchaseView.tsx:503:                      मकसद: <span className="font-semibold text-slate-800">{req.machineOrPurpose || 'General'}</span>
+src/components/views/PurchaseView.tsx:506:                      मांगकर्ता: <span className="font-semibold text-slate-800">{req.requestedBy}</span>
+src/components/views/PurchaseView.tsx:518:                      <span className="text-xs text-slate-500 font-bold">मांगी गई मात्रा:</span>
+src/components/views/PurchaseView.tsx:526:                        सप्लायर/वेंडर: <strong>{req.vendorName}</strong>
+src/components/views/PurchaseView.tsx:532:                        PO नंबर: <strong className="font-mono text-blue-700">{req.poNumber}</strong>
+src/components/views/PurchaseView.tsx:538:                        अनुमानित डिलीवरी: <strong>{req.expectedDeliveryDate}</strong>
+src/components/views/PurchaseView.tsx:544:                        लागत: <strong>₹{req.estimatedCost.toLocaleString()}</strong>
+src/components/views/PurchaseView.tsx:550:                        परचेस नोट: {req.purchaseNotes}
+src/components/views/PurchaseView.tsx:561:                          <span>माल स्टोर में उपलब्ध है</span>
+src/components/views/PurchaseView.tsx:564:                          लोकेशन: <strong>{req.storageLocationOrBin || 'Main Factory Store'}</strong>
+src/components/views/PurchaseView.tsx:567:                          प्राप्ति: <strong>{req.receivedDate}</strong> {req.receivedTime || ''} | मात्रा: <strong>{req.receivedQty || req.quantity} {req.unit}</strong>
+src/components/views/PurchaseView.tsx:570:                          GRN / इनवॉइस: <strong>{req.grnOrBillNo || 'N/A'}</strong> | जमाकर्ता: <strong>{req.receivedBy}</strong>
+src/components/views/PurchaseView.tsx:576:                              <span>डिपार्टमेंट द्वारा प्राप्त किया गया</span>
+src/components/views/PurchaseView.tsx:580:                              ⏳ फ्लोर द्वारा उठाना बाकी
+src/components/views/PurchaseView.tsx:587:                        परचेस कार्यवाही:
+src/components/views/PurchaseView.tsx:600:                          <span>{isOrdered ? 'PO अपडेट करें' : 'PO / ऑर्डर जारी करें'}</span>
+src/components/views/PurchaseView.tsx:611:                          <span>माल आ गया है (Mark Received)</span>
+src/components/views/PurchaseView.tsx:620:                          <span>WhatsApp सूचना भेजें</span>
+src/components/views/PurchaseView.tsx:638:                <h3 className="text-base font-bold">वेंडर को PO / ऑर्डर जारी करें</h3>
+src/components/views/PurchaseView.tsx:654:                  वेंडर / सप्लायर का नाम (Vendor Name)*
+src/components/views/PurchaseView.tsx:658:                  placeholder="उदा. Shreeji Electricals, Apex Packaging, JK Paper, आदि"
+src/components/views/PurchaseView.tsx:669:                    PO नंबर (Purchase Order No)*
+src/components/views/PurchaseView.tsx:682:                    अनुमानित डिलीवरी डेट (Expected Date)*
+src/components/views/PurchaseView.tsx:697:                    अनुमानित कुल लागत (Est Cost ₹)
+src/components/views/PurchaseView.tsx:710:                    परचेस रिमार्क / डिलीवरी शर्तें
+src/components/views/PurchaseView.tsx:716:                    placeholder="उदा. अर्जेंट डिलीवरी, कोरियर द्वारा"
+src/components/views/PurchaseView.tsx:728:                  रद्द करें
+src/components/views/PurchaseView.tsx:734:                  ऑर्डर व PO सबमिट करें (Confirm PO)
+src/components/views/PurchaseView.tsx:742:      {/* Material Received / GRN Modal (User requested: जब माल आ जाए तो सबमिट कर देगा तो सबको अपडेट मिल जाए) */}
+src/components/views/PurchaseView.tsx:750:                  <h3 className="text-base font-bold">माल प्राप्ति दर्ज करें (Goods Received Note - GRN)</h3>
+src/components/views/PurchaseView.tsx:753:                  यह सबमिट करते ही {receiveModalReq.department} डेस्क को तुरंत सूचना मिल जाएगी कि मटेरियल स्टोर में आ गया है!
+src/components/views/PurchaseView.tsx:768:                  इंडेन्ट: <strong>{receiveModalReq.id}</strong> | डिपार्टमेंट: <strong>{receiveModalReq.department}</strong> | मांगकर्ता: <strong>{receiveModalReq.requestedBy}</strong>
+src/components/views/PurchaseView.tsx:775:                    प्राप्त मात्रा (Received Qty)*
+src/components/views/PurchaseView.tsx:792:                    GRN नं / सप्लायर बिल नं (Bill No)
+src/components/views/PurchaseView.tsx:798:                    placeholder="उदा. GRN-2026-095"
+src/components/views/PurchaseView.tsx:806:                  स्टोर लोकेशन / बिन रैक (Storage Location / Rack Bin)*
+src/components/views/PurchaseView.tsx:810:                  placeholder="उदा. Maintenance Tool Crib Rack B2, Main Chemical Store Shelf 3"
+src/components/views/PurchaseView.tsx:820:                  सामग्री प्राप्तकर्ता (Received By Store Incharge)*
+src/components/views/PurchaseView.tsx:837:                  रद्द करें
+src/components/views/PurchaseView.tsx:843:                  ✓ माल आ गया है - सबमिट करें (Confirm Arrival)
+src/components/views/MaintenanceView.tsx:199:      alert('⚠️ कृपया स्पेयर पार्ट का नाम दर्ज करें!');
+src/components/views/MaintenanceView.tsx:282:    alert(`✅ ${technicianName} ने ${attendingModalIncident.machine} पर काम शुरू कर दिया है।\nस्थिति: "यह आदमी यहां पर काम कर रहा है" सक्रिय हो गई है।`);
+src/components/views/MaintenanceView.tsx:1596:                          <span>Attend / Start Repair (अटेंड करें)</span>
+src/components/views/MaintenanceView.tsx:1624:                        {/* PROMINENT ATTENDING TECHNICIAN BANNER: यह आदमी यहां पर काम कर रहा है */}
+src/components/views/MaintenanceView.tsx:1636:                                  <span>👨‍🔧 यह आदमी यहां पर काम कर रहा है (Active Attending):</span>
+src/components/views/MaintenanceView.tsx:1642:                                  <span>काम शुरू: {incident.attendingStartedAt ? new Date(incident.attendingStartedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently'}</span>
+src/components/views/MaintenanceView.tsx:1644:                                    <span>• {Math.max(1, Math.round((Date.now() - new Date(incident.attendingStartedAt).getTime()) / 60000))} मिनट से कार्य चालू</span>
+src/components/views/MaintenanceView.tsx:1655:                              <span>बदलें (Change Person)</span>
+src/components/views/MaintenanceView.tsx:1699:                              <span>Spare Parts Replaced (स्पेयर पार्ट रिप्लेसमेंट):</span>
+src/components/views/MaintenanceView.tsx:1708:                                <span>+ नया कस्टम पार्ट लिखें</span>
+src/components/views/MaintenanceView.tsx:1756:                              <span className="text-[11px] font-bold text-amber-950">नया स्पेयर जोड़ें:</span>
+src/components/views/MaintenanceView.tsx:1762:                                  title="नया स्पेयर पार्ट दर्ज करने के लिए पॉपअप खोलें"
+src/components/views/MaintenanceView.tsx:1765:                                  <span>कस्टम पार्ट पॉप-अप</span>
+src/components/views/MaintenanceView.tsx:1776:                                  {isDirectPartInput ? '📋 लिस्ट से चुनें' : '✍️ सीधे नाम टाइप करें'}
+src/components/views/MaintenanceView.tsx:1789:                                    placeholder="पार्ट का नाम टाइप करें..."
+src/components/views/MaintenanceView.tsx:1804:                                    <option value="CUSTOM_PART_POPUP">➕ नया कस्टम पार्ट लिखें (Custom Part Popup)...</option>
+src/components/views/MaintenanceView.tsx:1851:                                  <span>Breakdown Timing & Duration Tracking (स्टार्ट / स्टॉप समय):</span>
+src/components/views/MaintenanceView.tsx:1862:                                    Breakdown Start Time (शुरुआत का समय):
+src/components/views/MaintenanceView.tsx:1876:                                      Breakdown Stop Time (समाप्ति का समय):
+src/components/views/MaintenanceView.tsx:1910:                                  <span>Downtime Difference (दोनों समय का अंतर):</span>
+src/components/views/MaintenanceView.tsx:2014:                    <th className="py-2.5 px-3">Breakdown Start (स्टार्ट समय)</th>
+src/components/views/MaintenanceView.tsx:2015:                    <th className="py-2.5 px-3">Breakdown Stop (स्टॉप समय)</th>
+src/components/views/MaintenanceView.tsx:2016:                    <th className="py-2.5 px-3">Difference / कुल अंतर</th>
+src/components/views/MaintenanceView.tsx:2289:                  <span>Breakdown Start Date (तारीख):</span>
+src/components/views/MaintenanceView.tsx:2302:                    <span>Breakdown Start Time (समय):</span>
+src/components/views/MaintenanceAuditView.tsx:300:              रॉ मटेरियल से लेकर ग्राहक के बॉक्स तक 360° ट्रेसेबिलिटी, कंप्लेंट व रिपोर्ट
+src/components/views/MaintenanceAuditView.tsx:327:          <span>360° Root-to-Box Traceability (ट्रेसेबिलिटी जांच)</span>
+src/components/views/MaintenanceAuditView.tsx:351:          <span>Single Batch Report & Certificate (बैच रिपोर्ट)</span>
+src/components/views/MaintenanceAuditView.tsx:373:              🔎 Search Delivered Box / Customer / Invoice / Job / Lot (रॉ मटेरियल से बॉक्स तक सर्च करें):
+src/components/views/MaintenanceAuditView.tsx:496:                <span>Log Customer Complaint (कंप्लेंट दर्ज करें)</span>
+src/components/views/MaintenanceAuditView.tsx:573:                <span>Complete Backward & Forward Traceability Chain (कस्टमर डिलीवरी से मूल रॉ मटेरियल तक)</span>
+src/components/views/MaintenanceAuditView.tsx:589:                      Step 7: Customer Delivery & Gatepass (ग्राहक तक डिलीवरी)
+src/components/views/MaintenanceAuditView.tsx:632:                      Step 6: Box Packing & Assembly (पैकिंग व सीलिंग)
+src/components/views/MaintenanceAuditView.tsx:675:                      Step 5: QC Inspection & Defect Screening (क्वालिटी इंस्पेक्शन)
+src/components/views/MaintenanceAuditView.tsx:712:                      Step 4: Forming & Thermal Pressing (फॉर्मिंग मशीन)
+src/components/views/MaintenanceAuditView.tsx:749:                      Step 3: Cutting & Die-Punching (कटिंग मशीन)
+src/components/views/MaintenanceAuditView.tsx:786:                      Step 2: Slitting & Reel Conversion (स्लिटिंग मशीन)
+src/components/views/MaintenanceAuditView.tsx:827:                          Step 1: Origin Raw Material (मूल रॉ मटेरियल पेपर - Mother Jumbo Reels)
+src/components/views/MaintenanceAuditView.tsx:911:                ग्राहक की शिकायत दर्ज करें, रूट कॉज (RCA) पहचानें व समाधान करें
+src/components/views/MaintenanceAuditView.tsx:1026:                किसी भी एक बैच का सम्पूर्ण रिपोर्ट जनरेट करें, PDF प्रिंट करें या CSV में डाउनलोड करें
+src/components/views/MaintenanceAuditView.tsx:1109:                ऑपरेटर व मशीन के सभी टाइमस्टैम्प लॉग्स
+src/components/views/MaintenanceAuditView.tsx:1283:                <label className="font-bold text-amber-900 block mb-1">Root Cause Analysis (RCA - क्यों हुआ?)</label>
+src/components/views/MaintenanceAuditView.tsx:1294:                <label className="font-bold text-emerald-900 block mb-1">Corrective & Preventive Action (CAPA - सुधारात्मक कदम)</label>
+src/components/views/ExecutiveManpowerView.tsx:294:                    hindi: 'योजना',
+src/components/views/ExecutiveManpowerView.tsx:303:                    hindi: 'स्लिटिंग',
+src/components/views/ExecutiveManpowerView.tsx:312:                    hindi: 'कटिंग',
+src/components/views/ExecutiveManpowerView.tsx:321:                    hindi: 'फॉर्मिंग',
+src/components/views/ExecutiveManpowerView.tsx:330:                    hindi: 'क्वालिटी जांच',
+src/components/views/ExecutiveManpowerView.tsx:339:                    hindi: 'डिस्पैच',
+src/components/views/ExecutiveManpowerView.tsx:460:                  Live Machine Crew Allocations (मशीन व कामगार स्थिति)
+src/components/views/ExecutiveManpowerView.tsx:563:                  Operator Efficiency (कामगार दक्षता)
+src/components/views/ExecutiveManpowerView.tsx:620:                  Shift Handover summaries (शिफ्ट हैंडओवर)
+src/components/views/ExecutiveManpowerView.tsx:676:                  Raw Material & Wastage analytics (सामग्री विश्लेषण)
+src/components/views/CuttingView.tsx:135:  // "कटिंग के अंदर एक चीज़ और जोड़ना है जो उसका कटिंग का स्क्रैप निकलेगा। जो कटिंग में से जो एक्स्ट्रा मटेरियल जो स्क्रैप निकलता है, तो स्क्रैप कहां डालना है? वो पीसेस में से माइनस नहीं होगा। जो रिजेक्ट पीसेस होगा, वही माइनस होगा। दोनों मिक्स ना हो जाए।"
+src/components/views/CuttingView.tsx:528:      `✅ कटिंग शिफ्ट हैंडओवर सफलतापूर्वक संपन्न!\n\n` +
+src/components/views/CuttingView.tsx:529:      `निवर्तमान ऑपरेटर [${batch.worker}] के नाम सुरक्षित रिकॉर्ड:\n` +
+src/components/views/CuttingView.tsx:530:      `• पूर्ण क्रेट्स: ${handoverData.sliceProducedQty} Crates\n` +
+src/components/views/CuttingView.tsx:531:      `• लूज पीस: ${handoverData.sliceLoosePieces || 0} Pcs\n` +
+src/components/views/CuttingView.tsx:532:      `• कुल तैयार ब्लैंक्स: ${producedPiecesSlice.toLocaleString()} Pieces\n` +
+src/components/views/CuttingView.tsx:533:      `• रिजेक्शन स्क्रैप: ${handoverData.sliceScrapQty} KG\n\n` +
+src/components/views/CuttingView.tsx:534:      `मशीन [${selectedMachine}] का चालू कार्यभार ऑपरेटर ${handoverData.relievedByOperator} (${handoverData.nextShift} Shift)${nextHelpers.length > 0 ? ` + ${nextHelpers.length} Helpers (${nextHelpers.join(', ')})` : ''} को बिना काम रोके सौंप दिया गया है।`
+src/components/views/CuttingView.tsx:664:    // "कटिंग में से जो एक्स्ट्रा मटेरियल जो स्क्रैप निकलता है, तो स्क्रैप कहां डालना है? वो पीसेस में से माइनस नहीं होगा। जो रिजेक्ट पीसेस होगा, वही माइनस होगा। दोनों मिक्स ना हो जाए।"
+src/components/views/CuttingView.tsx:819:      action: `⏹️ Finished Cutting Batch ${batch.batchId} (${cratesDone} Crates + ${looseDone} Loose = ${grossCutPcs.toLocaleString()} Gross - ${rejectedPcsVal.toLocaleString()} Rejected Pcs = ${totalCutPcs.toLocaleString()} Net Passed Cut Blanks | Extra Paper Scrap: ${materialScrapKgVal} KG [अलग से स्क्रैप में जमा, पीसेस में से माइनस नहीं])${glueUsedVal > 0 ? ` | Adhesive Glue Consumed: ${glueUsedVal} KG of ${brandToDeduct}${glueDeductedMsg}` : ''}`,
+src/components/views/CuttingView.tsx:915:            title="ग्लू यूसेज रिकॉर्ड करें"
+src/components/views/CuttingView.tsx:918:            <span>💧 एडहेसिव ग्लू (Glue Tracker)</span>
+src/components/views/CuttingView.tsx:924:            title="फ्लोर मैनपावर रोस्टर देखें व बदलें"
+src/components/views/CuttingView.tsx:927:            <span>👥 लाइव मैनपावर (Floor Roster)</span>
+src/components/views/CuttingView.tsx:938:              <span>लाइव कटिंग फ्लोर मैनपावर रोस्टर (Live Station Crew & Floor Manpower)</span>
+src/components/views/CuttingView.tsx:945:              बंद करें ✕
+src/components/views/CuttingView.tsx:1174:                      title="क्रू व हेल्पर बदलें / नियुक्त करें"
+src/components/views/CuttingView.tsx:1176:                      <Users className="w-3 h-3" /> क्रू बदलें
+src/components/views/CuttingView.tsx:1193:                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Adhesive Glue (ग्लू):</span>
+src/components/views/CuttingView.tsx:1198:                      title="ग्लू यूसेज रिकॉर्ड करें"
+src/components/views/CuttingView.tsx:1200:                      <Droplets className="w-3 h-3" /> + दर्ज करें
+src/components/views/CuttingView.tsx:1214:                      : 'Click + दर्ज करें to record drum'}
+src/components/views/CuttingView.tsx:1331:                  <span>Output Reporting & Scrap/Rejection Counter Deduction (उत्पादन एवं स्क्रैप कटौती):</span>
+src/components/views/CuttingView.tsx:1338:              {/* Row 1: Production Additions (मेन काउंटर में प्लस होने वाली क्वांटिटी) */}
+src/components/views/CuttingView.tsx:1361:                    <span>+ Loose Pieces (लूज़ पीस - मेन काउंटर में प्लस होगा):</span>
+src/components/views/CuttingView.tsx:1383:                      <span>1. रिजेक्टेड पीस (Rejected Pieces):</span>
+src/components/views/CuttingView.tsx:1398:                    ⚠️ <b>केवल यही रिजेक्टेड पीस तैयार पीस में से माइनस (-) होगा।</b> (दोनों मिक्स नहीं होंगे)
+src/components/views/CuttingView.tsx:1407:                      <span>2. कटिंग मटेरियल स्क्रैप (Material Scrap KG):</span>
+src/components/views/CuttingView.tsx:1428:                    ℹ️ <b>कटिंग में से जो एक्स्ट्रा पेपर स्क्रैप निकलता है, वह सीधे स्क्रैप खाते में जुड़ेगा। यह पीसेस में से माइनस नहीं होगा।</b>
+src/components/views/CuttingView.tsx:1433:              {/* Row 2.5: Adhesive/Glue Inline Consumption Input (ग्लू खपत इनपुट) */}
+src/components/views/CuttingView.tsx:1438:                    <span>3. एक्चुअल ग्लू यूसेज (Actual Glue Consumed KG) *:</span>
+src/components/views/CuttingView.tsx:1469:                    <span>Main Counter Live Calculation (मेन काउंटर लाइव हिसाब):</span>
+src/components/views/CuttingView.tsx:1472:                    Crates + Loose - केवल रिजेक्टेड पीस
+src/components/views/CuttingView.tsx:1494:                      <span>अलग से कटिंग स्क्रैप: <b>{liveScrapKgVal} KG</b> (पीस में से माइनस नहीं)</span>
+src/components/views/CuttingView.tsx:1506:                  title="स्टेशन क्रू व हेल्पर बदलें"
+src/components/views/CuttingView.tsx:1508:                  <Users className="w-3.5 h-3.5" /> क्रू व हेल्पर
+src/components/views/CuttingView.tsx:1514:                  title="एडहेसिव ग्लू यूसेज दर्ज करें"
+src/components/views/CuttingView.tsx:1516:                  <Droplets className="w-3.5 h-3.5" /> ग्लू यूज़
+src/components/views/CuttingView.tsx:1650:                <span>🤝 ऑपरेटर के साथ नियुक्त हेल्पर (Assigned Helpers):</span>
+src/components/views/CuttingView.tsx:1662:                  <span>👥 क्रू व हेल्पर पॉप-अप (Modal)</span>
+src/components/views/CuttingView.tsx:1665:                  (उदा. ऑपरेटर + 2 हेल्पर साइड में दिखाई देंगे)
+src/components/views/CuttingView.tsx:1692:                  placeholder="+ नया हेल्पर नाम..."
+src/components/views/CuttingView.tsx:1716:                  + जोड़ें
+src/components/views/CuttingView.tsx:1914:                <th className="p-3 text-indigo-900">Date (तारीख)</th>
+src/components/views/AdminSettingsView.tsx:1288:          action: '⚡ All Factory Data Reset to 0 for Clean Testing (पूरा डेटा 0 किया गया)',
+src/components/views/AdminSettingsView.tsx:1309:      title: '⚡ Zero All Operational Data (पूरा डेटा 0 करें)',
+src/components/views/AdminSettingsView.tsx:1311:      confirmLabel: 'Yes, Reset All to 0 (डेटा 0 करें)',
+src/components/views/AdminSettingsView.tsx:1404:      const m = l.action?.match(/(\d+)\s*(Rolls|रील)/i);
+src/components/views/AdminSettingsView.tsx:1427:        const match = l.action?.match(/(\d+)\s*(Crates|crates|क्रेट)/i);
+src/components/views/AdminSettingsView.tsx:1664:    { key: 'Purchase', label: '🛒 Purchase & Indent Desk', desc: 'Material Indents, Vendor POs & Incoming Goods (माल प्राप्ति)' },
+src/components/views/AdminSettingsView.tsx:1810:      {/* TAB 0: BRAND ITEMS & PAPER MILL MASTER (ब्रांड आइटम एवं पेपर मिल मास्टर) */}
+src/components/views/AdminSettingsView.tsx:1822:                  Zero Data & Clean Setup (डेटा 0 करें)
+src/components/views/AdminSettingsView.tsx:1844:                <span>Reset All Data to 0 (डेटा 0 करें)</span>
+src/components/views/AdminSettingsView.tsx:1854:                  <span>📜 Paper Mill / Supplier Brands (पेपर मिल / ब्रांड लिस्ट)</span>
+src/components/views/AdminSettingsView.tsx:1957:                  <span>🍽️ Brand Cutlery Items & Products (कटलरी उत्पाद प्रबंधन)</span>
+src/components/views/AdminSettingsView.tsx:2091:                                title="Edit Next Sequence Counter (उदा. 1, 2, 3...)"
+src/components/views/AdminSettingsView.tsx:2162:                  <span>💧 Adhesive / Glue Brands (ग्लू ब्रांड लिस्ट)</span>
+src/components/views/AdminSettingsView.tsx:2191:                  <span>📚 Target Layers Master (टारगेट लेयर्स)</span>
+src/components/views/AdminSettingsView.tsx:2220:                  <span>⚖️ Target GSM Master (टारगेट GSM)</span>
+src/components/views/AdminSettingsView.tsx:2248:      {/* TAB 0.5: CRATE CAPACITY MASTER (क्रेट कैपेसिटी एवं वॉल्यूम फैलाव मास्टर) */}
+src/components/views/AdminSettingsView.tsx:2260:                  Crate Capacity Master & Volume Expansion (क्रेट कैपेसिटी एवं 3D फैलाव मास्टर)
+src/components/views/AdminSettingsView.tsx:2264:                🔐 <strong>Admin Exclusive Control:</strong> सेट करें कि प्रत्येक क्रेट में कटिंग (Flat Blanks) और फॉर्मिंग (3D Molded) के कितने नंग आते हैं।
+src/components/views/AdminSettingsView.tsx:2275:                <span>Reset Defaults (डिफ़ॉल्ट)</span>
+src/components/views/AdminSettingsView.tsx:2283:                <span>Save Master Matrix (मास्टर सेव)</span>
+src/components/views/AdminSettingsView.tsx:2296:                  Physical Manufacturing Law: Flat Blanks vs. 3D Molded Volume Expansion (वॉल्यूम विस्तार सिद्धांत)
+src/components/views/AdminSettingsView.tsx:2301:                      ✂️ 1. कटिंग (Flat Blanks)
+src/components/views/AdminSettingsView.tsx:2304:                      कागज पूरी तरह सपाट रहता है। स्टैकिंग घनी होती है, इसलिए क्रेट में अधिक नंग आते हैं (उदा. Spoon: <strong>10,000 Pcs/Crate</strong>)।
+src/components/views/AdminSettingsView.tsx:2309:                      ⚙️ 2. फॉर्मिंग (3D Curved Shape)
+src/components/views/AdminSettingsView.tsx:2312:                      मोल्डिंग से गहराई (Depth/Curve) आ जाती है जिससे प्रत्येक पीस का आयतन बढ़ जाता है। क्रेट में कम नंग आते हैं (उदा. Spoon: <strong>7,000 Pcs/Crate</strong>)।
+src/components/views/AdminSettingsView.tsx:2317:                      🔍 3. QC लॉकिंग (Strict 1:1)
+src/components/views/AdminSettingsView.tsx:2320:                      फॉर्मिंग के बाद कोई आकार नहीं बदलता। इसलिए QC में 1:1 क्रेट लॉकिंग रहती है (<strong>15 Formed Crates In = 15 QC Crates Max</strong>)।
+src/components/views/AdminSettingsView.tsx:2332:                Standard Crate Capacity per Product (उत्पादवार क्रेट मानक तालिका)
+src/components/views/AdminSettingsView.tsx:2342:                    <th className="py-3 px-4">Product Name (उत्पाद)</th>
+src/components/views/AdminSettingsView.tsx:2350:                      📈 Crate Expansion Ratio (वॉल्यूम फैलाव)
+src/components/views/AdminSettingsView.tsx:2456:              ➕ Add / Update Crate Capacity for Another Product (नया उत्पाद क्रेट मानक जोड़ें)
+src/components/views/AdminSettingsView.tsx:2517:      {/* TAB 1: USER ACCOUNTS & PERMISSIONS (यूज़र आईडी एवं अधिकार प्रबंधन) */}
+src/components/views/AdminSettingsView.tsx:2524:                User Accounts & Access Rights (यूज़र प्रबंधन व अधिकार)
+src/components/views/AdminSettingsView.tsx:2653:                    Grant Module Access Rights (अधिकार चेकबॉक्स):
+src/components/views/AdminSettingsView.tsx:2715:              Department Operators & Workers Master (मशीन ऑपरेटर सूची)
+src/components/views/AdminSettingsView.tsx:2778:      {/* TAB 2: 100% MASTER DATA OVERWRITE (जॉब, बैच, क्वालिटी, ऑर्डर व लॉग सुधार) */}
+src/components/views/AdminSettingsView.tsx:2785:                100% Master Data Correction & Overwrite (मास्टर डाटा सुधार)
+src/components/views/AdminSettingsView.tsx:2863:                        Job ID (जॉब नंबर):
+src/components/views/AdminSettingsView.tsx:2874:                        Product Item (आइटम प्रकार):
+src/components/views/AdminSettingsView.tsx:2909:                      <span>🎯 Reel Traceability & Jumbo Weights (रील नंबर व वजन सुधारें):</span>
+src/components/views/AdminSettingsView.tsx:2915:                          Reel No. (रील नंबर):
+src/components/views/AdminSettingsView.tsx:2995:                      Direct Stage Stock Balances Overwrite (स्टॉक बैलेंस सीधा सुधारें):
+src/components/views/AdminSettingsView.tsx:3057:                          <span>Crate Packing & Piece Counts (नंग) Overrides:</span>
+src/components/views/AdminSettingsView.tsx:3616:      {/* TAB 3: WHATSAPP BACKUP & LIVE AUTO-REPORTING (व्हाट्सएप बैकअप) */}
+src/components/views/AdminSettingsView.tsx:3623:                WhatsApp Live Shift Changeover & Machine Reports (व्हाट्सएप शिफ्ट चेंजओवर रिपोर्ट)
+src/components/views/AdminSettingsView.tsx:3694:                    Shift Changeover Auto Timing Settings (समय कस्टमाइज़)
+src/components/views/AdminSettingsView.tsx:3856:      {/* TAB 8: MAINTENANCE DESK MASTER & RIGHTS (मेंटेनेंस डेस्क मास्टर व राइट्स) */}
+src/components/views/AdminSettingsView.tsx:3863:                🔧 Maintenance Desk Master & Rights Suite (मेंटेनेंस डेस्क मास्टर एवं राइट्स)
+src/components/views/AdminSettingsView.tsx:4028:                    Slitting: Roll to Pcs Setting (रील से पीस लिमिट)
+src/components/views/PackingView.tsx:251:  // ACTION: ADD MORE CRATES TO RUNNING PACKING ORDER (उसी ऑर्डर में और क्रेट्स देना)
+src/components/views/PackingView.tsx:353:      `मशीन चालू है और नए क्रेट्स उसी ऑर्डर में जुड़ गए हैं।`
+src/components/views/PackingView.tsx:829:      {/* VISUAL WORKSTATION FLOOR SELECTOR (मशीन फ्लोर डैशबोर्ड कार्ड्स) */}
+src/components/views/PackingView.tsx:835:            1. Select Packing Workstation (मशीन चुनें):
+src/components/views/PackingView.tsx:1014:                      <span>+ Add More Crates (और क्रेट्स जोड़ें)</span>
+src/components/views/PackingView.tsx:1107:                Boxes Packed in Current Session / Run (बॉक्स तैयार):
+src/components/views/PackingView.tsx:1128:                💡 <b>Note:</b> Forward Partial करने पर जितने बॉक्स आपने दर्ज किए हैं, वे तुरंत <b>Dispatch</b> में उपलब्ध हो जाएंगे और मशीन <b>चालू (RUNNING)</b> रहेगी। जब तक आप <b>"Complete Job"</b> नहीं दबाएंगे, मशीन नहीं रुकेगी।
+src/components/views/PackingView.tsx:1505:              अगर आपने ज्यादा क्रेट इशू कर दिए थे और काम पूरा होने के बाद क्रेट बच गए हैं, तो यहाँ से सीधे QC स्टॉक में वापस जमा करें:
+src/components/views/PackingView.tsx:1597:              क्या आप <b>[{selectedMachine}]</b> पर चल रहे आर्डर <b>[{activeJob.id} — {activeJob.customer}]</b> के रन को रद्द और डिलीट करना चाहते हैं?
+src/components/views/PackingView.tsx:1631:              ⚡ पुष्टि करने पर यह रनिंग एंट्री हट जाएगी, मशीन <b>IDLE</b> हो जाएगी और सारा मटेरियल सुरक्षित वापस QC स्टॉक में चला जाएगा।
+src/components/views/PackingView.tsx:1675:              मशीन में कोई तकनीकी या मटेरियल समस्या आने पर होल्ड कारण दर्ज करें ताकि मेंटेनेंस टीम को तुरंत अलर्ट मिल सके:
+src/components/views/PackingView.tsx:1740:                    उसी रनिंग आर्डर में अतिरिक्त QC क्रेट्स इशू करें
+src/components/views/FormingView.tsx:1213:                <span>🤝 ऑपरेटर के साथ नियुक्त हेल्पर (Assigned Helpers):</span>
+src/components/views/FormingView.tsx:1225:                  <span>👥 क्रू व हेल्पर पॉप-अप (Modal)</span>
+src/components/views/FormingView.tsx:1352:                <th className="p-3 text-indigo-900">Date (तारीख)</th>
+src/components/views/MarketingView.tsx:359:                ऑर्डर सफलतापूर्वक सबमिट हो गया है!
+src/components/views/MarketingView.tsx:409:                <span>+ नया ऑर्डर दर्ज करें (Enter Next Order)</span>
+src/components/views/MarketingView.tsx:420:                <span>मुख्य मेनू पर जाएं (Back to Main Hub)</span>
+src/components/views/MasterExecutiveDashboard.tsx:75:              <span>Machine & Operator Audit (8-दिन/5-दिन रिपोर्ट) ➔</span>
+src/components/views/MasterExecutiveDashboard.tsx:154:                Live QC Dispatch & Inspector Pipeline (रियल-टाइम क्यूसी डिस्पैच व इंस्पेक्टर स्थिति)
+src/components/views/MasterExecutiveDashboard.tsx:157:                फॉर्मिंग से डिस्पैच किए गए क्रेट्स, नियुक्त इंस्पेक्टर (Assigned Inspector) व स्टेज स्थिति
+src/components/views/MasterExecutiveDashboard.tsx:344:                    <div className="text-[10px] font-bold text-amber-800 uppercase">कार्यरत टेक्नीशियन:</div>
+src/components/views/MasterExecutiveDashboard.tsx:358:                        ✅ रिपेयर पूरा करें (Mark Ready)
+src/components/views/MasterExecutiveDashboard.tsx:366:                    <div className="text-[10px] font-bold text-red-800 uppercase">ब्रेकडाउन (इंतज़ार जारी):</div>
+src/components/views/MasterExecutiveDashboard.tsx:377:                        👨‍🔧 मैं अटेंड कर रहा हूँ (Start Repair)
+src/components/ShiftHandoverModal.tsx:142:      alert('कृपया आने वाले ऑपरेटर (Relieving Operator) का चयन करें या नाम लिखें।');
+src/components/ShiftHandoverModal.tsx:147:      alert('आने वाला ऑपरेटर (Relieving Operator) वर्तमान ऑपरेटर से भिन्न होना चाहिए।');
+src/components/ShiftHandoverModal.tsx:152:      alert('कृपया शिफ्ट हैंडओवर का सत्यापन चेकबॉक्स स्वीकार करें।');
+src/components/ShiftHandoverModal.tsx:187:                    ? 'कटिंग शिफ्ट हैंडओवर (Cutting Desk Shift Handover)'
+src/components/ShiftHandoverModal.tsx:188:                    : `सतत शिफ्ट हैंडओवर (${stageName} Shift Handover)`}
+src/components/ShiftHandoverModal.tsx:195:                मशीन को रोके बिना ऑपरेटर A का उत्पादन (क्रेट्स, लूज पीस व स्क्रैप) लॉक करें और ऑपरेटर B को बैच हैंडओवर करें।
+src/components/ShiftHandoverModal.tsx:285:                    निवर्तमान ऑपरेटर (Outgoing Operator A) - उत्पादन व स्क्रैप लॉक
+src/components/ShiftHandoverModal.tsx:288:                    इस ऑपरेटर के खाते में जमा होने वाला सटीक उत्पादन दर्ज करें
+src/components/ShiftHandoverModal.tsx:310:                  <span>काटे गए क्रेट्स ({unitLabel}):</span>
+src/components/ShiftHandoverModal.tsx:323:                  फुल तैयार क्रेट्स की संख्या
+src/components/ShiftHandoverModal.tsx:331:                  <span>खुले / लूज पीस (Loose Pcs):</span>
+src/components/ShiftHandoverModal.tsx:343:                  अतिरिक्त खुले पीस (जैसे 500 पीस)
+src/components/ShiftHandoverModal.tsx:353:                      ? 'रिजेक्शन स्क्रैप (Scrap in KG):'
+src/components/ShiftHandoverModal.tsx:354:                      : 'डिफेक्ट पीस (Defect Pieces):'}
+src/components/ShiftHandoverModal.tsx:369:                    ? 'कटिंग स्क्रैप वजन (KG में)'
+src/components/ShiftHandoverModal.tsx:370:                    : 'खराब / रिजेक्टेड पीस'}
+src/components/ShiftHandoverModal.tsx:380:                  <b>कुल उत्पादित फ्लैट ब्लैंक्स:</b>{' '}
+src/components/ShiftHandoverModal.tsx:396:                  <span>मशीन स्ट्रोक / मीटर काउंटर (Stroke Count):</span>
+src/components/ShiftHandoverModal.tsx:405:                <span className="text-[10px] text-slate-500 mt-0.5 block">हैंडओवर के समय मशीन का स्ट्रोक काउंटर</span>
+src/components/ShiftHandoverModal.tsx:411:                  <span>हैंडओवर रिमार्क्स (Handover Remarks / Notes):</span>
+src/components/ShiftHandoverModal.tsx:417:                  placeholder="उदा. 5 क्रेट्स + 500 लूज पीस तैयार, 1 kg स्क्रैप, ब्लेड धार सही है।"
+src/components/ShiftHandoverModal.tsx:420:                <span className="text-[10px] text-slate-500 mt-0.5 block">ब्लेड की स्थिति, कच्चा माल या विशेष सूचना</span>
+src/components/ShiftHandoverModal.tsx:428:                <b>रिकॉर्ड लॉक नोटिस:</b> सबमिट करने पर ऑपरेटर <b>{batch.worker}</b> के नाम{' '}
+src/components/ShiftHandoverModal.tsx:430:                  {parsedProduced} क्रेट्स + {parsedLoose} लूज पीस ({calculatedPieces?.toLocaleString()} पीस)
+src/components/ShiftHandoverModal.tsx:432:                और <span className="font-bold underline">{parsedScrap} kg स्क्रैप</span> स्थायी रूप से दर्ज हो जाएंगे।
+src/components/ShiftHandoverModal.tsx:446:                    आने वाला ऑपरेटर (Incoming Relieving Operator B)
+src/components/ShiftHandoverModal.tsx:449:                    कार्यभार संभालने वाले ऑपरेटर एवं उनके साथ नियुक्त हेल्पर
+src/components/ShiftHandoverModal.tsx:454:                हैंडओवर समय: <b>{nowTime}</b>
+src/components/ShiftHandoverModal.tsx:462:                  <span>ऑपरेटर चुनें (Select Relieving Operator):</span>
+src/components/ShiftHandoverModal.tsx:472:                  <option value="">-- ऑपरेटर का चयन करें --</option>
+src/components/ShiftHandoverModal.tsx:481:                <span className="text-[10px] text-slate-400 mt-0.5 block">या नीचे नया नाम टाइप करें</span>
+src/components/ShiftHandoverModal.tsx:487:                  <span>आने वाली शिफ्ट (Relieving Shift):</span>
+src/components/ShiftHandoverModal.tsx:519:                अन्य कोई ऑपरेटर (Type Custom Operator Name if not in list):
+src/components/ShiftHandoverModal.tsx:528:                placeholder="उदा. RAJESH_CUTTING"
+src/components/ShiftHandoverModal.tsx:538:                  <span>इनकमिंग ऑपरेटर के साथ हेल्पर (Assigned Helpers):</span>
+src/components/ShiftHandoverModal.tsx:548:                  <span className="text-xs text-slate-400 italic">कोई हेल्पर चयनित नहीं (अकेला ऑपरेटर)</span>
+src/components/ShiftHandoverModal.tsx:599:                  placeholder="अन्य हेल्पर का नाम लिखकर + दबाएँ..."
+src/components/ShiftHandoverModal.tsx:607:                  + जोड़ें
+src/components/ShiftHandoverModal.tsx:623:                <b>हैंडओवर भौतिक सत्यापन स्वीकारोक्ति (Handover Acceptance):</b> मैंने मशीन की स्थिति, कच्चा माल और ऑपरेटर{' '}
+src/components/ShiftHandoverModal.tsx:624:                <b>{batch.worker}</b> द्वारा तैयार <b>{parsedProduced} क्रेट्स + {parsedLoose} लूज पीस ({calculatedPieces?.toLocaleString()} कुल पीस)</b> एवं{' '}
+src/components/ShiftHandoverModal.tsx:625:                <b>{parsedScrap} kg स्क्रैप</b> की भौतिक जांच कर ली है और नया कार्यभार ऑपरेटर <b>{finalRelievingOperator || '[चयनित ऑपरेटर]'}</b> को सुपुर्द कर रहा हूँ।
+src/components/ShiftHandoverModal.tsx:637:              रद्द करें (Cancel)
+src/components/ShiftHandoverModal.tsx:644:              <span>हैंडओवर सुरक्षित करें (Lock Output & Confirm Handover)</span>
+src/components/ErrorBoundary.tsx:57:              एक रनटाइम एरर के कारण स्क्रीन रीसेट हो गई थी। आपका डेटा सुरक्षित है। नीचे दिए गए बटन से तुरंत स्क्रीन वापस लाएं:
+src/components/LotGenealogyModal.tsx:163:              <span>Stage-by-Stage Genealogy Chain (लॉट-टू-लॉट विस्तृत इतिहास)</span>
+src/components/LotGenealogyModal.tsx:175:                    <span className="font-extrabold text-xs text-blue-950 uppercase">Slitting Machine (स्लिटिंग स्टेज)</span>
+src/components/LotGenealogyModal.tsx:227:                    <span className="font-extrabold text-xs text-indigo-950 uppercase">Cutting Machine (कटिंग स्टेज)</span>
+src/components/LotGenealogyModal.tsx:279:                    <span className="font-extrabold text-xs text-purple-950 uppercase">Forming Machines (फॉर्मिंग स्टेज)</span>
+src/components/LotGenealogyModal.tsx:331:                    <span className="font-extrabold text-xs text-emerald-950 uppercase">Quality Control (QC स्टेज)</span>
+src/components/LotGenealogyModal.tsx:385:                    <span className="font-extrabold text-xs text-slate-900 uppercase">Packing & Dispatch (पैकिंग व डिस्पैच)</span>
+src/components/TechnicianAttendModal.tsx:116:      alert('⚠️ कृपया टेक्नीशियन का नाम चुनें या दर्ज करें।');
+src/components/TechnicianAttendModal.tsx:336:        `📢 *Status:* "मेरी साइड से मशीन ओके है - रेडी टू रन!" Operator can resume production immediately.`
+src/components/TechnicianAttendModal.tsx:373:                  {isUnderRepair ? '🟡 Under Repair (काम चालू)' : '🔴 Stopped (बंद है)'}
+src/components/TechnicianAttendModal.tsx:432:                <div className="text-[11px] font-bold text-slate-500 uppercase">Reason / कारण:</div>
+src/components/TechnicianAttendModal.tsx:470:                  {targetMachine} पर वर्तमान में कोई खुला ब्रेकडाउन टिकट नहीं है।
+src/components/TechnicianAttendModal.tsx:473:                  यदि मशीन बंद है या मेंटेनेंस की आवश्यकता है, तो नीचे से सीधे अटेंड करें।
+src/components/TechnicianAttendModal.tsx:487:                <span>स्टेप 1: मशीन अटेंड करें (Technician Reply & Acknowledgment)</span>
+src/components/TechnicianAttendModal.tsx:490:                जब आप मशीन पर पहुँचें, तो तुरंत अपना नाम चुनकर <b>"मैं अटेंड कर रहा हूँ"</b> बटन दबाएं।
+src/components/TechnicianAttendModal.tsx:491:                इससे ऑपरेटर डेस्क और मेंटेनेंस डैशबोर्ड पर तुरंत दिख जाएगा कि आप इस मशीन पर काम कर रहे हैं।
+src/components/TechnicianAttendModal.tsx:497:                    टेक्नीशियन का नाम (Select Technician):
+src/components/TechnicianAttendModal.tsx:509:                    <option value="">+ Other / Custom Name (अन्य)</option>
+src/components/TechnicianAttendModal.tsx:516:                      अन्य टेक्नीशियन का नाम (Enter Custom Name):
+src/components/TechnicianAttendModal.tsx:520:                      placeholder="e.g. मुकेश प्रजापति"
+src/components/TechnicianAttendModal.tsx:530:                    शुरुआती निरीक्षण / नोट्स (Inspection / Action Note - Optional):
+src/components/TechnicianAttendModal.tsx:534:                    placeholder="उदा. हीटर और थर्मोकपल की जांच शुरू की..."
+src/components/TechnicianAttendModal.tsx:548:                  <span>👨‍🔧 मैं इस ब्रेकडाउन को अटेंड कर रहा हूँ (Start Attending)</span>
+src/components/TechnicianAttendModal.tsx:565:                      रिपेयरिंग कार्य चालू है (Under Repair)
+src/components/TechnicianAttendModal.tsx:568:                      👨‍🔧 यह आदमी यहां पर काम कर रहा है: <b>{activeIncident?.technicianName || activeIncident?.attendedBy || effectiveTechName}</b>
+src/components/TechnicianAttendModal.tsx:571:                      काम शुरू होने का समय:{' '}
+src/components/TechnicianAttendModal.tsx:580:                      (रिस्पांस टाइम: {activeIncident?.responseTimeMinutes || 1} मिनट)
+src/components/TechnicianAttendModal.tsx:587:                    चालू रिपेयर समय (Repairing Time):
+src/components/TechnicianAttendModal.tsx:626:                      'हीटर एलिमेंट रिप्लेस किया',
+src/components/TechnicianAttendModal.tsx:627:                      'थर्मोकपल सेंसर कैलिब्रेट किया',
+src/components/TechnicianAttendModal.tsx:628:                      'ब्लेड शार्प और री-अलाइन किया',
+src/components/TechnicianAttendModal.tsx:629:                      'टेफ्लॉन टेप चेंज किया',
+src/components/TechnicianAttendModal.tsx:630:                      'न्यूमेटिक प्रेशर और वॉल्व ट्यून किया'
+src/components/TechnicianAttendModal.tsx:648:                      बदले गए स्पेयर पार्ट्स (Spare Parts Replaced):
+src/components/TechnicianAttendModal.tsx:657:                        <span>➕ कस्टम पार्ट पॉप-अप</span>
+src/components/TechnicianAttendModal.tsx:668:                        {isDirectPartInput ? '📋 लिस्ट से चुनें' : '✍️ सीधे नाम टाइप करें'}
+src/components/TechnicianAttendModal.tsx:681:                          placeholder="स्पेयर पार्ट का नाम टाइप करें (उदा. Brass Bush 32mm)..."
+src/components/TechnicianAttendModal.tsx:696:                          <option value="CUSTOM_PART_POPUP">➕ नया कस्टम पार्ट लिखें (Type Custom Part)...</option>
+src/components/TechnicianAttendModal.tsx:774:                    <span>📲 ऑपरेटर / फ्लोर हेड को व्हाट्सएप पर "रेडी टू रन" मैसेज भेजें</span>
+src/components/TechnicianAttendModal.tsx:778:                    कुल डाउनटाइम: <b>{elapsedWaiting} मिनट</b> | रिपेयर समय: <b>{elapsedRepairing} मिनट</b>
+src/components/TechnicianAttendModal.tsx:788:                  <span>✅ मेरी साइड से ओके है - रिपेयर पूरा हुआ (Handover & Set Machine Running)</span>
+src/components/LiveFloorManpowerTracker.tsx:285:                  लाईव प्लांट मैनपावर व हेल्पर ट्रैकर (Live Floor Workforce Tracker)
+src/components/LiveFloorManpowerTracker.tsx:292:                वर्तमान में फ्लोर पर कुल कार्यरत ऑपरेटर्स, प्रत्येक ऑपरेटर के साथ नियुक्त हेल्पर, सुपरवाइजर व मेंटेनेंस टीम
+src/components/LiveFloorManpowerTracker.tsx:303:              <span>+ नया वर्कर / हेल्पर जोड़ें</span>
+src/components/LiveFloorManpowerTracker.tsx:311:              <span>WhatsApp रिपोर्ट</span>
+src/components/LiveFloorManpowerTracker.tsx:325:                कुल कार्यरत व्यक्ति (Total On Floor)
+src/components/LiveFloorManpowerTracker.tsx:329:                <span className="text-xs font-bold text-emerald-700">वर्कर एक्टिव</span>
+src/components/LiveFloorManpowerTracker.tsx:336:            <span className="text-[10px] uppercase font-bold text-slate-500 block">ऑपरेटर्स (Operators)</span>
+src/components/LiveFloorManpowerTracker.tsx:339:              <span className="text-[11px] text-slate-400 font-bold">मशीन पर</span>
+src/components/LiveFloorManpowerTracker.tsx:345:            <span className="text-[10px] uppercase font-bold text-amber-900 block">हेल्पर (Helpers)</span>
+src/components/LiveFloorManpowerTracker.tsx:348:              <span className="text-[11px] text-amber-700 font-bold">पेयर्ड</span>
+src/components/LiveFloorManpowerTracker.tsx:354:            <span className="text-[10px] uppercase font-bold text-purple-900 block">क्यूसी (QC Team)</span>
+src/components/LiveFloorManpowerTracker.tsx:357:              <span className="text-[11px] text-purple-700 font-bold">इंस्पेक्टर</span>
+src/components/LiveFloorManpowerTracker.tsx:363:            <span className="text-[10px] uppercase font-bold text-slate-500 block">सुपरवाइजर + मेंटेनेंस</span>
+src/components/LiveFloorManpowerTracker.tsx:378:              <span>स्टेशनवार ऑपरेटर एवं नियुक्त हेल्पर सूची (Station-wise Operator & Helpers Allocation)</span>
+src/components/LiveFloorManpowerTracker.tsx:381:              प्रत्येक मशीन पर मुख्य ऑपरेटर और उसके साथ कार्य कर रहे हेल्परों की सटीक संख्या व नाम
+src/components/LiveFloorManpowerTracker.tsx:385:            {Object.keys(stationMap).length} सक्रिय वर्कस्टेशन
+src/components/LiveFloorManpowerTracker.tsx:415:                    <span className="text-[10px] text-slate-400 uppercase font-bold block">मुख्य ऑपरेटर:</span>
+src/components/LiveFloorManpowerTracker.tsx:430:                    🤝 <span>नियुक्त हेल्पर ({st.helpers.length} Helpers):</span>
+src/components/LiveFloorManpowerTracker.tsx:444:                    बदलें
+src/components/LiveFloorManpowerTracker.tsx:450:                    <span className="text-[11px] text-slate-400 italic">कोई हेल्पर नहीं (अकेला ऑपरेटर)</span>
+src/components/LiveFloorManpowerTracker.tsx:474:              <span>फ्लोर मैनपावर हाजिरी व मास्टर रोस्टर (Workforce Attendance & Roster)</span>
+src/components/LiveFloorManpowerTracker.tsx:477:              उपस्थिति बदलने के लिए टॉगल बटन दबाएँ (Click present badge to toggle attendance)
+src/components/LiveFloorManpowerTracker.tsx:490:                placeholder="खोजें (नाम, मशीन, ऑपरेटर)..."
+src/components/LiveFloorManpowerTracker.tsx:501:              <option value="ALL">सभी विभाग (All Depts)</option>
+src/components/LiveFloorManpowerTracker.tsx:516:              <option value="ALL">सभी पद (All Roles)</option>
+src/components/LiveFloorManpowerTracker.tsx:517:              <option value="OPERATOR">ऑपरेटर्स (Operators)</option>
+src/components/LiveFloorManpowerTracker.tsx:518:              <option value="HELPER">हेल्पर (Helpers)</option>
+src/components/LiveFloorManpowerTracker.tsx:519:              <option value="SUPERVISOR">सुपरवाइजर (Supervisors)</option>
+src/components/LiveFloorManpowerTracker.tsx:520:              <option value="QC_INSPECTOR">क्यूसी (QC Inspectors)</option>
+src/components/LiveFloorManpowerTracker.tsx:521:              <option value="MAINTENANCE">मेंटेनेंस (Maintenance)</option>
+src/components/LiveFloorManpowerTracker.tsx:531:                <th className="p-3">कर्मचारी नाम (Worker Name)</th>
+src/components/LiveFloorManpowerTracker.tsx:532:                <th className="p-3">पद (Role)</th>
+src/components/LiveFloorManpowerTracker.tsx:533:                <th className="p-3">विभाग (Department)</th>
+src/components/LiveFloorManpowerTracker.tsx:534:                <th className="p-3">आवंटित स्टेशन / ऑपरेटर (Station / Paired Op)</th>
+src/components/LiveFloorManpowerTracker.tsx:535:                <th className="p-3">शिफ्ट (Shift)</th>
+src/components/LiveFloorManpowerTracker.tsx:536:                <th className="p-3">आने का समय (In-Time)</th>
+src/components/LiveFloorManpowerTracker.tsx:537:                <th className="p-3 text-right">उपस्थिति स्थिति (Status)</th>
+src/components/LiveFloorManpowerTracker.tsx:544:                    कोई कर्मचारी नहीं मिला (No workers matched the filter)
+src/components/LiveFloorManpowerTracker.tsx:630:                        {w.isPresent ? '● उपस्थित (Present)' : '○ अनुपस्थित (Absent)'}
+src/components/LiveFloorManpowerTracker.tsx:648:                  हेल्पर असाइनमेंट ({editingStation.machine})
+src/components/LiveFloorManpowerTracker.tsx:651:                  ऑपरेटर: <b>{editingStation.operator}</b> ({editingStation.dept})
+src/components/LiveFloorManpowerTracker.tsx:665:                  इस ऑपरेटर के साथ नियुक्त हेल्पर ({editingStation.currentHelpers.length} Helpers):
+src/components/LiveFloorManpowerTracker.tsx:669:                    <span className="text-xs text-slate-400 italic">कोई हेल्पर नहीं</span>
+src/components/LiveFloorManpowerTracker.tsx:713:                  placeholder="हेल्पर का नाम लिखें (उदा. SUNIL_HELPER)..."
+src/components/LiveFloorManpowerTracker.tsx:730:                  + जोड़ें
+src/components/LiveFloorManpowerTracker.tsx:737:                  उपलब्ध हेल्पर (Quick Pick):
+src/components/LiveFloorManpowerTracker.tsx:766:                रद्द करें
+src/components/LiveFloorManpowerTracker.tsx:773:                सुरक्षित करें (Save Allocation)
+src/components/LiveFloorManpowerTracker.tsx:790:                  + नया फ्लोर वर्कर / हेल्पर जोड़ें
+src/components/LiveFloorManpowerTracker.tsx:793:                  नया ऑपरेटर, हेल्पर या सुपरवाइजर मास्टर रोस्टर में दर्ज करें
+src/components/LiveFloorManpowerTracker.tsx:808:                  कर्मचारी का नाम (Worker Name) *:
+src/components/LiveFloorManpowerTracker.tsx:814:                  placeholder="उदा. SUNIL_HELPER"
+src/components/LiveFloorManpowerTracker.tsx:822:                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">पद (Role) *:</label>
+src/components/LiveFloorManpowerTracker.tsx:828:                    <option value="HELPER">हेल्पर (Helper)</option>
+src/components/LiveFloorManpowerTracker.tsx:829:                    <option value="OPERATOR">ऑपरेटर (Operator)</option>
+src/components/LiveFloorManpowerTracker.tsx:830:                    <option value="SUPERVISOR">सुपरवाइजर (Supervisor)</option>
+src/components/LiveFloorManpowerTracker.tsx:831:                    <option value="QC_INSPECTOR">क्यूसी इंस्पेक्टर (QC)</option>
+src/components/LiveFloorManpowerTracker.tsx:832:                    <option value="MAINTENANCE">मेंटेनेंस (Maintenance)</option>
+src/components/LiveFloorManpowerTracker.tsx:837:                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">विभाग (Dept):</label>
+src/components/LiveFloorManpowerTracker.tsx:855:                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">शिफ्ट (Shift):</label>
+src/components/LiveFloorManpowerTracker.tsx:867:                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">आवंटित मशीन:</label>
+src/components/LiveFloorManpowerTracker.tsx:872:                    placeholder="उदा. Cutting-1"
+src/components/LiveFloorManpowerTracker.tsx:881:                    किस ऑपरेटर के साथ नियुक्त है (Paired With Operator):
+src/components/LiveFloorManpowerTracker.tsx:887:                    placeholder="उदा. CUT_OP1"
+src/components/LiveFloorManpowerTracker.tsx:900:                रद्द करें
+src/components/LiveFloorManpowerTracker.tsx:906:                + वर्कर सेव करें
+src/components/AttendingTechnicianModal.tsx:53:      alert('⚠️ कृपया अटेंड करने वाले मेंटेनेंस मैनेजर या टेक्नीशियन का नाम चुनें!');
+src/components/AttendingTechnicianModal.tsx:71:                <span>अटेंड ब्रेकडाउन (Attend Breakdown)</span>
+src/components/AttendingTechnicianModal.tsx:74:                मशीन: <strong>{machineName}</strong> [{incidentId}]
+src/components/AttendingTechnicianModal.tsx:94:                <span className="font-bold text-amber-900 block">रिपोर्ट की गई खराबी (Reported Fault):</span>
+src/components/AttendingTechnicianModal.tsx:103:              <span>अटेंड करने वाले मेंटेनेंस मैनेजर / इंजीनियर का नाम चुनें: *</span>
+src/components/AttendingTechnicianModal.tsx:104:              <span className="text-[11px] font-bold text-amber-700">अनिवार्य (Required)</span>
+src/components/AttendingTechnicianModal.tsx:136:              या कोई अन्य नाम / एक्सटर्नल वेंडर (Or Type Custom Name):
+src/components/AttendingTechnicianModal.tsx:142:              placeholder="उदा. Sanjay Patel (Maintenance Lead) या वेंडर नाम"
+src/components/AttendingTechnicianModal.tsx:150:              शुरुआती निरीक्षण नोट (Initial Inspection Note - Optional):
+src/components/AttendingTechnicianModal.tsx:156:              placeholder="उदा. हीटर और मोटर का वोल्टेज चेक करना शुरू किया..."
+src/components/AttendingTechnicianModal.tsx:168:                डैशबोर्ड पर यह नाम दिखेगा (Will display on dashboard):
+src/components/AttendingTechnicianModal.tsx:174:                "यह आदमी यहां पर काम कर रहा है" स्थिति तुरंत चालू होगी।
+src/components/AttendingTechnicianModal.tsx:186:              रद्द करें (Cancel)
+src/components/AttendingTechnicianModal.tsx:193:              <span>👨‍🔧 मैं काम शुरू कर रहा हूँ (Confirm Attend)</span>
+src/components/MaterialRequisitionModal.tsx:107:      alert('कृपया मटेरियल या स्पेयर पार्ट का नाम दर्ज करें (Item name required)');
+src/components/MaterialRequisitionModal.tsx:236:                  इंडेन्ट सिस्टम
+src/components/MaterialRequisitionModal.tsx:240:                किसी भी प्लांट डेस्क से तुरंत मटेरियल व स्पेयर पार्ट डिमांड भेजें और लाइव आगमन ट्रैक करें
+src/components/MaterialRequisitionModal.tsx:259:                🎉 <strong>{arrivedCount} मटेरियल स्टोर में आ चुका है!</strong> (Ready for collection at Factory Store)
+src/components/MaterialRequisitionModal.tsx:269:              देखें कौन सा माल आया है →
+src/components/MaterialRequisitionModal.tsx:286:              <span>1. नया इंडेन्ट भरें (Raise Requisition)</span>
+src/components/MaterialRequisitionModal.tsx:298:              <span>2. मेरे इंडेन्ट्स व माल आगमन स्थिति (Live Status)</span>
+src/components/MaterialRequisitionModal.tsx:315:              <span>परचेस डिपार्टमेंट डेस्क खोलें</span>
+src/components/MaterialRequisitionModal.tsx:341:                      डिपार्टमेंट / मशीन डेस्क (Department)*
+src/components/MaterialRequisitionModal.tsx:348:                      <option value="Maintenance">Maintenance (मेंटेनेंस / टूलींग)</option>
+src/components/MaterialRequisitionModal.tsx:349:                      <option value="Forming">Forming Desk (फॉर्मिंग मशीन)</option>
+src/components/MaterialRequisitionModal.tsx:350:                      <option value="Cutting">Cutting Desk (कटिंग स्टेशन)</option>
+src/components/MaterialRequisitionModal.tsx:351:                      <option value="Slitting">Slitting Desk (स्लिटिंग मशीन)</option>
+src/components/MaterialRequisitionModal.tsx:352:                      <option value="QC">QC Desk (क्वालिटी इंस्पेक्शन)</option>
+src/components/MaterialRequisitionModal.tsx:353:                      <option value="Packing">Packing Station (पैकिंग डेस्क)</option>
+src/components/MaterialRequisitionModal.tsx:361:                      मटेरियल कैटेगरी (Item Category)*
+src/components/MaterialRequisitionModal.tsx:388:                      मटेरियल / स्पेयर पार्ट का नाम (Item Description)*
+src/components/MaterialRequisitionModal.tsx:392:                      placeholder="उदा. Band Heater 1500W, BOPP Brown Tape, Cutting Blade, Hydraulic Oil, etc."
+src/components/MaterialRequisitionModal.tsx:403:                        त्वरित सुझाव:
+src/components/MaterialRequisitionModal.tsx:421:                        पार्ट नंबर / स्पेसिफिकेशन (Part No / Size)
+src/components/MaterialRequisitionModal.tsx:425:                        placeholder="उदा. K-Type, 160mm, 280 GSM, 65 Micron"
+src/components/MaterialRequisitionModal.tsx:434:                        मात्रा (Required Quantity)*
+src/components/MaterialRequisitionModal.tsx:449:                        इकाई (Unit)*
+src/components/MaterialRequisitionModal.tsx:456:                        <option value="Pcs">Pcs / Nos (नग)</option>
+src/components/MaterialRequisitionModal.tsx:457:                        <option value="KG">KG (किलो)</option>
+src/components/MaterialRequisitionModal.tsx:458:                        <option value="Box">Box / Cartons (बॉक्सेज)</option>
+src/components/MaterialRequisitionModal.tsx:459:                        <option value="Rolls">Rolls (रोल्स)</option>
+src/components/MaterialRequisitionModal.tsx:460:                        <option value="Litre">Litre (लीटर)</option>
+src/components/MaterialRequisitionModal.tsx:461:                        <option value="Set">Set (सेट)</option>
+src/components/MaterialRequisitionModal.tsx:462:                        <option value="Meters">Meters (मीटर)</option>
+src/components/MaterialRequisitionModal.tsx:470:                        प्राथमिकता / तात्कालिकता (Urgency Priority)*
+src/components/MaterialRequisitionModal.tsx:484:                          🚨 Emergency / Machine Stopped (मशीन बंद है - तत्काल चाहिए)
+src/components/MaterialRequisitionModal.tsx:487:                          ⚡ Urgent / Stock Exhausted (स्टॉक खत्म - 24 घंटे में)
+src/components/MaterialRequisitionModal.tsx:490:                          📦 Normal / Planned Maintenance (सामान्य - 2-3 दिन)
+src/components/MaterialRequisitionModal.tsx:492:                        <option value="LOW">⏳ Low / Routine Stock Up (नियमित)</option>
+src/components/MaterialRequisitionModal.tsx:498:                        किस मशीन या काम के लिए चाहिए (Machine / Purpose)
+src/components/MaterialRequisitionModal.tsx:502:                        placeholder="उदा. Forming-1 Upper Mould, Slitting Cutter, Dispatch Box"
+src/components/MaterialRequisitionModal.tsx:513:                        मांगकर्ता का नाम (Requested By)*
+src/components/MaterialRequisitionModal.tsx:517:                        placeholder="ऑपरेटर / सुपरवाइजर का नाम"
+src/components/MaterialRequisitionModal.tsx:527:                        विशेष टिप्पणी (Remarks / Notes)
+src/components/MaterialRequisitionModal.tsx:531:                        placeholder="सप्लायर या मॉडल सम्बन्धी कोई खास निर्देश..."
+src/components/MaterialRequisitionModal.tsx:548:                  रद्द करें
+src/components/MaterialRequisitionModal.tsx:555:                  <span>सबमिट करें और परचेस को भेजें (Submit Requisition)</span>
+src/components/MaterialRequisitionModal.tsx:569:                    placeholder="मटेरियल, इंडेन्ट नंबर, वेंडर या नाम से खोजें..."
+src/components/MaterialRequisitionModal.tsx:582:                    <option value="ALL">सभी डिपार्टमेंट (All Depts)</option>
+src/components/MaterialRequisitionModal.tsx:732:                              अनुमानित डिलीवरी: <strong>{req.expectedDeliveryDate || 'Soon'}</strong>
+src/components/MaterialRequisitionModal.tsx:748:            कुल इंडेन्ट्स: <span className="font-bold text-slate-800">{requisitions.length}</span> | माल आया हुआ: <span className="font-bold text-emerald-700">{requisitions.filter(r => r.status === 'RECEIVED').length}</span>
+src/components/MaterialRequisitionModal.tsx:754:            बंद करें (Close)
+src/components/LiveMaintenanceTracker.tsx:90:              सभी मशीनें सुचारू रूप से चालू हैं (All Machines Operational)
+src/components/LiveMaintenanceTracker.tsx:93:              वर्तमान में प्लांट में कोई एक्टिव ब्रेकडाउन नहीं है। सभी मेंटेनेंस टेक्नीशियन उपलब्ध (Standby) हैं।
+src/components/LiveMaintenanceTracker.tsx:117:              वर्तमान में कौन सा टेक्नीशियन किस मशीन पर काम कर रहा है (Floor Live Traceability)
+src/components/LiveMaintenanceTracker.tsx:183:                      <span>कार्यरत: <b>{inc.technicianName}</b></span>
+src/components/LiveMaintenanceTracker.tsx:191:                    <span className="font-bold">⚠️ कोई टेक्नीशियन नहीं पहुँचा</span>
+src/components/LiveMaintenanceTracker.tsx:213:                      <span>रिपेयर पूरा हुआ - मशीन ओके करें</span>
+src/components/LiveMaintenanceTracker.tsx:218:                      <span>👨‍🔧 मैं अटेंड कर रहा हूँ (Start Repair)</span>
+src/components/LiveMaintenanceTracker.tsx:228:      {/* Technician Roster Status (कौन फ्री है, कौन बिजी है) */}
+src/components/LiveMaintenanceTracker.tsx:233:            <span>मेंटेनेंस टीम लाइव स्थिति (Technician Availability Roster):</span>
+src/components/LiveMaintenanceTracker.tsx:259:                      <span>Available (उपलब्ध)</span>
+src/components/PlantManpowerModal.tsx:29:              लाईव प्लांट मैनपावर एवं हेल्पर ऑडिट (Live Plant Manpower & Helper Audit)
+src/components/HoldModal.tsx:37:          'Blade Wear & Dull Cutters (ब्लेड घिसाव / धार खत्म)',
+src/components/HoldModal.tsx:38:          'Die Alignment Error (डाई अलाइनमेंट मिसमैच)',
+src/components/HoldModal.tsx:39:          'Paper Feed Jam / Web Slippage (पेपर फीड जैम)',
+src/components/HoldModal.tsx:40:          'Sensor Fault / Safety Barrier Trip (ऑप्टिकल/सेफ्टी सेंसर फॉल्ट)',
+src/components/HoldModal.tsx:41:          'Motor Overload / Inverter Drive Trip (मोटर ओवरलोड)'
+src/components/HoldModal.tsx:45:          'Temperature Deviation (Mould Heater) (तापमान विचलन / हीटर कॉइल)',
+src/components/HoldModal.tsx:46:          'Hydraulic / Pneumatic Pressure Loss (हाइड्रोलिक/एयर प्रेशर कमी)',
+src/components/HoldModal.tsx:47:          'Speed Mismatch / Cycle Timing Error (स्पीड बेमेल)',
+src/components/HoldModal.tsx:48:          'Mould Tooling & Teflon Strip Damage (मोल्ड टूलिंग / टेफ्लॉन क्षति)',
+src/components/HoldModal.tsx:49:          'Paper Forming Wrinkle / Tear (कप/चम्मच रिम व क्रैक फॉल्ट)'
+src/components/HoldModal.tsx:53:          'Leak Test Fail (Water Penetration) (लीक टेस्ट फेल)',
+src/components/HoldModal.tsx:54:          'Burst / Compression Test Fail (बर्स्ट स्ट्रेंथ फेल)',
+src/components/HoldModal.tsx:55:          'Dimension Out-of-Tolerance (Angle/Depth) (साइज/डायमेंशन विचलन)',
+src/components/HoldModal.tsx:56:          'Visual Blemish / Print Ink Smudge / Spot (सतह पर दाग/खराबी)',
+src/components/HoldModal.tsx:57:          'Rim Curl / Edge Flange Defect (रिम कर्ल खराबी)'
+src/components/HoldModal.tsx:61:          'Rewind Tension / Core Slippage (कोर स्लिपेज / टेंशन फॉल्ट)',
+src/components/HoldModal.tsx:62:          'Slitting Circular Blade Dull / Burr (कटर ब्लेड बर्र)',
+src/components/HoldModal.tsx:63:          'Jumbo Reel Unwind Chuck Loose (अनवाइंड चक ढीला)',
+src/components/HoldModal.tsx:64:          'Web Alignment Guide Sensor Drift (एलाइनमेंट ड्रिफ्ट)'
+src/components/HoldModal.tsx:191:        `🛠️ *Action Required:* Please visit workstation *${stationName}*, tap the link below or open the machine screen to click *"👨‍🔧 मैं अटेंड कर रहा हूँ"* so the entire factory sees you are repairing it.\n` +
+src/components/HoldModal.tsx:193:        `✅ When repaired, click "रिपेयर पूरा हुआ" to automatically set the machine back to RUNNING.`
+src/components/HoldModal.tsx:259:            Machine Stop & Maintenance Alert (मशीन स्टॉप व मेंटेनेंस अलर्ट)
+src/components/HoldModal.tsx:263:          मशीन बंद करने पर मेंटेनेंस टीम को तत्काल अलर्ट चला जाएगा और मेंटेनेंस डेस्क पर टिकट दर्ज होगा।
+src/components/HoldModal.tsx:283:                Priority Level (प्राथमिकता):
+src/components/HoldModal.tsx:290:                <option value="Normal">🟢 Normal (साधारण)</option>
+src/components/HoldModal.tsx:291:                <option value="Urgent">🟠 Urgent (जरूरी)</option>
+src/components/HoldModal.tsx:292:                <option value="Critical">🔴 Critical (अति आवश्यक / लाइन जाम)</option>
+src/components/HoldModal.tsx:300:              Reason for Hold / Breakdown (स्टॉप का कारण):
+src/components/HoldModal.tsx:315:                <option value="Operator Lunch / Tea Break">Operator Lunch / Tea Break (चाय/लंच ब्रेक)</option>
+src/components/HoldModal.tsx:316:                <option value="Raw Material Supply Shortage">Raw Material Supply Shortage (मटेरियल कमी)</option>
+src/components/HoldModal.tsx:317:                <option value="Other Emergency Technical Fault">Other Emergency Technical Fault (अन्य आपातकालीन खराबी)</option>
+src/components/HoldModal.tsx:325:              Custom Description / Technical Details (विस्तृत जानकारी):
+src/components/HoldModal.tsx:340:              <span>Reporting Operator Name (ऑपरेटर का नाम):</span>
+src/components/HoldModal.tsx:351:          {/* Maintenance Phone Number Input & Quick Contacts (User requirement: "नंबर एक डालने की सुविधा चाहिए") */}
+src/components/HoldModal.tsx:356:                <span>Maintenance Phone Number (मेंटेनेंस नंबर):</span>
+src/components/HoldModal.tsx:393:              * आप ऊपर से संपर्क चुन सकते हैं या नया फोन नंबर सीधे टाइप कर सकते हैं।
+src/components/HoldModal.tsx:426:            <span>Stop Silently (केवल स्टॉप)</span>
+src/components/StockDetailModal.tsx:68:      name: 'Slit Rolls Stock (स्लिटिंग रोल्स)',
+src/components/StockDetailModal.tsx:72:      unitHindi: 'रोल्स',
+src/components/StockDetailModal.tsx:81:      name: 'Cut Crates Stock (कटिंग क्रेट्स)',
+src/components/StockDetailModal.tsx:85:      unitHindi: 'क्रेट्स',
+src/components/StockDetailModal.tsx:94:      name: 'Formed Crates Stock (फॉर्मिंग क्रेट्स)',
+src/components/StockDetailModal.tsx:98:      unitHindi: 'क्रेट्स',
+src/components/StockDetailModal.tsx:107:      name: 'QC Approved Stock (क्यू.सी. पास क्रेट्स)',
+src/components/StockDetailModal.tsx:111:      unitHindi: 'क्रेट्स',
+src/components/StockDetailModal.tsx:120:      name: 'Ready Packed Goods (डिस्पैच रेडी बॉक्सेस)',
+src/components/StockDetailModal.tsx:124:      unitHindi: 'बॉक्स',
+src/components/StockDetailModal.tsx:261:          title="Close Modal (बंद करें)"
+src/components/StockDetailModal.tsx:285:              प्रत्येक जॉब नंबर (Job ID), मदर रील (Reel No.), GSM और पेपर मिल के अनुसार सटीक स्टॉक
+src/components/StockDetailModal.tsx:286:              विवरण
+src/components/StockDetailModal.tsx:295:              Total In-Stock (कुल स्टॉक)
+src/components/StockDetailModal.tsx:302:              {totalLotsCount} अलग-अलग जॉब लॉट्स में
+src/components/StockDetailModal.tsx:308:              Active Job Lots (जॉब लॉट संख्या)
+src/components/StockDetailModal.tsx:319:              Estimated Pieces (अनुमानित नग)
+src/components/StockDetailModal.tsx:332:              Paper Mills in Stock (कागज़ ब्रांड)
+src/components/StockDetailModal.tsx:354:              placeholder="Search by Job ID, Reel No, Brand, GSM... (खोजें)"
+src/components/StockDetailModal.tsx:401:                    <th className="p-3">Order ID (ऑर्डर नं.)</th>
+src/components/StockDetailModal.tsx:402:                    <th className="p-3">Customer (ग्राहक)</th>
+src/components/StockDetailModal.tsx:495:                    <th className="p-3">Job ID (जॉब नंबर)</th>
+src/components/StockDetailModal.tsx:496:                    <th className="p-3">Mother Reel No. (मदर रील नं.)</th>
+src/components/StockDetailModal.tsx:497:                    <th className="p-3">Paper Mill (कागज़ ब्रांड)</th>
+src/components/StockDetailModal.tsx:671:              Close (बंद करें)
+src/components/MachineReadyNotificationModal.tsx:137:              मेंटेनेंस साइड से ओके है — मशीन रेडी!
+src/components/MachineReadyNotificationModal.tsx:158:                Total Downtime (बंद रहा):
+src/components/MachineReadyNotificationModal.tsx:189:              🛠️ Action Taken / Work Done (क्या काम किया):
+src/components/MachineReadyNotificationModal.tsx:199:              <span>Spare Parts Replaced (स्पेयर पार्ट्स):</span>
+src/components/MachineReadyNotificationModal.tsx:212:            <span>"मेरी साइड से मशीन ओके है। ऑपरेटर रन बटन दबाकर प्रोडक्शन चालू कर सकता है।"</span>
+src/components/MachineReadyNotificationModal.tsx:222:            Later / सिर्फ बंद करें
+src/components/MachineReadyNotificationModal.tsx:229:            <span>मशीन चालू करें (Resume Run)</span>
+src/components/BatchReportModal.tsx:141:  let stageSummaryTitle = 'Batch Initialized (प्रारंभिक चरण)';
+src/components/BatchReportModal.tsx:145:    stageSummaryTitle = 'Dispatched & Delivered (डिस्पैच पूर्ण)';
+src/components/BatchReportModal.tsx:148:    stageSummaryTitle = 'Stage 5: Packed & Sealed (पैकिंग पूर्ण - डिस्पैच हेतु तैयार)';
+src/components/BatchReportModal.tsx:151:    stageSummaryTitle = 'Stage 4: QC Approved (क्यू.सी. पास - पैकिंग हेतु तैयार)';
+src/components/BatchReportModal.tsx:155:      ? 'Stage 3: Forming In-Progress (फॉर्मिंग मशीन पर कार्य चालू)'
+src/components/BatchReportModal.tsx:156:      : 'Stage 3: Forming Done • QC Pending (फॉर्मिंग पूर्ण - क्यू.सी. बाकी)';
+src/components/BatchReportModal.tsx:160:      ? 'Stage 2: Cutting In-Progress (कटिंग मशीन पर कार्य चालू)'
+src/components/BatchReportModal.tsx:161:      : 'Stage 2: Cutting Done • Forming Pending (कटिंग पूर्ण - फॉर्मिंग बाकी)';
+src/components/BatchReportModal.tsx:164:    stageSummaryTitle = 'Stage 1: Slitting Completed • Awaiting Cutting (केवल स्लिटिंग हुई है - कटिंग पेंडिंग)';
+src/components/BatchReportModal.tsx:193:      { Parameter: 'Stage 4: QC Inspection', Value: qcCompleted ? `APPROVED by ${qcLog?.worker || 'QC Inspector'}` : 'Pending Inspection (क्यू.सी. पेंडिंग)' },
+src/components/BatchReportModal.tsx:212:2️⃣ *Cutting:* ${cutCompleted ? `✅ Done (${targetJob?.availableCuttingCrates || 0} Crates)` : cutRunning ? `⚡ RUNNING on ${runningCuttingBatch?.machine}` : '⏳ PENDING (प्रक्रिया बाकी)'}
+src/components/BatchReportModal.tsx:213:3️⃣ *Forming:* ${formCompleted ? `✅ Done (${targetJob?.availableFormingCrates || 0} Crates)` : formRunning ? `⚡ RUNNING on ${runningFormingBatch?.machine}` : '⏳ PENDING (प्रक्रिया बाकी)'}
+src/components/BatchReportModal.tsx:214:4️⃣ *QC Inspection:* ${qcCompleted ? `🛡️ APPROVED by ${qcLog?.worker || 'QC Inspector'}` : '⏳ PENDING INSPECTION (निरीक्षण बाकी)'}
+src/components/BatchReportModal.tsx:215:5️⃣ *Packing:* ${packCompleted ? `📦 Boxes Packed & Sealed` : '⏳ PENDING (पैकिंग बाकी)'}
+src/components/BatchReportModal.tsx:247:                लाइव उत्पादन प्रोग्रेस, वास्तविक एंट्री अनुसार स्टेज ट्रैकिंग
+src/components/BatchReportModal.tsx:414:                <span>1. Production Stage Telemetry & Audit Chain (चरणबद्ध उत्पादन विवरण)</span>
+src/components/BatchReportModal.tsx:417:                * केवल वही चरण स्वीकृत दिखेंगे जिनकी ऑपरेटर द्वारा वास्तविक एंट्री सबमिट हुई है
+src/components/BatchReportModal.tsx:425:                    <th className="p-2.5">Stage (चरण)</th>
+src/components/BatchReportModal.tsx:426:                    <th className="p-2.5">Machine (मशीन)</th>
+src/components/BatchReportModal.tsx:427:                    <th className="p-2.5">Operator (ऑपरेटर)</th>
+src/components/BatchReportModal.tsx:428:                    <th className="p-2.5">Shift & Time (शिफ्ट/समय)</th>
+src/components/BatchReportModal.tsx:429:                    <th className="p-2.5">Inputs & Output Recorded (मात्रा विवरण)</th>
+src/components/BatchReportModal.tsx:430:                    <th className="p-2.5 text-right">Stage Status (स्थिति)</th>
+src/components/BatchReportModal.tsx:439:                        <span>1. Slitting (स्लिटिंग)</span>
+src/components/BatchReportModal.tsx:456:                        <span className="text-slate-400 italic">स्लिटिंग अभी शुरू नहीं हुई</span>
+src/components/BatchReportModal.tsx:477:                        <span>2. Cutting (कटिंग)</span>
+src/components/BatchReportModal.tsx:493:                        <span className="text-amber-800 font-bold">मशीन पर कटिंग चालू है (In Progress)</span>
+src/components/BatchReportModal.tsx:495:                        <span className="text-slate-400 italic">कटिंग की एंट्री अभी नहीं हुई है (Not Started)</span>
+src/components/BatchReportModal.tsx:520:                        <span>3. Forming (फॉर्मिंग)</span>
+src/components/BatchReportModal.tsx:536:                        <span className="text-amber-800 font-bold">फॉर्मिंग प्रेस पर कार्य चालू है (In Progress)</span>
+src/components/BatchReportModal.tsx:538:                        <span className="text-slate-400 italic">फॉर्मिंग की एंट्री अभी नहीं हुई है (Not Started)</span>
+src/components/BatchReportModal.tsx:563:                        <span>4. QC Inspection (गुणवत्ता जांच)</span>
+src/components/BatchReportModal.tsx:579:                        <span className="text-slate-400 italic">क्यू.सी. निरीक्षण अभी बाकी है (Pending QC Audit)</span>
+src/components/BatchReportModal.tsx:600:                        <span>5. Packing (पैकिंग व बॉक्सिंग)</span>
+src/components/BatchReportModal.tsx:618:                        <span className="text-slate-400 italic">पैकिंग लाइन पर अभी नहीं पहुंचा (Pending Packing)</span>
+src/components/BatchReportModal.tsx:639:                        <span>6. Dispatch (डिस्पैच व इनवॉइस)</span>
+src/components/BatchReportModal.tsx:651:                        <span className="text-slate-500">फैक्ट्री वेयरहाउस में सुरक्षित (Ready in Warehouse)</span>
+src/components/BatchReportModal.tsx:759:                {qcCompleted ? `Clearance Granted: ${new Date().toLocaleDateString('en-GB')}` : 'निरीक्षण के बाद ही साइन होगा'}
+src/components/BatchReportModal.tsx:778:                {qcCompleted ? 'Final Authorized Signatory' : 'बैच प्रक्रियाधीन है'}
+src/components/LoginView.tsx:54:          <p className="font-bold text-amber-950 m-0">सुरक्षा प्रतिबंध (Login Required Policy):</p>
+src/components/LoginView.tsx:56:            Login के बिना Voice AI Floor Dictation, Google Search Grounding या कोई भी फ्लोर स्क्रीन डायरेक्ट एक्सेस नहीं हो सकती।
+src/components/LoginView.tsx:64:            Workstation Username (ऑपरेटर आईडी)
+src/components/LoginView.tsx:91:            Private Access Password (पासवर्ड)
+src/components/LoginView.tsx:120:            <span>अमान्य लॉगिन! गलत यूजरनेम या पासवर्ड। कृपया दोबारा प्रयास करें।</span>
+src/components/LoginView.tsx:130:          <span>Login & Open Floor Hub (लॉगिन करें)</span>
+src/components/CustomSparePartModal.tsx:28:      alert('⚠️ कृपया स्पेयर पार्ट का नाम दर्ज करें (Please enter spare part name)');
+src/components/CustomSparePartModal.tsx:82:                ➕ नया कस्टम स्पेयर पार्ट दर्ज करें (Add Custom Spare Part)
+src/components/CustomSparePartModal.tsx:85:                नया स्पेयर पार्ट का नाम, मात्रा व विवरण टाइप करें
+src/components/CustomSparePartModal.tsx:103:              <span>स्पेयर पार्ट का नाम (Spare Part Name): *</span>
+src/components/CustomSparePartModal.tsx:104:              <span className="text-[10px] text-rose-600 font-bold">अनिवार्य (Required)</span>
+src/components/CustomSparePartModal.tsx:112:              placeholder="उदा. Brass Bush 32mm / Heater Coil 2000W / Cutter Blade 160mm"
+src/components/CustomSparePartModal.tsx:116:              जो पार्ट लिस्ट में नहीं मिल रहा है, उसका सटीक नाम यहाँ लिखें
+src/components/CustomSparePartModal.tsx:124:              <span>कैटेगरी / विभाग (Category):</span>
+src/components/CustomSparePartModal.tsx:148:                संख्या / मात्रा (Qty): *
+src/components/CustomSparePartModal.tsx:162:                इकाई (Unit):
+src/components/CustomSparePartModal.tsx:181:              पार्ट नंबर / स्पेसिफिकेशन / नोट्स (Part No. / Specs - Optional):
+src/components/CustomSparePartModal.tsx:187:              placeholder="उदा. Model: Festo 24V DC / Size: 160mm x 25mm / Bin #B-04"
+src/components/CustomSparePartModal.tsx:199:              रद्द करें (Cancel)
+src/components/CustomSparePartModal.tsx:206:              <span>✅ यह स्पेयर पार्ट जोड़ें (Add to List)</span>
+src/components/NavigationHub.tsx:87:  const DEFAULT_POEM = `मेहनत और लगन से हर रोल को नया रूप हम देते हैं,
+src/components/NavigationHub.tsx:88:सटीक माप और शुद्ध गुणवत्ता से कारखाने का मान बढ़ाते हैं।
+src/components/NavigationHub.tsx:89:हर चम्मच, हर कांटा, हर पैक में है विश्वास हमारा,
+src/components/NavigationHub.tsx:90:वंडरक्राफ की शान है हर कामगार का पसीना प्यारा।`;
+src/components/NavigationHub.tsx:209:      subtitle: '8-Day Machine Output, 5-Day/1-Mo/6-Mo Operator Audit & Filter Reports (मशीन व ऑपरेटर रिपोर्ट)',
+src/components/NavigationHub.tsx:243:      subtitle: 'Material Indents, Vendor POs & Incoming Goods (माल प्राप्ति)',
+src/components/NavigationHub.tsx:309:      {/* DAILY FACTORY INSPIRATION POEM (दैनिक प्रेरणा कविता) */}
+src/components/NavigationHub.tsx:315:            <span>दैनिक प्रेरणा कविता (Factory Floor Inspiration)</span>
+src/components/NavigationHub.tsx:328:                <span>कविता अपडेट करें (Edit Poem)</span>
+src/components/NavigationHub.tsx:338:                  <span>सेव करें (Save)</span>
+src/components/NavigationHub.tsx:345:                  रद्द करें
+src/components/NavigationHub.tsx:352:                  मूल कविता
+src/components/NavigationHub.tsx:366:              placeholder="यहाँ अपनी पसंदीदा प्रेरणादायक कविता या कारखाना संदेश लिखें..."
+src/components/NavigationHub.tsx:389:                  <span>Material Indent (इंडेन्ट)</span>
+src/components/NavigationHub.tsx:401:                  मटेरियल व स्पेयर डिमांड ट्रैक करें
+src/components/NavigationHub.tsx:422:                  <span>Floor Manpower (मैनपावर)</span>
+src/components/NavigationHub.tsx:428:                  ऑपरेटर, 2-हेल्पर व मशीन आवंटन
+src/components/NavigationHub.tsx:457:                  लाइव उत्पादन प्रगति: स्लिटिंग ➔ कटिंग ➔ फॉर्मिंग ➔ क्यूसी ➔ पैकिंग (क्लिक करके सीधे डेस्क पर जाएँ)
+src/components/NavigationHub.tsx:495:                  hindi: 'स्लिटिंग',
+src/components/NavigationHub.tsx:505:                  hindi: 'कटिंग',
+src/components/NavigationHub.tsx:515:                  hindi: 'फॉर्मिंग',
+src/components/NavigationHub.tsx:525:                  hindi: 'क्वालिटी जांच',
+src/components/NavigationHub.tsx:535:                  hindi: 'बॉक्स पैकिंग',
+src/components/GlueUsageModal.tsx:151:                <span>एडहेसिव ग्लू यूज़ एंट्री</span>
+src/components/GlueUsageModal.tsx:176:                <span>ग्लू ब्रांड (Adhesive Glue Brand) *</span>
+src/components/GlueUsageModal.tsx:202:                ग्लू मात्रा (Quantity in KG / Litres) *
+src/components/GlueUsageModal.tsx:221:                शिफ्ट (Shift) *
+src/components/GlueUsageModal.tsx:238:                मशीन (Station / Machine) *
+src/components/GlueUsageModal.tsx:255:                डिपार्टमेंट / स्टेज (Department) *
+src/components/GlueUsageModal.tsx:262:                <option value="Cutting">Cutting Desk (कटिंग)</option>
+src/components/GlueUsageModal.tsx:263:                <option value="Forming">Forming Desk (फॉर्मिंग)</option>
+src/components/GlueUsageModal.tsx:264:                <option value="Slitting">Slitting Desk (स्लिटिंग)</option>
+src/components/GlueUsageModal.tsx:265:                <option value="Packing">Packing Station (पैकिंग)</option>
+src/components/GlueUsageModal.tsx:274:                ऑपरेटर / यूजर (Operator Name) *
+src/components/GlueUsageModal.tsx:288:                ड्रम / लॉट नंबर (Drum / Lot No.)
+src/components/GlueUsageModal.tsx:304:                जॉब आईडी (Job ID - Optional)
+src/components/GlueUsageModal.tsx:317:                बैच आईडी (Batch ID - Optional)
+src/components/GlueUsageModal.tsx:332:              उपयोग विवरण / टिप्पणी (Purpose / Remarks)
+src/components/GlueUsageModal.tsx:350:              रद्द करें (Cancel)
+src/components/GlueUsageModal.tsx:357:              <span>ग्लू यूज़ दर्ज करें (Save Entry)</span>
+src/components/MachineBreakdownBanner.tsx:81:                  🟡 REPAIR IN PROGRESS • काम चालू है
+src/components/MachineBreakdownBanner.tsx:88:                <span>कार्यरत टेक्नीशियन:</span>
+src/components/MachineBreakdownBanner.tsx:93:                  (⏱️ {currentRepairMins} मिनट से काम जारी है)
+src/components/MachineBreakdownBanner.tsx:101:              <span className="text-[10px] text-slate-500 uppercase block font-bold">कुल बंद समय:</span>
+src/components/MachineBreakdownBanner.tsx:110:              <span>रिपेयर पूरा हुआ - मशीन ओके करें</span>
+src/components/MachineBreakdownBanner.tsx:117:            <span className="text-slate-500 font-bold uppercase text-[11px]">समस्या (Reason):</span>
+src/components/MachineBreakdownBanner.tsx:121:            मशीन ठीक होते ही ऊपर दिए गए बटन से "रिपेयर पूरा हुआ" दर्ज करें।
+src/components/MachineBreakdownBanner.tsx:139:                🔴 BREAKDOWN • मशीन बंद है
+src/components/MachineBreakdownBanner.tsx:145:                (टेक्नीशियन का इंतज़ार • {totalDownMins} मिनट से बंद)
+src/components/MachineBreakdownBanner.tsx:149:              कारण: <span className="text-red-900">{displayReason}</span>
+src/components/MachineBreakdownBanner.tsx:161:            <span>👨‍🔧 मैं अटेंड कर रहा हूँ (Technician Reply)</span>
+src/components/MachineBreakdownBanner.tsx:168:          📢 जो मेंटेनेंस टेक्नीशियन इस मशीन पर काम करने आया है, वह <b>"मैं अटेंड कर रहा हूँ"</b> बटन दबाकर तुरंत काम शुरू दर्ज करे।
+src/components/MachineBreakdownBanner.tsx:176:            ब्रेकडाउन विवरण बदलें
+src/components/StationCrewModal.tsx:92:                <span>मशीन क्रू व हेल्पर आवंटन</span>
+src/components/StationCrewModal.tsx:116:              <span>मशीन ऑपरेटर (Main Machine Operator) *</span>
+src/components/StationCrewModal.tsx:154:                <span>आवंटित हेल्पर (Assigned Helpers on this Machine)</span>
+src/components/StationCrewModal.tsx:162:              कटिंग/मशीन चालू होते ही यह हेल्पर सीधे नीचे दिए गए मैनपावर ट्रैकर में ऑपरेटर के साथ लाइव दिखेंगे।
+src/components/StationCrewModal.tsx:193:                placeholder="नया हेल्पर नाम दर्ज करें (e.g. BABLU_HELPER)"
+src/components/StationCrewModal.tsx:201:                <span>जोड़ें</span>
+src/components/StationCrewModal.tsx:210:              <span>लाइव स्टेशन मैनपावर प्रीव्यू (Floor Tracker Preview)</span>
+src/components/StationCrewModal.tsx:213:              मशीन <strong>{machine}</strong> पर ऑपरेटर <strong>{operator || '...'}</strong> काम करेंगे तथा उनके साथ{' '}
+src/components/StationCrewModal.tsx:214:              <strong>{selectedHelpers.length} हेल्पर</strong> ({selectedHelpers.length > 0 ? selectedHelpers.join(', ') : 'कोई नहीं'}) तैनात रहेंगे।
+src/components/StationCrewModal.tsx:226:            रद्द करें (Cancel)
+src/components/StationCrewModal.tsx:234:            <span>क्रू व हेल्पर कन्फर्म करें (Save & Deploy)</span>
+src/components/OpeningStockModal.tsx:63:        return 'Rolls (रोल्स)';
+src/components/OpeningStockModal.tsx:67:        return 'Crates (क्रेट्स)';
+src/components/OpeningStockModal.tsx:69:        return 'Boxes (डिब्बे)';
+src/components/OpeningStockModal.tsx:78:      alert('⚠️ संख्या 0 या उससे अधिक होनी चाहिए।');
+src/components/OpeningStockModal.tsx:241:                किसी भी आइटम या स्टेज के लिए प्रारंभिक स्टॉक सीधे दर्ज या अपडेट करें
+src/components/OpeningStockModal.tsx:259:              1. उत्पाद चुनें (Select Product): *
+src/components/OpeningStockModal.tsx:278:                पेपर मिल / ब्रांड (Mill):
+src/components/OpeningStockModal.tsx:309:              <span>2. स्टॉक स्टेज चुनें (Select Production Stage): *</span>
+src/components/OpeningStockModal.tsx:310:              <span className="text-[11px] font-bold text-emerald-700">वर्तमान चयन: {stage}</span>
+src/components/OpeningStockModal.tsx:324:                <span className="text-[9px] opacity-80">स्लिट रोल्स</span>
+src/components/OpeningStockModal.tsx:338:                <span className="text-[9px] opacity-80">कटिंग क्रेट्स</span>
+src/components/OpeningStockModal.tsx:352:                <span className="text-[9px] opacity-80">फॉर्मिंग क्रेट्स</span>
+src/components/OpeningStockModal.tsx:366:                <span className="text-[9px] opacity-80">पास क्रेट्स</span>
+src/components/OpeningStockModal.tsx:380:                <span className="text-[9px] opacity-80">तैयार डिब्बे</span>
+src/components/OpeningStockModal.tsx:390:                  ओपनिंग स्टॉक संख्या ({getStageUnitLabel()}): *
+src/components/OpeningStockModal.tsx:406:                  अनुमानित पीस प्रति {stage === 'Rolls' ? 'रोल' : stage === 'Packed' ? 'बॉक्स' : 'क्रेट'} (Pcs/Unit):
+src/components/OpeningStockModal.tsx:421:                कुल अनुमानित पीस (Total Equivalent Pieces):
+src/components/OpeningStockModal.tsx:433:                लॉट / रील संदर्भ (Lot Reference):
+src/components/OpeningStockModal.tsx:447:                अपडेट का प्रकार (Action Mode):
+src/components/OpeningStockModal.tsx:459:                  + Add to Existing (जोड़ें)
+src/components/OpeningStockModal.tsx:470:                  Set Exact Balance (नया कुल)
+src/components/OpeningStockModal.tsx:483:              रद्द करें (Cancel)
+src/components/OpeningStockModal.tsx:490:              <span>💾 Save Opening Stock (ओपनिंग स्टॉक सेव करें)</span>
+src/components/ShiftHandoverHistoryModal.tsx:83:                ऑपरेटर शिफ्ट हैंडओवर रिकॉर्ड्स, उत्पादन संख्या एवं डिजिटल हस्ताक्षर सत्यापन
+src/components/ShiftHandoverHistoryModal.tsx:124:              <option value="ALL">All Departments (सभी विभाग)</option>
+src/components/ShiftHandoverHistoryModal.tsx:125:              <option value="SLITTING">Slitting (स्लिटिंग)</option>
+src/components/ShiftHandoverHistoryModal.tsx:126:              <option value="CUTTING">Cutting (कटिंग)</option>
+src/components/ShiftHandoverHistoryModal.tsx:127:              <option value="FORMING">Forming (फॉर्मिंग)</option>
+src/components/ShiftHandoverHistoryModal.tsx:128:              <option value="QC">QC Inspection (क्यूसी)</option>
+src/components/ShiftHandoverHistoryModal.tsx:129:              <option value="PACKING">Packing (पैकिंग)</option>
+src/components/ShiftHandoverHistoryModal.tsx:198:                      Relieved Operator (निवर्तमान)
+src/components/ShiftHandoverHistoryModal.tsx:208:                      Relieving Operator (आगामी)
+src/components/Header.tsx:91:            title="Machine & Operator Performance Audit (मशीन व ऑपरेटर परफ़ॉर्मेंस ऑडिट)"
+src/components/Header.tsx:104:            title="Live Plant Floor Workforce & Helpers Audit (लाईव मैनपावर व हेल्पर ट्रैकर)"
+src/components/Header.tsx:107:            <span>मैनपावर {manpowerCount !== undefined ? `(${manpowerCount})` : ''}</span>
+src/components/Header.tsx:117:            title="Material Requisition & Purchase Tracking (मटेरियल इंडेन्ट)"
+src/components/Header.tsx:120:            <span className="hidden sm:inline">इंडेन्ट (Requisition)</span>
+src/components/Header.tsx:134:            title="Shift Handover History & Operator Signatures Dossier (शिफ्ट हैंडओवर ऑडिट)"
+src/components/Header.tsx:137:            <span className="hidden md:inline">हैंडओवर</span>
+src/components/Header.tsx:147:            title="Re-hydrate & Synchronize State from IndexedDB (डेटा रिफ्रेश)"
+src/components/Header.tsx:192:              title="Switch Active Operator Desk (यूज़र बदलें)"
+src/App.tsx:809:          {/* Machine Ready Handover Notification Modal (User requested: मेंटेनेंस साइड से ओके होने पर पॉपअप) */}
+src/types.ts:80:  // Goods Receiving fields (जब माल आ जाए)

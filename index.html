@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Prevent benign Vite dev HMR websocket disconnection errors in the sandboxed preview environment -->
+    <script>
+      (function () {
+        function isViteWsError(err) {
+          if (!err) return false;
+          var msg = (err.message || err.stack || err.reason || String(err) || '').toLowerCase();
+          return msg.includes('websocket') || msg.includes('closed without opened') || msg.includes('vite');
+        }
+
+        window.addEventListener(
+          'unhandledrejection',
+          function (event) {
+            if (isViteWsError(event.reason)) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            }
+          },
+          true
+        );
+
+        window.addEventListener(
+          'error',
+          function (event) {
+            if (isViteWsError(event.error) || isViteWsError(event.message)) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            }
+          },
+          true
+        );
+
+        var NativeWebSocket = window.WebSocket;
+        if (typeof NativeWebSocket === 'function') {
+          function ViteHmrWebSocket(url, protocols) {
+            var isHmr =
+              protocols === 'vite-hmr' ||
+              (Array.isArray(protocols) && protocols.indexOf('vite-hmr') !== -1);
+
+            if (isHmr) {
+              var target = new EventTarget();
+              target.url = String(url);
+              target.protocol = 'vite-hmr';
+              target.readyState = 0;
+              target.bufferedAmount = 0;
+              target.extensions = '';
+              target.binaryType = 'blob';
+              target.send = function () {};
+              target.close = function () {
+                target.readyState = 3;
+                var ev = new Event('close');
+                if (typeof target.onclose === 'function') target.onclose(ev);
+                target.dispatchEvent(ev);
+              };
+
+              setTimeout(function () {
+                if (target.readyState === 0) {
+                  target.readyState = 1;
+                  var ev = new Event('open');
+                  if (typeof target.onopen === 'function') target.onopen(ev);
+                  target.dispatchEvent(ev);
+                }
+              }, 10);
+
+              return target;
+            }
+
+            return new NativeWebSocket(url, protocols);
+          }
+
+          ViteHmrWebSocket.prototype = NativeWebSocket.prototype;
+          ViteHmrWebSocket.CONNECTING = NativeWebSocket.CONNECTING;
+          ViteHmrWebSocket.OPEN = NativeWebSocket.OPEN;
+          ViteHmrWebSocket.CLOSING = NativeWebSocket.CLOSING;
+          ViteHmrWebSocket.CLOSED = NativeWebSocket.CLOSED;
+          window.WebSocket = ViteHmrWebSocket;
+        }
+      })();
+    </script>
+    <title>Wünderkraf Paperware ERP</title>
+    <meta name="description" content="Master Factory ERP & Production Suite with Voice Audio Transcription, Paper Stock Analytics, and Google Drive Cloud Backup" />
+    <meta property="og:title" content="Wünderkraf Paperware ERP" />
+    <meta property="og:description" content="Master Factory ERP & Production Suite with Voice Audio Transcription, Paper Stock Analytics, and Google Drive Cloud Backup" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1a365d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Wünderkraf ERP" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
