@@ -34,8 +34,11 @@ import {
   CheckCircle2,
   Tag,
   Box,
-  Wrench
-, Phone} from 'lucide-react';
+  Wrench,
+  Phone,
+  Cloud,
+  Wifi
+} from 'lucide-react';
 import {
   FactoryState,
   Job,
@@ -63,7 +66,7 @@ import {
 } from '../../lib/constants';
 import { triggerWhatsAppShiftNotification } from '../../lib/whatsappReports';
 import { exportToJSON, getCurrentExpectedShift } from '../../lib/utils';
-import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState } from '../../lib/storage';
+import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState, getCentralSyncEndpoint, setCustomSyncEndpoint, forceSyncWithCentral, getPendingSyncCount } from '../../lib/storage';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
 import { OpeningStockModal } from '../OpeningStockModal';
 
@@ -278,11 +281,60 @@ _If you received this message, your contact number and routing configuration are
     engine: string;
   } | null>(null);
 
+  // Central Sync Bridge Telemetry & Controls
+  const [syncEndpoint, setSyncEndpointState] = useState<string>(() => getCentralSyncEndpoint());
+  const [isEditingEndpoint, setIsEditingEndpoint] = useState<boolean>(false);
+  const [endpointInput, setEndpointInput] = useState<string>('');
+  const [pendingQueueCount, setPendingQueueCount] = useState<number>(0);
+  const [isSyncingBridge, setIsSyncingBridge] = useState<boolean>(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
+  const refreshSyncTelemetry = () => {
+    setSyncEndpointState(getCentralSyncEndpoint());
+    getPendingSyncCount().then(setPendingQueueCount).catch(() => {});
+  };
+
   useEffect(() => {
     if (activeTab === 'backup_restore') {
       getStorageHealth().then(setStorageHealth).catch(() => {});
+      refreshSyncTelemetry();
     }
   }, [activeTab]);
+
+  const handleManualCentralSync = async () => {
+    setIsSyncingBridge(true);
+    setSyncStatusMsg(null);
+    try {
+      const result = await forceSyncWithCentral(state);
+      if (result.syncedState) {
+        onSaveState(result.syncedState);
+      }
+      setSyncStatusMsg(result.message);
+      refreshSyncTelemetry();
+    } catch (err: any) {
+      setSyncStatusMsg(`Sync failed: ${err.message}`);
+    } finally {
+      setIsSyncingBridge(false);
+      setTimeout(() => setSyncStatusMsg(null), 5000);
+    }
+  };
+
+  const handleSaveCustomEndpoint = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCustomSyncEndpoint(endpointInput);
+    setSyncEndpointState(getCentralSyncEndpoint());
+    setIsEditingEndpoint(false);
+    refreshSyncTelemetry();
+    alert('Central Sync Endpoint updated!');
+  };
+
+  const handleResetEndpoint = () => {
+    setCustomSyncEndpoint('');
+    setSyncEndpointState(getCentralSyncEndpoint());
+    setIsEditingEndpoint(false);
+    refreshSyncTelemetry();
+    alert('Reset to default same-origin /api/sync/state endpoint.');
+  };
 
   // ==========================================
   // AUTO-NUMBERING & BATCH PREFIX MASTER STATE
@@ -5256,6 +5308,121 @@ ${formLines.join('\n')}
                 <span className="text-[10px] text-slate-400 block">
                   {state.archivedJobs?.length || 0} Jobs, {state.archivedLogs?.length || 0} Logs
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Central Sync Bridge (100_2026_V1 Multi-Device Bidirectional Sync) */}
+          <div className="bg-white border border-blue-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center font-black">
+                  <Cloud className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Central Sync Bridge (100_2026_V1)</div>
+                  <div className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <span>Multi-Device Convergence & Offline Write-Queue</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <Wifi className="w-3 h-3" /> LIVE BIDIRECTIONAL
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleManualCentralSync}
+                  disabled={isSyncingBridge}
+                  className="px-4 py-2 bg-[#2b6cb0] hover:bg-[#1a365d] disabled:opacity-50 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingBridge ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingBridge ? 'Synchronizing...' : 'Force Central Sync Now'}</span>
+                </button>
+              </div>
+            </div>
+
+            {syncStatusMsg && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>{syncStatusMsg}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-xs">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-500 font-bold block">Active Central Sync Endpoint</span>
+                <span className="font-mono text-xs text-slate-800 break-all font-semibold block mt-1">
+                  {syncEndpoint}
+                </span>
+                <div className="mt-2 flex items-center gap-2">
+                  {!isEditingEndpoint ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEndpointInput(syncEndpoint);
+                        setIsEditingEndpoint(true);
+                      }}
+                      className="text-[11px] font-bold text-blue-700 hover:text-blue-900 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit className="w-3 h-3" /> Change Endpoint URL
+                    </button>
+                  ) : (
+                    <form onSubmit={handleSaveCustomEndpoint} className="w-full mt-2 space-y-2">
+                      <input
+                        type="url"
+                        value={endpointInput}
+                        onChange={(e) => setEndpointInput(e.target.value)}
+                        placeholder="https://your-server.com/api/sync/state"
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg font-mono focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="submit"
+                          className="px-2.5 py-1 bg-blue-600 text-white rounded font-bold text-[11px] cursor-pointer hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingEndpoint(false)}
+                          className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded font-bold text-[11px] cursor-pointer hover:bg-slate-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleResetEndpoint}
+                          className="text-[11px] text-red-600 hover:underline cursor-pointer ml-auto"
+                        >
+                          Reset to Default
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-500 font-bold block">Offline Write-Queue Backlog</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="font-extrabold text-slate-900 text-base">{pendingQueueCount}</span>
+                  <span className="text-[11px] text-slate-500">entries awaiting push</span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                  Entries recorded while floor devices experience momentary WiFi disconnects are retained in IndexedDB and automatically synced as soon as connectivity resumes.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-500 font-bold block">Cross-Device Convergence</span>
+                <span className="font-bold text-emerald-700 flex items-center gap-1.5 mt-1">
+                  <CheckCircle2 className="w-4 h-4" /> Real-time State Mirroring Active
+                </span>
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                  Every entry saved on any device (Planning, Slitting, Cutting, QC) instantly commits to IndexedDB and broadcasts to the central shared repository.
+                </p>
               </div>
             </div>
           </div>

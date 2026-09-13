@@ -1,9 +1,11 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
+import { mergeFactoryStates } from './src/lib/syncMerge';
 
 dotenv.config();
 
@@ -13,9 +15,118 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
+// Shared repository file path for Central Sync Bridge
+const DATA_DIR = path.join(process.cwd(), 'data');
+const CENTRAL_STATE_FILE = path.join(DATA_DIR, 'central_factory_state.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (e) {
+    console.error('Failed to create data directory:', e);
+  }
+}
+
+// In-memory cache of central state
+let cachedCentralState: any = null;
+function loadCentralStateFromDisk(): any {
+  try {
+    if (fs.existsSync(CENTRAL_STATE_FILE)) {
+      const raw = fs.readFileSync(CENTRAL_STATE_FILE, 'utf8');
+      cachedCentralState = JSON.parse(raw);
+      return cachedCentralState;
+    }
+  } catch (e) {
+    console.error('Failed to read central state file:', e);
+  }
+  return cachedCentralState;
+}
+
+function saveCentralStateToDisk(state: any): boolean {
+  try {
+    cachedCentralState = state;
+    const tempFile = `${CENTRAL_STATE_FILE}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(state, null, 2), 'utf8');
+    fs.renameSync(tempFile, CENTRAL_STATE_FILE);
+    return true;
+  } catch (e) {
+    console.error('Failed to write central state file:', e);
+    return false;
+  }
+}
+
+// Initialize on boot
+loadCentralStateFromDisk();
+
 // Body parser
 app.use(express.json({ limit: '150mb' }));
 app.use(express.urlencoded({ extended: true, limit: '150mb' }));
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'Wünderkraf Paperware ERP Server'
+  });
+});
+
+// Central Sync Bridge Endpoints (Bidirectional Sync across all recording devices)
+app.get('/api/sync/state', (req, res) => {
+  try {
+    const state = loadCentralStateFromDisk();
+    const stats = fs.existsSync(CENTRAL_STATE_FILE) ? fs.statSync(CENTRAL_STATE_FILE) : null;
+    res.json({
+      success: true,
+      timestamp: stats?.mtimeMs || Date.now(),
+      state: state || null,
+      jobCount: state?.jobs?.length || 0,
+      logCount: state?.logs?.length || 0
+    });
+  } catch (err: any) {
+    console.error('Central sync GET error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/sync/state', (req, res) => {
+  try {
+    const incomingPayload = req.body;
+    const incomingState = incomingPayload.state || incomingPayload;
+
+    if (!incomingState || !Array.isArray(incomingState.jobs)) {
+      return res.status(400).json({ success: false, error: 'Invalid state payload: jobs array required' });
+    }
+
+    const currentBase = loadCentralStateFromDisk();
+    const mergedState = mergeFactoryStates(currentBase, incomingState);
+    const saved = saveCentralStateToDisk(mergedState);
+
+    res.json({
+      success: saved,
+      timestamp: Date.now(),
+      state: mergedState,
+      jobCount: mergedState.jobs?.length || 0,
+      logCount: mergedState.logs?.length || 0
+    });
+  } catch (err: any) {
+    console.error('Central sync POST error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/sync/status', (req, res) => {
+  const exists = fs.existsSync(CENTRAL_STATE_FILE);
+  const stats = exists ? fs.statSync(CENTRAL_STATE_FILE) : null;
+  res.json({
+    status: 'operational',
+    bridge: '100_2026_V1 Bidirectional Sync Bridge',
+    hasCentralState: exists,
+    sizeBytes: stats?.size || 0,
+    lastModified: stats?.mtime || null
+  });
+});
 
 // Lazy Google GenAI initialization
 let aiClient: GoogleGenAI | null = null;
@@ -29,15 +140,6 @@ function getAI(): GoogleGenAI {
   }
   return aiClient;
 }
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'Wünderkraf Paperware ERP Server'
-  });
-});
 
 // Audio Transcription API Endpoint
 // Uses gemini-3.5-transcribe as requested by feature specification

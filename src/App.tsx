@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { FactoryState, CurrentView, ProductType } from './types';
 import { INITIAL_STATE, LOCAL_STORAGE_KEY, DEFAULT_USERS } from './lib/constants';
-import { initializeFactoryState, persistFactoryState } from './lib/storage';
+import { initializeFactoryState, persistFactoryState, forceSyncWithCentral, subscribeToSyncEvents } from './lib/storage';
 
 // Header & Navigation Hub
 import { Header } from './components/Header';
@@ -96,7 +96,7 @@ export const App: React.FC = () => {
     return INITIAL_STATE;
   });
 
-  // Asynchronous IndexedDB hydration on app start to retrieve deep storage without quota limitations
+  // Asynchronous IndexedDB + Central Sync Bridge hydration on app start
   useEffect(() => {
     let isMounted = true;
     initializeFactoryState()
@@ -109,11 +109,24 @@ export const App: React.FC = () => {
         }
       })
       .catch((err) => {
-        console.warn('[Storage] Could not initialize from IndexedDB:', err);
+        console.warn('[Storage] Could not initialize state:', err);
       });
+
+    // Listen for live updates from other devices / tabs via Central Sync Bridge bus
+    const unsubscribe = subscribeToSyncEvents((syncedState) => {
+      if (isMounted && syncedState && Array.isArray(syncedState.jobs)) {
+        setState((prev) => {
+          if (syncedState.users?.admin && !syncedState.users.admin.perms?.includes('*')) {
+            syncedState.users.admin.perms = ['*'];
+          }
+          return syncedState;
+        });
+      }
+    });
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -288,21 +301,26 @@ export const App: React.FC = () => {
     });
   };
 
-  // Re-hydrate complete factory state from high-capacity IndexedDB on user demand
+  // Re-hydrate and synchronize state across all devices via Central Sync Bridge & IndexedDB
   const handleRefreshState = async () => {
     setIsRefreshingState(true);
     try {
-      const loadedState = await initializeFactoryState();
-      if (loadedState) {
-        if (loadedState.users?.admin && !loadedState.users.admin.perms?.includes('*')) {
-          loadedState.users.admin.perms = ['*'];
+      const syncResult = await forceSyncWithCentral(state);
+      if (syncResult && syncResult.syncedState) {
+        if (syncResult.syncedState.users?.admin && !syncResult.syncedState.users.admin.perms?.includes('*')) {
+          syncResult.syncedState.users.admin.perms = ['*'];
         }
-        setState(loadedState);
-        setRefreshToast('Factory state re-hydrated & synchronized with IndexedDB!');
+        setState(syncResult.syncedState);
+        setRefreshToast(syncResult.message);
         setTimeout(() => setRefreshToast(null), 3500);
       }
     } catch (err) {
-      console.warn('[Storage] Refresh error from IndexedDB:', err);
+      console.warn('[Storage] Refresh error from Central Bridge:', err);
+      // Fallback local hydration
+      const localState = await initializeFactoryState();
+      if (localState) {
+        setState(localState);
+      }
     } finally {
       setTimeout(() => {
         setIsRefreshingState(false);
