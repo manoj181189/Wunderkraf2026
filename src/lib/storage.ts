@@ -459,63 +459,51 @@ export async function forceSyncWithCentral(currentState: FactoryState): Promise<
   syncedState: FactoryState;
   message: string;
 }> {
-  let convergedState = currentState;
   let cloudSuccess = false;
 
   // 1. Flush offline queue first
   await flushOfflineSyncQueue().catch(() => {});
 
-  // 2. Synchronize with Firestore Cloud (GitHub Pages & Multi-Device)
+  // 2. Push current local state (authoritative when user explicitly clicks Sync) to Firestore Cloud
   if (isFirebaseConfigured()) {
     try {
-      const cloudState = await fetchStateFromCloud();
-      if (cloudState) {
-        convergedState = mergeFactoryStates(cloudState, convergedState);
-      }
-      await syncStateToCloud(convergedState);
-      await saveToIndexedDB(convergedState);
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(convergedState));
-      } catch (e) {}
+      await syncStateToCloud(currentState);
       cloudSuccess = true;
     } catch (e) {
-      console.warn('[FirebaseSync] Force sync error:', e);
+      console.warn('[FirebaseSync] Force sync push error:', e);
     }
   }
 
-  // 3. Synchronize with local/custom HTTP endpoint
+  // 3. Push to local/custom HTTP endpoint
   try {
-    const centralState = await fetchCentralState();
-    if (centralState) {
-      convergedState = mergeFactoryStates(centralState, convergedState);
-      await saveToIndexedDB(convergedState);
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(convergedState));
-      } catch (e) {}
-
-      const endpoint = getCentralSyncEndpoint();
-      await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: convergedState, clientTimestamp: Date.now() })
-      }).catch(() => {});
-    }
+    const endpoint = getCentralSyncEndpoint();
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: currentState, clientTimestamp: Date.now() })
+    }).catch(() => {});
   } catch (err: any) {
-    console.warn('[Sync Bridge] HTTP Force sync error:', err);
+    console.warn('[Sync Bridge] HTTP Force sync push error:', err);
   }
+
+  // 4. Persist locally
+  await saveToIndexedDB(currentState);
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentState));
+  } catch (e) {}
 
   if (cloudSuccess) {
     return {
       success: true,
-      syncedState: convergedState,
-      message: 'Cloud Sync Successful: All devices on GitHub Pages & mobile are synchronized!'
+      syncedState: currentState,
+      message: 'Cloud Sync Successful: Local entries & deletions successfully pushed to Cloud & GitHub Pages!'
     };
   }
 
   return {
     success: true,
-    syncedState: convergedState,
-    message: 'Sync updated and persisted to local offline engine.'
+    syncedState: currentState,
+    message: 'Sync updated and persisted. Deletions and updates saved successfully.'
   };
 }
 
