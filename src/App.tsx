@@ -305,7 +305,7 @@ export const App: React.FC = () => {
   // Persistence effect: Writes to high-capacity IndexedDB and mirrors safely with auto-pruning to localStorage
   const handleSaveState = async (nextState: FactoryState) => {
     setState(nextState);
-    const result = await persistFactoryState(nextState);
+    const result = await persistFactoryState(nextState, state);
     if (result.mergedState) {
       setState(result.mergedState);
     }

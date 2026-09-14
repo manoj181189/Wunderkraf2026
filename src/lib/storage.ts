@@ -312,7 +312,10 @@ export async function fetchCentralState(): Promise<FactoryState | null> {
  * 4. Broadcasts to same-device tabs.
  * 5. Asynchronously flushes to central shared endpoint.
  */
-export async function persistFactoryState(nextState: FactoryState): Promise<{
+export async function persistFactoryState(
+  nextState: FactoryState,
+  currentState: FactoryState
+): Promise<{
   success: boolean;
   savedToIndexedDB: boolean;
   savedToLocalStorage: boolean;
@@ -322,8 +325,7 @@ export async function persistFactoryState(nextState: FactoryState): Promise<{
   let savedToLocalStorage = false;
 
   // Merge with latest local authoritative state before persistence
-  const current = await loadFromIndexedDB();
-  const merged = current ? mergeFactoryStates(current, nextState) : nextState;
+  const merged = mergeFactoryStates(currentState, nextState);
 
   // 1. Primary IndexedDB write
   try {
@@ -631,7 +633,7 @@ export function importDatabaseBackup(file: File): Promise<FactoryState> {
           throw new Error('Backup file is missing required "jobs" array');
         }
 
-        await persistFactoryState(stateCandidate);
+        await persistFactoryState(stateCandidate, stateCandidate);
         resolve(stateCandidate);
       } catch (err: any) {
         reject(new Error(err.message || 'Failed to parse database backup JSON'));
