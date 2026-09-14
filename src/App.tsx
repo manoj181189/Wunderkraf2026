@@ -303,11 +303,12 @@ export const App: React.FC = () => {
   }, [state]);
 
   // Persistence effect: Writes to high-capacity IndexedDB and mirrors safely with auto-pruning to localStorage
-  const handleSaveState = (nextState: FactoryState) => {
+  const handleSaveState = async (nextState: FactoryState) => {
     setState(nextState);
-    persistFactoryState(nextState).catch((e) => {
-      console.error('[Storage] Failed to persist factory state:', e);
-    });
+    const result = await persistFactoryState(nextState);
+    if (result.mergedState) {
+      setState(result.mergedState);
+    }
   };
 
   // Re-hydrate and synchronize state across all devices via Central Sync Bridge & IndexedDB

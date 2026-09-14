@@ -316,27 +316,32 @@ export async function persistFactoryState(nextState: FactoryState): Promise<{
   success: boolean;
   savedToIndexedDB: boolean;
   savedToLocalStorage: boolean;
+  mergedState: FactoryState;
 }> {
   let savedToIndexedDB = false;
   let savedToLocalStorage = false;
 
+  // Merge with latest local authoritative state before persistence
+  const current = await loadFromIndexedDB();
+  const merged = current ? mergeFactoryStates(current, nextState) : nextState;
+
   // 1. Primary IndexedDB write
   try {
-    savedToIndexedDB = await saveToIndexedDB(nextState);
+    savedToIndexedDB = await saveToIndexedDB(merged);
   } catch (e) {
     console.error('[Storage] Error during IndexedDB persistence:', e);
   }
 
   // 2. Mirror to localStorage with auto-pruning if quota reached
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextState));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
     savedToLocalStorage = true;
   } catch (localStorageErr: any) {
     console.warn('[Storage] localStorage quota reached. Attempting defensive pruning...', localStorageErr);
     try {
       const trimmedState: FactoryState = {
-        ...nextState,
-        logs: (nextState.logs || []).slice(-100)
+        ...merged,
+        logs: (merged.logs || []).slice(-100)
       };
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(trimmedState));
       savedToLocalStorage = true;
@@ -346,14 +351,14 @@ export async function persistFactoryState(nextState: FactoryState): Promise<{
   }
 
   // 3. Enqueue to offline write-queue for central sync
-  await enqueueOfflineSync(nextState);
+  await enqueueOfflineSync(merged);
 
   // 4. Notify all local tabs on same browser
-  syncBus?.postMessage({ type: 'STATE_CHANGED', state: nextState });
+  syncBus?.postMessage({ type: 'STATE_CHANGED', state: merged });
 
   // 5. Real-time Multi-Device Cloud Sync (Firestore: Works on GitHub Pages worldwide)
   if (isFirebaseConfigured()) {
-    syncStateToCloud(nextState).catch((err) => {
+    syncStateToCloud(merged).catch((err) => {
       console.warn('[FirebaseSync] Background cloud sync deferred:', err);
     });
   }
@@ -364,7 +369,8 @@ export async function persistFactoryState(nextState: FactoryState): Promise<{
   return {
     success: savedToIndexedDB || savedToLocalStorage,
     savedToIndexedDB,
-    savedToLocalStorage
+    savedToLocalStorage,
+    mergedState: merged
   };
 }
 

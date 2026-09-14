@@ -224,10 +224,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const { job, batch } = activeBatchObj;
     const forwardedFormedPcs = Math.round(qty * effectiveFormPcs);
 
-    // Dynamic conversion standards: Cutting baseline = 10,000 pcs/crate, Forming baseline = 7,000 pcs/crate
-    const cutCrateCapacity = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 10000;
+    // Dynamic conversion standards: Forming capacity per crate
+    const formingCrateCapacity = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * cutCrateCapacity;
+    const totalInputPieces = inputCrates * formingCrateCapacity;
     const prevProducedPieces = batch.producedPieces || 0;
     const prevProducedCrates = batch.producedQty || 0;
     const cumulativeOutputPieces = prevProducedPieces + forwardedFormedPcs;
@@ -567,10 +567,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
     const { job, batch } = activeBatchObj;
 
-    // Dynamic conversion standards: Cutting baseline = 10,000 pcs/crate, Forming baseline = 7,000 pcs/crate
-    const cutCrateCapacity = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 10000;
+    // Dynamic conversion standards: Forming capacity per crate
+    const formingCrateCapacity = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * cutCrateCapacity;
+    const totalInputPieces = inputCrates * formingCrateCapacity;
 
     const currentOutputPieces = Math.round(cratesDone * effectiveFormPcs) + looseDone;
     const prevProducedPieces = batch.producedPieces || 0;

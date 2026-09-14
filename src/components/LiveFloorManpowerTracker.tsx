@@ -207,8 +207,9 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
     if (!editingStation) return;
     const { machine, operator, currentHelpers } = editingStation;
 
-    // Update floorWorkers: unpair existing helpers for this machine, then assign new helpers
+    // Update floorWorkers: unpair existing helpers for this machine/operator, then assign new helpers
     const updatedWorkers = workers.map((w) => {
+      // If this worker is in the new list, assign them
       if (currentHelpers.includes(w.name)) {
         return {
           ...w,
@@ -217,8 +218,9 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
           isPresent: true
         };
       }
-      // If the worker was a helper previously assigned to this machine or paired with this operator, clear their assignment
-      if (w.role === 'HELPER' && (w.assignedMachine === machine || w.pairedWithOperator === operator)) {
+      
+      // If the worker was a helper previously paired with this operator, unpair them
+      if (w.role === 'HELPER' && w.pairedWithOperator === operator) {
         return {
           ...w,
           assignedMachine: undefined,
@@ -696,7 +698,20 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
 
                     <td className="p-3 text-slate-500 font-mono text-[11px]">{w.inTime || '08:00 AM'}</td>
 
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to remove ${w.name} from the roster?`)) {
+                            onSaveState({
+                              ...state,
+                              floorWorkers: workers.filter((worker) => worker.id !== w.id),
+                            });
+                          }
+                        }}
+                        className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-[10px] font-bold cursor-pointer"
+                      >
+                        Delete
+                      </button>
                       <button
                         onClick={() => handleToggleAttendance(w.id)}
                         className={`px-3 py-1 rounded-full text-xs font-extrabold transition cursor-pointer active:scale-95 ${
