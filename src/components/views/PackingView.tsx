@@ -1158,7 +1158,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
                   className="py-2.5 px-3 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Pause className="w-4 h-4" />
-                  <span>Hold Station</span>
+                  <span>Call In-Charge / Report Hold</span>
                 </button>
               ) : (
                 <button

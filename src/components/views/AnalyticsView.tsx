@@ -17,7 +17,8 @@ import {
   Filter,
   Activity,
   UserCheck,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { FactoryState } from '../../types';
 import { calculateAvailableScrapKg, exportToCSV } from '../../lib/utils';
@@ -69,6 +70,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
   const [scrapSoldKg, setScrapSoldKg] = useState('');
   const [ratePerKg, setRatePerKg] = useState('18');
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // Interactive Scrap Telemetry Drilldown Modal State
+  const [scrapDrilldownModal, setScrapDrilldownModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle: string;
+    events: NormalizedProductionEvent[];
+  } | null>(null);
 
   const logs = state.logs || [];
   const scrapSales = state.scrapSales || [];
@@ -536,10 +545,28 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 rounded-xl p-4">
-              <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">
-                Machine Scrap & Defects
-              </span>
+            <button
+              type="button"
+              onClick={() => {
+                const scrapEvents = (machineStats.events || []).filter((e) => (e.scrapKg && e.scrapKg > 0) || (e.scrapPieces && e.scrapPieces > 0));
+                setScrapDrilldownModal({
+                  isOpen: true,
+                  title: `Scrap & Defects Trace: ${selectedMachine === 'ALL' ? 'All Plant Machines' : selectedMachine}`,
+                  subtitle: `Detailed batch log with exact Batch ID, Machine, Operator, and Defect reason (${scrapEvents.length} records)`,
+                  events: scrapEvents
+                });
+              }}
+              className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 hover:border-rose-400 rounded-xl p-4 text-left transition hover:shadow-md cursor-pointer group"
+              title="Click to trace all scrap batches for this machine filter"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">
+                  Machine Scrap & Defects
+                </span>
+                <span className="text-[10px] text-rose-600 font-extrabold bg-rose-100 px-1.5 py-0.2 rounded border border-rose-200 group-hover:bg-rose-600 group-hover:text-white transition">
+                  🔍 Drill Down
+                </span>
+              </div>
               <div className="text-2xl font-black text-rose-950 mt-1">
                 {machineStats.totalScrapKg} <span className="text-xs font-bold text-rose-700">KG</span>
                 {machineStats.totalScrapPieces > 0 && (
@@ -548,10 +575,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-rose-700 font-semibold mt-1">
-                Yield: {machineStats.yieldPercent}% Good Output
+              <div className="text-[11px] text-rose-700 font-semibold mt-1 flex items-center justify-between">
+                <span>Yield: {machineStats.yieldPercent}% Good Output</span>
+                <span className="text-[10px] font-bold underline group-hover:text-rose-900">Trace Logs ➔</span>
               </div>
-            </div>
+            </button>
 
             <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-4">
               <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wide">
@@ -935,17 +963,36 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-rose-50 to-amber-50 border border-rose-200 rounded-xl p-4">
-              <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">
-                Scrap & Defect Rate %
-              </span>
+            <button
+              type="button"
+              onClick={() => {
+                const scrapEvents = (operatorStats.events || []).filter((e) => (e.scrapKg && e.scrapKg > 0) || (e.scrapPieces && e.scrapPieces > 0));
+                setScrapDrilldownModal({
+                  isOpen: true,
+                  title: `Operator Scrap Trace: ${selectedOperator === 'ALL' ? 'All Plant Operators' : selectedOperator}`,
+                  subtitle: `Detailed run log with exact Batch ID, Machine, Stage, and Waste generated (${scrapEvents.length} records)`,
+                  events: scrapEvents
+                });
+              }}
+              className="bg-gradient-to-br from-rose-50 to-amber-50 border border-rose-200 hover:border-rose-400 rounded-xl p-4 text-left transition hover:shadow-md cursor-pointer group"
+              title="Click to trace all scrap events for this operator"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">
+                  Scrap & Defect Rate %
+                </span>
+                <span className="text-[10px] text-rose-600 font-extrabold bg-rose-100 px-1.5 py-0.2 rounded border border-rose-200 group-hover:bg-rose-600 group-hover:text-white transition">
+                  🔍 Drill Down
+                </span>
+              </div>
               <div className="text-2xl font-black text-rose-950 mt-1">
                 {operatorStats.scrapRatePercent}%
               </div>
-              <div className="text-[11px] text-rose-700 font-semibold mt-1">
-                Total Scrap: {operatorStats.totalScrapKg} KG {operatorStats.totalScrapPieces > 0 ? `• ${operatorStats.totalScrapPieces} Pcs` : ''}
+              <div className="text-[11px] text-rose-700 font-semibold mt-1 flex items-center justify-between">
+                <span>Total Scrap: {operatorStats.totalScrapKg} KG {operatorStats.totalScrapPieces > 0 ? `• ${operatorStats.totalScrapPieces} Pcs` : ''}</span>
+                <span className="text-[10px] font-bold underline group-hover:text-rose-900">Trace Logs ➔</span>
               </div>
-            </div>
+            </button>
 
             <div className="bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-4">
               <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wide">
@@ -1233,9 +1280,23 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
                 Paper Scrap Management & Recycling Sales
               </h4>
             </div>
-            <div className="px-3 py-1 bg-rose-100 border border-rose-300 rounded-lg text-xs font-extrabold text-rose-900">
-              Available Warehouse Scrap: {(availableScrap ?? 0).toLocaleString()} KG
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const allScrapEvents = allEvents.filter((e) => (e.scrapKg && e.scrapKg > 0) || (e.scrapPieces && e.scrapPieces > 0));
+                setScrapDrilldownModal({
+                  isOpen: true,
+                  title: 'Warehouse Scrap Origin & Generation Log',
+                  subtitle: `Tracking ${allScrapEvents.length} distinct scrap-generating events across Slitting, Cutting, Forming, and QC`,
+                  events: allScrapEvents
+                });
+              }}
+              className="px-3 py-1 bg-rose-100 hover:bg-rose-200 border border-rose-300 rounded-lg text-xs font-extrabold text-rose-900 cursor-pointer transition flex items-center gap-1.5 group shadow-2xs"
+              title="Click to view itemized scrap origins by Batch, Machine, and Operator"
+            >
+              <span>Available Warehouse Scrap: {(availableScrap ?? 0).toLocaleString()} KG</span>
+              <span className="text-[10px] bg-rose-700 text-white px-1.5 py-0.2 rounded font-bold">🔍 View Trace</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1388,6 +1449,142 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
                   <Bar dataKey="pieces" fill="#319795" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================================= */}
+      {/* INTERACTIVE SCRAP TELEMETRY & TRACEABILITY DRILL-DOWN MODAL                               */}
+      {/* ========================================================================================= */}
+      {scrapDrilldownModal?.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-300 rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 bg-gradient-to-r from-rose-900 to-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-rose-500/30 text-rose-300 flex items-center justify-center">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wide m-0 text-white">
+                    {scrapDrilldownModal.title}
+                  </h3>
+                  <p className="text-[11px] text-rose-200 m-0">
+                    {scrapDrilldownModal.subtitle}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScrapDrilldownModal(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Table Content */}
+            <div className="p-4 overflow-y-auto flex-1 space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <span className="font-bold">
+                  Total Scrap Recorded: <span className="text-rose-700 font-extrabold">{scrapDrilldownModal.events.reduce((acc, e) => acc + (e.scrapKg || 0), 0)} KG</span>
+                  {' • '}
+                  <span className="text-rose-700 font-extrabold">{scrapDrilldownModal.events.reduce((acc, e) => acc + (e.scrapPieces || 0), 0)} Pieces</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const csvRows = scrapDrilldownModal.events.map((e) => ({
+                      'Event ID': e.id,
+                      'Job ID': e.jobId || 'N/A',
+                      'Product': e.product || 'N/A',
+                      'Stage': e.stage,
+                      'Machine': e.machine,
+                      'Operator': e.operator,
+                      'Shift': e.shift,
+                      'Date': e.date,
+                      'Timestamp': e.timestamp,
+                      'Scrap KG': e.scrapKg || 0,
+                      'Scrap Pcs': e.scrapPieces || 0,
+                      'Details': e.action
+                    }));
+                    exportToCSV(`scrap_traceability_${new Date().toISOString().split('T')[0]}.csv`, csvRows);
+                  }}
+                  className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold text-[11px] flex items-center gap-1 cursor-pointer transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export CSV</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                      <th className="p-2.5">Date & Time</th>
+                      <th className="p-2.5">Batch / Job</th>
+                      <th className="p-2.5">Stage</th>
+                      <th className="p-2.5">Machine</th>
+                      <th className="p-2.5">Responsible Operator</th>
+                      <th className="p-2.5 text-right">Scrap (KG)</th>
+                      <th className="p-2.5 text-right">Scrap (Pcs)</th>
+                      <th className="p-2.5">Action Log / Remark</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {scrapDrilldownModal.events.length > 0 ? (
+                      scrapDrilldownModal.events.map((ev, idx) => (
+                        <tr key={idx} className="hover:bg-rose-50/40">
+                          <td className="p-2.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                            {ev.date} {ev.timestamp?.split(' ')[1] || ''}
+                          </td>
+                          <td className="p-2.5 font-mono font-bold text-slate-900">
+                            {ev.jobId || ev.id || 'N/A'}
+                          </td>
+                          <td className="p-2.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
+                              {ev.stage}
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-bold text-slate-800">
+                            {ev.machine}
+                          </td>
+                          <td className="p-2.5 font-bold text-blue-900">
+                            {ev.operator}
+                          </td>
+                          <td className="p-2.5 text-right font-black text-rose-700">
+                            {ev.scrapKg > 0 ? `${ev.scrapKg} KG` : '-'}
+                          </td>
+                          <td className="p-2.5 text-right font-black text-rose-700">
+                            {ev.scrapPieces > 0 ? `${ev.scrapPieces.toLocaleString()}` : '-'}
+                          </td>
+                          <td className="p-2.5 text-slate-600 text-[11px] max-w-xs truncate" title={ev.action}>
+                            {ev.action}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="p-4 text-center text-slate-400 italic">
+                          No scrap recorded for the selected filter.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-slate-100 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setScrapDrilldownModal(null)}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Close Audit Trace
+              </button>
             </div>
           </div>
         </div>

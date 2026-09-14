@@ -36,8 +36,12 @@ import {
   Box,
   Wrench,
   Phone,
+  User,
   Cloud,
-  Wifi
+  Wifi,
+  Scale,
+  Undo2,
+  History
 } from 'lucide-react';
 import {
   FactoryState,
@@ -62,7 +66,9 @@ import {
   PRODUCT_PREFIX_MAP,
   DEFAULT_CRATE_CAPACITY_MASTER,
   DEFAULT_COORDINATION_MATRIX,
-  DEFAULT_MAINTENANCE_CONTACTS
+  DEFAULT_MAINTENANCE_CONTACTS,
+  TARGET_LAYERS_DEFAULT,
+  TARGET_GSM_DEFAULT
 } from '../../lib/constants';
 import { triggerWhatsAppShiftNotification } from '../../lib/whatsappReports';
 import { exportToJSON, getCurrentExpectedShift, exportToCSV } from '../../lib/utils';
@@ -78,8 +84,8 @@ interface AdminSettingsViewProps {
   currentUser?: { username: string; perms: string[] } | null;
 }
 
-type AdminTab = 'brand_items_paper' | 'crate_master' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'coordination_matrix' | 'opening_stock_inward';
-type MasterDataSubTab = 'jobs' | 'orders' | 'logs' | 'plans' | 'numbering';
+type AdminTab = 'brand_items_paper' | 'crate_master' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward';
+type MasterDataSubTab = 'plans' | 'jobs' | 'reconcile' | 'batches' | 'orders' | 'logs' | 'numbering';
 
 export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   state,
@@ -412,7 +418,13 @@ _If you received this message, your contact number and routing configuration are
   const [glueBrandsList, setGlueBrandsList] = useState<string[]>(state.glueBrands || []);
   const [newGlueBrandInput, setNewGlueBrandInput] = useState('');
   
-  const [targetLayersList, setTargetLayersList] = useState<number[]>(state.targetLayersMaster || [4, 6, 8, 10, 12, 14, 16]);
+  const [targetLayersList, setTargetLayersList] = useState<number[]>(() => {
+    if (state.targetLayersMaster && state.targetLayersMaster.length > 0) {
+      const isLegacy = state.targetLayersMaster.some((l) => l !== 8 && l !== 9) && state.targetLayersMaster.length > 2;
+      return isLegacy ? TARGET_LAYERS_DEFAULT : state.targetLayersMaster;
+    }
+    return TARGET_LAYERS_DEFAULT;
+  });
   const [newTargetLayerInput, setNewTargetLayerInput] = useState('');
   const [editingTargetLayerIdx, setEditingTargetLayerIdx] = useState<number | null>(null);
   const [editingTargetLayerVal, setEditingTargetLayerVal] = useState<string>('');
@@ -421,12 +433,14 @@ _If you received this message, your contact number and routing configuration are
   const [editingGlueBrandName, setEditingGlueBrandName] = useState('');
 
 
-  const [targetGsmList, setTargetGsmList] = useState<string[]>(state.targetGsmMaster || []);
+  const [targetGsmList, setTargetGsmList] = useState<string[]>(() => {
+    if (state.targetGsmMaster && state.targetGsmMaster.length > 0) {
+      const isLegacy = state.targetGsmMaster.some((g) => g !== '60 GSM' && g !== '120 GSM') && state.targetGsmMaster.length > 2;
+      return isLegacy ? TARGET_GSM_DEFAULT : state.targetGsmMaster;
+    }
+    return TARGET_GSM_DEFAULT;
+  });
   const [newTargetGsmInput, setNewTargetGsmInput] = useState('');
-  const [newScrapLimitInput, setNewScrapLimitInput] = useState('');
-  const [newToleranceInput, setNewToleranceInput] = useState('');
-  const scrapLimitsList = state.scrapLimitsMaster && state.scrapLimitsMaster.length > 0 ? state.scrapLimitsMaster : [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0];
-  const scrapToleranceKgList = state.scrapToleranceKgMaster && state.scrapToleranceKgMaster.length > 0 ? state.scrapToleranceKgMaster : [5, 10, 15, 20, 25, 30, 40, 50];
 
   const [newProductSeq, setNewProductSeq] = useState('1');
   const [editingProductIdx, setEditingProductIdx] = useState<number | null>(null);
@@ -598,6 +612,39 @@ _If you received this message, your contact number and routing configuration are
   const [logEditForm, setLogEditForm] = useState<LogEntry | null>(null);
 
   // ==========================================
+  // DIRECT STOCK RECONCILIATION SUITE STATE
+  // ==========================================
+  const [reconcileJobId, setReconcileJobId] = useState<string>(state.jobs[0]?.id || '');
+  const [reconcileJobTarget, setReconcileJobTarget] = useState<Job | null>(() => state.jobs[0] ? JSON.parse(JSON.stringify(state.jobs[0])) : null);
+  const [reconcileReason, setReconcileReason] = useState<string>('Physical Cycle Count Verification');
+  const [reconcileDocRef, setReconcileDocRef] = useState<string>('');
+  const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
+
+  // ==========================================
+  // IN-FLIGHT BATCH CORRECTIONS & MATERIAL REVERSAL STATE
+  // ==========================================
+  const [batchSearchQuery, setBatchSearchQuery] = useState('');
+  const [batchFilterStage, setBatchFilterStage] = useState('');
+  const [correctingBatchModal, setCorrectingBatchModal] = useState<{
+    jobId: string;
+    batch: RunningBatch;
+    bIdx: number;
+  } | null>(null);
+  const [batchCorrectionForm, setBatchCorrectionForm] = useState<RunningBatch | null>(null);
+  const [batchCorrectionReason, setBatchCorrectionReason] = useState<string>('Floor Operator / Machine Assignment Fix');
+
+  const [reversingMaterialModal, setReversingMaterialModal] = useState<{
+    jobId: string;
+    batch: RunningBatch;
+    bIdx: number;
+    returnQty: number;
+    maxQty: number;
+    stageName: string;
+    targetStockName: string;
+    reason: string;
+  } | null>(null);
+
+  // ==========================================
   // TAB 3: WHATSAPP CONFIG & REPORT STATE
   // ==========================================
   const [waPhone, setWaPhone] = useState(state.whatsappConfig?.phone || '');
@@ -637,6 +684,8 @@ _If you received this message, your contact number and routing configuration are
     ];
   });
   const [newPartName, setNewPartName] = useState('');
+  const [editingSparePartIdx, setEditingSparePartIdx] = useState<number | null>(null);
+  const [editingSparePartText, setEditingSparePartText] = useState('');
   const [maxRollPieces, setMaxRollPieces] = useState<number>(state.maxPiecesPerSlitRoll || 12000);
   const [strictRollAudit, setStrictRollAudit] = useState<boolean>(state.strictAuditRollYield || false);
 
@@ -1064,7 +1113,7 @@ _If you received this message, your contact number and routing configuration are
       productionPlans: updatedPlans,
       logs: [...state.logs, newLog]
     });
-    alert('Production Plan master data overwritten successfully!');
+    showToast('✅ Production Plan master data overwritten successfully!');
   };
 
   const executeDeletePlan = (planId: string) => {
@@ -1429,64 +1478,6 @@ _If you received this message, your contact number and routing configuration are
     });
   };
 
-
-  const handleAddScrapLimit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newScrapLimitInput.trim()) return;
-    const val = Number(newScrapLimitInput);
-    if (isNaN(val)) return;
-    if (scrapLimitsList.includes(val)) return alert('Already exists');
-    onSaveState({
-      ...state,
-      scrapLimitsMaster: [...scrapLimitsList, val].sort((a,b) => a-b)
-    });
-    setNewScrapLimitInput('');
-  };
-
-  const handleDeleteScrapLimit = (val: number) => {
-    setConfirmModal({
-      isOpen: true, title: 'Remove Scrap Limit',
-      message: `Remove standard scrap limit ${val}%?`,
-      confirmLabel: 'Remove',
-      
-      onConfirm: () => {
-        onSaveState({
-          ...state,
-          scrapLimitsMaster: scrapLimitsList.filter((s) => s !== val)
-        });
-        setConfirmModal(null);
-      }
-    });
-  };
-
-  const handleAddTolerance = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newToleranceInput.trim()) return;
-    const val = Number(newToleranceInput);
-    if (isNaN(val)) return;
-    if (scrapToleranceKgList.includes(val)) return alert('Already exists');
-    onSaveState({
-      ...state,
-      scrapToleranceKgMaster: [...scrapToleranceKgList, val].sort((a,b) => a-b)
-    });
-    setNewToleranceInput('');
-  };
-
-  const handleDeleteTolerance = (val: number) => {
-    setConfirmModal({
-      isOpen: true, title: 'Remove Tolerance Limit',
-      message: `Remove paper scrap tolerance limit ${val} KG?`,
-      confirmLabel: 'Remove',
-      
-      onConfirm: () => {
-        onSaveState({
-          ...state,
-          scrapToleranceKgMaster: scrapToleranceKgList.filter((s) => s !== val)
-        });
-        setConfirmModal(null);
-      }
-    });
-  };
   const handleAddTargetGsm = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = newTargetGsmInput.trim().toUpperCase();
@@ -1736,18 +1727,501 @@ _If you received this message, your contact number and routing configuration are
 
     setEditingLogIndex(null);
     setLogEditForm(null);
-    alert('✅ Log Entry Updated Successfully!');
+    showToast('✅ Log Entry Updated Successfully!');
   };
 
   const handleDeleteLogEntry = (originalIndex: number) => {
-    if (!confirm('Are you sure you want to delete this log entry?')) return;
+    const targetLog = state.logs[originalIndex];
+    const logDesc = targetLog
+      ? `[${targetLog.stage || 'Log'} - ${targetLog.action ? targetLog.action.slice(0, 60) : 'Entry'}...]`
+      : 'this audit log entry';
 
-    const updatedLogs = state.logs.filter((_, idx) => idx !== originalIndex);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Audit Log Entry',
+      message: `Are you sure you want to permanently delete this audit log entry from database: ${logDesc}?`,
+      confirmLabel: 'Yes, Delete Entry',
+      isDanger: true,
+      onConfirm: () => {
+        const updatedLogs = state.logs.filter((_, idx) => idx !== originalIndex);
+        onSaveState({
+          ...state,
+          logs: updatedLogs
+        });
+        setConfirmModal(null);
+        showToast('🗑️ Audit log entry deleted successfully.');
+      }
+    });
+  };
+
+  // ==========================================
+  // DIRECT STOCK RECONCILIATION HANDLERS
+  // ==========================================
+  const handleOpenReconcileModal = (job: Job) => {
+    setReconcileJobId(job.id);
+    setReconcileJobTarget(JSON.parse(JSON.stringify(job)));
+    setReconcileReason('Physical Cycle Count Verification');
+    setReconcileDocRef('');
+    setIsReconcileModalOpen(true);
+  };
+
+  const handleSaveReconciliation = () => {
+    if (!reconcileJobTarget) return;
+    const cleanReason = reconcileReason.trim();
+    if (!cleanReason) {
+      showToast('⚠️ Mandatory reason required for inventory reconciliation audit!', 'error');
+      return;
+    }
+
+    const origJob = state.jobs.find((j) => j.id === reconcileJobTarget.id);
+    const prevRolls = origJob?.availableRolls || 0;
+    const prevCutCrates = origJob?.availableCuttingCrates || 0;
+    const prevFormCrates = origJob?.availableFormingCrates || 0;
+    const prevQcCrates = origJob?.availableQcCrates || 0;
+
+    const newRolls = Math.max(0, Number(reconcileJobTarget.availableRolls) || 0);
+    const newCutCrates = Math.max(0, Number(reconcileJobTarget.availableCuttingCrates) || 0);
+    const newFormCrates = Math.max(0, Number(reconcileJobTarget.availableFormingCrates) || 0);
+    const newQcCrates = Math.max(0, Number(reconcileJobTarget.availableQcCrates) || 0);
+
+    const diffRolls = newRolls - prevRolls;
+    const diffCutCrates = newCutCrates - prevCutCrates;
+    const diffFormCrates = newFormCrates - prevFormCrates;
+    const diffQcCrates = newQcCrates - prevQcCrates;
+
+    const updatedJobs = state.jobs.map((j) => {
+      if (j.id === reconcileJobTarget.id) {
+        return {
+          ...j,
+          availableRolls: newRolls,
+          availableCuttingCrates: newCutCrates,
+          availableFormingCrates: newFormCrates,
+          availableQcCrates: newQcCrates,
+          totalCutPieces: Number(reconcileJobTarget.totalCutPieces) || undefined,
+          totalFormedPieces: Number(reconcileJobTarget.totalFormedPieces) || undefined,
+          totalQcPieces: Number(reconcileJobTarget.totalQcPieces) || undefined
+        };
+      }
+      return j;
+    });
+
+    const auditText = `⚖️ Super-Admin Stock Reconciliation on Job [${reconcileJobTarget.id}] (${reconcileJobTarget.product}): ` +
+      `Slit Rolls: ${prevRolls} ➔ ${newRolls} (${diffRolls >= 0 ? '+' : ''}${diffRolls}), ` +
+      `Cut Crates: ${prevCutCrates} ➔ ${newCutCrates} (${diffCutCrates >= 0 ? '+' : ''}${diffCutCrates}), ` +
+      `Formed Crates: ${prevFormCrates} ➔ ${newFormCrates} (${diffFormCrates >= 0 ? '+' : ''}${diffFormCrates}), ` +
+      `QC OK Crates: ${prevQcCrates} ➔ ${newQcCrates} (${diffQcCrates >= 0 ? '+' : ''}${diffQcCrates}). ` +
+      `Reason: "${cleanReason}"${reconcileDocRef ? ` | Ref Slip: ${reconcileDocRef}` : ''}`;
+
+    const newLog: LogEntry = {
+      jobId: reconcileJobTarget.id,
+      product: reconcileJobTarget.product,
+      stage: 'Admin Master',
+      machine: 'STOCK-RECONCILER',
+      shift: 'DAY',
+      action: auditText,
+      worker: 'SUPER-ADMIN',
+      user: currentUser?.username || 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
+    };
+
     onSaveState({
       ...state,
-      logs: updatedLogs
+      jobs: updatedJobs,
+      logs: [...state.logs, newLog]
     });
-    alert('✅ Log entry deleted.');
+
+    setIsReconcileModalOpen(false);
+    showToast(`✅ Physical Stage Stock Reconciled & Logged for Job [${reconcileJobTarget.id}]!`);
+  };
+
+  // ==========================================
+  // IN-FLIGHT BATCH CORRECTIONS & MATERIAL REVERSAL HANDLERS
+  // ==========================================
+  const handleStartCorrectBatch = (jobId: string, batch: RunningBatch, bIdx: number) => {
+    setCorrectingBatchModal({ jobId, batch, bIdx });
+    setBatchCorrectionForm(JSON.parse(JSON.stringify(batch)));
+    setBatchCorrectionReason('Operator ID / Machine Assignment Correction');
+  };
+
+  const handleSaveBatchCorrection = () => {
+    if (!correctingBatchModal || !batchCorrectionForm) return;
+    const { jobId, bIdx, batch: oldBatch } = correctingBatchModal;
+    const cleanReason = batchCorrectionReason.trim() || 'Floor Data Correction';
+
+    const updatedJobs = state.jobs.map((j) => {
+      if (j.id === jobId) {
+        const batches = [...(j.runningBatches || [])];
+        batches[bIdx] = {
+          ...batches[bIdx],
+          ...batchCorrectionForm,
+          batchId: String(batchCorrectionForm.batchId || '').trim().toUpperCase(),
+          machine: String(batchCorrectionForm.machine || '').trim(),
+          worker: String(batchCorrectionForm.worker || '').trim().toUpperCase(),
+          issuedQty: Number(batchCorrectionForm.issuedQty) || 0,
+          outputPieces: Number(batchCorrectionForm.outputPieces) || 0,
+          scrapPieces: Number(batchCorrectionForm.scrapPieces) || 0,
+          status: batchCorrectionForm.status || 'Running'
+        };
+        return {
+          ...j,
+          runningBatches: batches
+        };
+      }
+      return j;
+    });
+
+    const newLog: LogEntry = {
+      jobId: jobId,
+      stage: 'Admin Master',
+      machine: batchCorrectionForm.machine || 'BATCH-CORRECTION',
+      shift: 'DAY',
+      action: `🛠️ In-Flight Batch Correction on [${batchCorrectionForm.batchId}]: Machine: "${oldBatch.machine}" ➔ "${batchCorrectionForm.machine}", Operator: "${oldBatch.worker}" ➔ "${batchCorrectionForm.worker}", Status: "${oldBatch.status}" ➔ "${batchCorrectionForm.status}", Issued: ${oldBatch.issuedQty || 0} ➔ ${batchCorrectionForm.issuedQty || 0}. Reason: "${cleanReason}"`,
+      worker: 'SUPER-ADMIN',
+      user: currentUser?.username || 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
+    };
+
+    onSaveState({
+      ...state,
+      jobs: updatedJobs,
+      logs: [...state.logs, newLog]
+    });
+
+    setCorrectingBatchModal(null);
+    setBatchCorrectionForm(null);
+    showToast(`✅ In-flight batch [${batchCorrectionForm.batchId}] corrected & logged.`);
+  };
+
+  const handleStartReverseMaterial = (jobId: string, batch: RunningBatch, bIdx: number) => {
+    const isCutting = batch.machine?.toLowerCase().includes('cutting') || batch.batchId?.includes('CUT');
+    const isForming = batch.machine?.toLowerCase().includes('forming') || batch.batchId?.includes('FRM') || batch.batchId?.includes('FORM');
+    const isQc = batch.machine?.toLowerCase().includes('qc') || batch.batchId?.includes('QC');
+
+    let stageName = 'Forming Run';
+    let targetStockName = 'Cutting Crates (Cut Stock)';
+    if (isCutting) {
+      stageName = 'Cutting Run';
+      targetStockName = 'Slit Rolls Inventory';
+    } else if (isQc) {
+      stageName = 'QC Inspection';
+      targetStockName = 'Formed Crates Floor Stock';
+    }
+
+    setReversingMaterialModal({
+      jobId,
+      batch,
+      bIdx,
+      returnQty: batch.issuedQty || 1,
+      maxQty: batch.issuedQty || 1,
+      stageName,
+      targetStockName,
+      reason: 'Material Issued in Error / Machine Breakdown'
+    });
+  };
+
+  const handleConfirmMaterialReversal = () => {
+    if (!reversingMaterialModal) return;
+    const { jobId, batch, bIdx, returnQty, targetStockName, reason } = reversingMaterialModal;
+    const cleanReason = reason.trim() || 'Material un-issue to preceding stage';
+
+    const qtyToReturn = Math.max(1, Math.min(returnQty, batch.issuedQty || 1));
+
+    const isCutting = batch.machine?.toLowerCase().includes('cutting') || batch.batchId?.includes('CUT');
+    const isForming = batch.machine?.toLowerCase().includes('forming') || batch.batchId?.includes('FRM') || batch.batchId?.includes('FORM');
+    const isQc = batch.machine?.toLowerCase().includes('qc') || batch.batchId?.includes('QC');
+
+    const updatedJobs = state.jobs.map((j) => {
+      if (j.id === jobId) {
+        let rolls = j.availableRolls || 0;
+        let cutCrates = j.availableCuttingCrates || 0;
+        let formCrates = j.availableFormingCrates || 0;
+        let qcCrates = j.availableQcCrates || 0;
+
+        if (isCutting) {
+          rolls += qtyToReturn;
+        } else if (isForming) {
+          cutCrates += qtyToReturn;
+        } else if (isQc) {
+          formCrates += qtyToReturn;
+        } else {
+          cutCrates += qtyToReturn;
+        }
+
+        const batches = [...(j.runningBatches || [])];
+        const curBatch = batches[bIdx];
+        if (curBatch) {
+          const remainingIssued = Math.max(0, (curBatch.issuedQty || 0) - qtyToReturn);
+          if (remainingIssued === 0 && (!curBatch.outputPieces || curBatch.outputPieces === 0)) {
+            // Remove batch entirely if 0 remaining and no production
+            batches.splice(bIdx, 1);
+          } else {
+            batches[bIdx] = {
+              ...curBatch,
+              issuedQty: remainingIssued,
+              status: remainingIssued === 0 ? 'Completed' : curBatch.status
+            };
+          }
+        }
+
+        return {
+          ...j,
+          availableRolls: rolls,
+          availableCuttingCrates: cutCrates,
+          availableFormingCrates: formCrates,
+          availableQcCrates: qcCrates,
+          runningBatches: batches
+        };
+      }
+      return j;
+    });
+
+    const newLog: LogEntry = {
+      jobId: jobId,
+      stage: 'Admin Master',
+      machine: batch.machine || 'REVERSAL-DESK',
+      shift: 'DAY',
+      action: `↩️ Super-Admin Material Reversal: Returned ${qtyToReturn} units from Batch [${batch.batchId}] (${batch.machine}) back to ${targetStockName} on Job [${jobId}]. Reason: "${cleanReason}"`,
+      worker: 'SUPER-ADMIN',
+      user: currentUser?.username || 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
+    };
+
+    onSaveState({
+      ...state,
+      jobs: updatedJobs,
+      logs: [...state.logs, newLog]
+    });
+
+    setReversingMaterialModal(null);
+    showToast(`✅ Returned ${qtyToReturn} units back to ${targetStockName}!`);
+  };
+
+  const handleExpungeBatch = (jobId: string, batchId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Expunge In-Flight Batch Record',
+      message: `Are you sure you want to permanently delete / purge Batch [${batchId}] from Job [${jobId}]?`,
+      confirmLabel: 'Yes, Expunge Batch',
+      isDanger: true,
+      onConfirm: () => {
+        const updatedJobs = state.jobs.map((j) => {
+          if (j.id === jobId) {
+            return {
+              ...j,
+              runningBatches: (j.runningBatches || []).filter((b) => b.batchId !== batchId)
+            };
+          }
+          return j;
+        });
+
+        const newLog: LogEntry = {
+          jobId: jobId,
+          stage: 'Admin Master',
+          machine: 'PURGE-DESK',
+          shift: 'DAY',
+          action: `🗑️ Super-Admin Expunged In-Flight Batch [${batchId}] from Job [${jobId}]`,
+          worker: 'SUPER-ADMIN',
+          user: currentUser?.username || 'admin',
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleString()
+        };
+
+        onSaveState({
+          ...state,
+          jobs: updatedJobs,
+          logs: [...state.logs, newLog]
+        });
+
+        setConfirmModal(null);
+        showToast(`🗑️ Batch [${batchId}] expunged from database.`);
+      }
+    });
+  };
+
+  // ==========================================
+  // PERMANENT RECORD EXPUNCTION HANDLERS
+  // ==========================================
+  const handlePurgeCompletedPlans = () => {
+    const activePlans = (state.productionPlans || []).filter(
+      (p) => p.status !== 'Completed' && p.status !== 'Cancelled'
+    );
+    const purgedCount = (state.productionPlans || []).length - activePlans.length;
+    if (purgedCount === 0) {
+      showToast('No completed or cancelled plans to purge.', 'info');
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Purge Completed & Cancelled Plans',
+      message: `Are you sure you want to permanently delete all ${purgedCount} Completed & Cancelled production plans? Active / Scheduled plans will be kept intact.`,
+      confirmLabel: `Purge ${purgedCount} Plans`,
+      isDanger: true,
+      onConfirm: () => {
+        const newLog: LogEntry = {
+          jobId: 'PLAN-PURGE',
+          stage: 'Admin Master',
+          machine: 'EXPUNGE-DESK',
+          shift: 'DAY',
+          action: `🗑️ Purged ${purgedCount} completed / cancelled production plans from database`,
+          worker: 'SUPER-ADMIN',
+          user: currentUser?.username || 'admin',
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleString()
+        };
+        onSaveState({
+          ...state,
+          productionPlans: activePlans,
+          logs: [...state.logs, newLog]
+        });
+        setPlanEditForm(null);
+        setSelectedPlanIdToEdit(activePlans[0]?.id || '');
+        setConfirmModal(null);
+        showToast(`✅ Successfully purged ${purgedCount} completed/cancelled plans.`);
+      }
+    });
+  };
+
+  const handlePurgeAllPlans = () => {
+    const totalPlans = (state.productionPlans || []).length;
+    if (totalPlans === 0) return;
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Expunge ALL Production Plans',
+      message: `⚠️ DANGER: Are you sure you want to permanently purge ALL ${totalPlans} production plans in the database? This cannot be undone.`,
+      confirmLabel: 'Yes, Purge ALL Plans',
+      isDanger: true,
+      onConfirm: () => {
+        const newLog: LogEntry = {
+          jobId: 'ALL-PLANS',
+          stage: 'Admin Master',
+          machine: 'EXPUNGE-DESK',
+          shift: 'DAY',
+          action: `🗑️ Super-Admin permanently expunged ALL ${totalPlans} production plans`,
+          worker: 'SUPER-ADMIN',
+          user: currentUser?.username || 'admin',
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleString()
+        };
+        onSaveState({
+          ...state,
+          productionPlans: [],
+          logs: [...state.logs, newLog]
+        });
+        setPlanEditForm(null);
+        setSelectedPlanIdToEdit('');
+        setConfirmModal(null);
+        showToast(`✅ All ${totalPlans} production plans expunged.`);
+      }
+    });
+  };
+
+  const handlePurgeDispatchedOrders = () => {
+    const activeOrders = state.packJobs.filter(
+      (o) => o.status !== 'Dispatched' && o.status !== 'Completed'
+    );
+    const purgedCount = state.packJobs.length - activeOrders.length;
+    if (purgedCount === 0) {
+      showToast('No dispatched or completed orders to purge.', 'info');
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Purge Dispatched & Completed Orders',
+      message: `Are you sure you want to permanently delete ${purgedCount} Dispatched & Completed packing orders? Pending & In-Progress orders will remain intact.`,
+      confirmLabel: `Purge ${purgedCount} Orders`,
+      isDanger: true,
+      onConfirm: () => {
+        const newLog: LogEntry = {
+          jobId: 'ORDER-PURGE',
+          stage: 'Admin Master',
+          machine: 'EXPUNGE-DESK',
+          shift: 'DAY',
+          action: `🗑️ Purged ${purgedCount} dispatched / completed packing orders from database`,
+          worker: 'SUPER-ADMIN',
+          user: currentUser?.username || 'admin',
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleString()
+        };
+        onSaveState({
+          ...state,
+          packJobs: activeOrders,
+          logs: [...state.logs, newLog]
+        });
+        setSelectedOrderIdToEdit(activeOrders[0]?.id || '');
+        setOrderEditForm(activeOrders[0] ? JSON.parse(JSON.stringify(activeOrders[0])) : null);
+        setConfirmModal(null);
+        showToast(`✅ Successfully purged ${purgedCount} dispatched/completed orders.`);
+      }
+    });
+  };
+
+  const handlePurgeFilteredLogs = () => {
+    if (filteredLogs.length === 0) return;
+    const indicesToRemove = new Set(filteredLogs.map((f) => f.originalIndex));
+    const remainingLogs = state.logs.filter((_, idx) => !indicesToRemove.has(idx));
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Purge Filtered Audit Logs',
+      message: `Are you sure you want to permanently delete all ${filteredLogs.length} logs currently matching your search/stage filters?`,
+      confirmLabel: `Purge ${filteredLogs.length} Logs`,
+      isDanger: true,
+      onConfirm: () => {
+        const newLog: LogEntry = {
+          jobId: 'LOG-PURGE',
+          stage: 'Admin Master',
+          machine: 'EXPUNGE-DESK',
+          shift: 'DAY',
+          action: `🗑️ Purged ${filteredLogs.length} audit logs matching filter [Search: "${logSearchQuery}", Stage: "${logFilterStage || 'All'}"]`,
+          worker: 'SUPER-ADMIN',
+          user: currentUser?.username || 'admin',
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleString()
+        };
+        onSaveState({
+          ...state,
+          logs: [...remainingLogs, newLog]
+        });
+        setConfirmModal(null);
+        showToast(`✅ Successfully purged ${filteredLogs.length} audit log entries.`);
+      }
+    });
+  };
+
+  const handlePurgeAllLogs = () => {
+    if (state.logs.length === 0) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Expunge ALL Audit Logs',
+      message: `⚠️ DANGER: Are you sure you want to permanently delete ALL ${state.logs.length} audit log entries from the database?`,
+      confirmLabel: 'Yes, Expunge ALL Logs',
+      isDanger: true,
+      onConfirm: () => {
+        const freshLog: LogEntry = {
+          jobId: 'SYSTEM-PURGE',
+          stage: 'Admin Master',
+          machine: 'EXPUNGE-DESK',
+          shift: 'DAY',
+          action: `⚡ Super-Admin purged entire audit log history (${state.logs.length} entries expunged)`,
+          worker: 'SUPER-ADMIN',
+          user: currentUser?.username || 'admin',
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleString()
+        };
+        onSaveState({
+          ...state,
+          logs: [freshLog]
+        });
+        setConfirmModal(null);
+        showToast('✅ All historical audit logs expunged.');
+      }
+    });
   };
 
   // ==========================================
@@ -1920,6 +2394,26 @@ ${formLines.join('\n')}
     if (maintSpareParts.includes(newPartName.trim())) return alert('Spare part already in catalogue!');
     setMaintSpareParts([...maintSpareParts, newPartName.trim()]);
     setNewPartName('');
+  };
+
+  const handleStartEditSparePart = (idx: number) => {
+    setEditingSparePartIdx(idx);
+    setEditingSparePartText(maintSpareParts[idx] || '');
+  };
+
+  const handleSaveEditSparePart = (idx: number) => {
+    const cleanText = editingSparePartText.trim();
+    if (!cleanText) return;
+    const updated = [...maintSpareParts];
+    updated[idx] = cleanText;
+    setMaintSpareParts(updated);
+    setEditingSparePartIdx(null);
+    setEditingSparePartText('');
+  };
+
+  const handleCancelEditSparePart = () => {
+    setEditingSparePartIdx(null);
+    setEditingSparePartText('');
   };
 
   const handleRemoveSparePart = (idx: number) => {
@@ -2388,15 +2882,15 @@ ${formLines.join('\n')}
         </button>
 
         <button
-          onClick={() => setActiveTab('coordination_matrix')}
+          onClick={() => setActiveTab('staff_escalation')}
           className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'coordination_matrix'
+            activeTab === 'staff_escalation'
               ? 'bg-[#1a365d] text-white shadow-xs'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           <Smartphone className="w-4 h-4 text-emerald-500" />
-          <span>📱 Coordination Matrix & Subscriptions</span>
+          <span>📱 Staff & Escalation Hierarchy</span>
         </button>
 
         <button
@@ -2799,7 +3293,7 @@ ${formLines.join('\n')}
                 type="number"
                 value={newTargetLayerInput}
                 onChange={(e) => setNewTargetLayerInput(e.target.value)}
-                placeholder="Enter Layer (e.g. 4, 6, 8)"
+                placeholder="Enter Layer (e.g. 8, 9)"
                 className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
               />
               <button type="submit" className="px-4 py-2 bg-[#2b6cb0] hover:bg-[#1a365d] text-white rounded-xl text-xs font-extrabold">Add Layer</button>
@@ -2833,65 +3327,6 @@ ${formLines.join('\n')}
             </div>
           </div>
 
-
-          {/* Section 6: Scrap Limits (%) */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide m-0 flex items-center gap-2">
-                  <span>🗑️ Standard Scrap Limit (%)</span>
-                </h4>
-              </div>
-            </div>
-            <form onSubmit={handleAddScrapLimit} className="flex items-center gap-2 max-w-xl">
-              <input
-                type="number"
-                step="0.1"
-                value={newScrapLimitInput}
-                onChange={(e) => setNewScrapLimitInput(e.target.value)}
-                placeholder="Enter Limit % (e.g. 2.5)"
-                className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none uppercase"
-              />
-              <button type="submit" className="px-4 py-2 bg-[#2b6cb0] hover:bg-[#1a365d] text-white rounded-xl text-xs font-extrabold">Add Limit %</button>
-            </form>
-            <div className="flex flex-wrap gap-2 pt-2">
-              {scrapLimitsList.map((val) => (
-                <div key={val} className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700">
-                  {val}%
-                  <button type="button" onClick={() => handleDeleteScrapLimit(val)} className="text-rose-500 hover:text-rose-700 font-bold ml-2">×</button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section 7: Scrap Tolerance (KG) */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide m-0 flex items-center gap-2">
-                  <span>⚖️ Paper Scrap Tolerance Limit (KG)</span>
-                </h4>
-              </div>
-            </div>
-            <form onSubmit={handleAddTolerance} className="flex items-center gap-2 max-w-xl">
-              <input
-                type="number"
-                value={newToleranceInput}
-                onChange={(e) => setNewToleranceInput(e.target.value)}
-                placeholder="Enter Tolerance KG (e.g. 15)"
-                className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none uppercase"
-              />
-              <button type="submit" className="px-4 py-2 bg-[#2b6cb0] hover:bg-[#1a365d] text-white rounded-xl text-xs font-extrabold">Add Tolerance</button>
-            </form>
-            <div className="flex flex-wrap gap-2 pt-2">
-              {scrapToleranceKgList.map((val) => (
-                <div key={val} className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700">
-                  {val} KG
-                  <button type="button" onClick={() => handleDeleteTolerance(val)} className="text-rose-500 hover:text-rose-700 font-bold ml-2">×</button>
-                </div>
-              ))}
-            </div>
-          </div>
           {/* Section 5: Target GSM */}
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
@@ -2906,7 +3341,7 @@ ${formLines.join('\n')}
                 type="text"
                 value={newTargetGsmInput}
                 onChange={(e) => setNewTargetGsmInput(e.target.value)}
-                placeholder="Enter GSM (e.g. 280 GSM)"
+                placeholder="Enter GSM (e.g. 60 GSM, 120 GSM)"
                 className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none uppercase"
               />
               <button type="submit" className="px-4 py-2 bg-[#2b6cb0] hover:bg-[#1a365d] text-white rounded-xl text-xs font-extrabold">Add GSM</button>
@@ -3508,7 +3943,7 @@ ${formLines.join('\n')}
               </p>
             </div>
             {/* Sub-tabs */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl flex-wrap">
               <button
                 type="button"
                 onClick={() => setMasterSubTab('plans')}
@@ -3526,6 +3961,26 @@ ${formLines.join('\n')}
                 }`}
               >
                 Production Jobs Master
+              </button>
+              <button
+                type="button"
+                onClick={() => setMasterSubTab('reconcile')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  masterSubTab === 'reconcile' ? 'bg-amber-600 text-white shadow-xs' : 'text-amber-800 hover:text-amber-950 hover:bg-amber-50'
+                }`}
+              >
+                <Scale className="w-3.5 h-3.5" />
+                Stock Reconciliation
+              </button>
+              <button
+                type="button"
+                onClick={() => setMasterSubTab('batches')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  masterSubTab === 'batches' ? 'bg-purple-600 text-white shadow-xs' : 'text-purple-800 hover:text-purple-950 hover:bg-purple-50'
+                }`}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                In-Flight Batches & Reversal
               </button>
               <button
                 type="button"
@@ -3553,7 +4008,7 @@ ${formLines.join('\n')}
                 }`}
               >
                 <Sliders className="w-3.5 h-3.5" />
-                Auto-Numbering & Batch Prefix Master
+                Auto-Numbering Master
               </button>
             </div>
           </div>
@@ -3973,6 +4428,90 @@ ${formLines.join('\n')}
                     </div>
                   </div>
 
+                  {/* Linked Job Audit Entry List */}
+                  {(() => {
+                    const jobLogs = state.logs
+                      .map((log, idx) => ({ log, originalIndex: idx }))
+                      .filter(({ log }) => log.jobId === jobEditForm.id)
+                      .reverse();
+
+                    return (
+                      <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50 space-y-2.5">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <label className="text-xs font-extrabold text-slate-800 uppercase flex items-center gap-1.5">
+                            <History className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Audit Entries & Production History for Job [{jobEditForm.id}] ({jobLogs.length}):</span>
+                          </label>
+                          <span className="text-[10px] text-slate-500 font-bold">
+                            Live Audit Trail • Delete or Edit Any Entry
+                          </span>
+                        </div>
+
+                        {jobLogs.length === 0 ? (
+                          <div className="text-xs text-slate-400 text-center py-3 bg-white rounded-lg border border-dashed border-slate-200">
+                            No audit log entries recorded for this job yet.
+                          </div>
+                        ) : (
+                          <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto max-h-60">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead className="bg-slate-100 text-slate-700 font-black uppercase text-[10px] sticky top-0 border-b border-slate-200">
+                                <tr>
+                                  <th className="p-2">Date / Time</th>
+                                  <th className="p-2">Stage</th>
+                                  <th className="p-2">Machine</th>
+                                  <th className="p-2">Action</th>
+                                  <th className="p-2">Worker</th>
+                                  <th className="p-2 text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                {jobLogs.map(({ log, originalIndex }) => (
+                                  <tr key={originalIndex} className="hover:bg-slate-50 transition">
+                                    <td className="p-2 whitespace-nowrap text-[11px] text-slate-500">
+                                      {log.timestamp || log.rawDate || '-'}
+                                    </td>
+                                    <td className="p-2 whitespace-nowrap">
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
+                                        {log.stage || 'Floor'}
+                                      </span>
+                                    </td>
+                                    <td className="p-2 whitespace-nowrap font-semibold">{log.machine || '-'}</td>
+                                    <td className="p-2 text-slate-800 max-w-xs truncate" title={log.action}>
+                                      {log.action}
+                                    </td>
+                                    <td className="p-2 whitespace-nowrap font-bold text-slate-900">
+                                      {log.worker || log.user || '-'}
+                                    </td>
+                                    <td className="p-2 text-right whitespace-nowrap">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleStartEditLog(originalIndex)}
+                                          className="p-1 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
+                                          title="Edit this log entry"
+                                        >
+                                          <Edit className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteLogEntry(originalIndex)}
+                                          className="p-1 text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
+                                          title="Delete this log entry"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <button
                     type="button"
                     onClick={handleSaveJobOverwrite}
@@ -3985,6 +4524,346 @@ ${formLines.join('\n')}
               ) : (
                 <div className="text-xs text-slate-500 text-center py-6">Select a job above to edit</div>
               )}
+            </div>
+          )}
+
+          {/* ------------------------------------------------------------- */}
+          {/* SUB-TAB: DIRECT STOCK RECONCILIATION SUITE */}
+          {/* ------------------------------------------------------------- */}
+          {masterSubTab === 'reconcile' && (
+            <div className="space-y-4">
+              {/* Header Banner */}
+              <div className="bg-linear-to-r from-amber-900 via-amber-950 to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-amber-800/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[11px] font-extrabold uppercase tracking-wider mb-1.5">
+                      <Scale className="w-3.5 h-3.5 text-amber-400" />
+                      Physical Stage Inventory Reconciler
+                    </div>
+                    <h3 className="text-lg font-black tracking-tight text-white m-0">
+                      Direct Stage Stock Reconciliation & Reason Audit
+                    </h3>
+                    <p className="text-xs text-amber-200/80 mt-1 max-w-2xl">
+                      Live-reconcile physical stage floor inventories (Slit Rolls, Cut Crates, Formed Crates, QC Crates, Finished Cartons) with mandatory reason audit logging.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="bg-white/10 px-3 py-2 rounded-xl text-center backdrop-blur-xs border border-white/10">
+                      <div className="text-[10px] text-amber-200 uppercase font-bold">Total Jobs in Floor</div>
+                      <div className="text-base font-black text-amber-300">{state.jobs.length}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Aggregate Summary */}
+                <div className="mt-4 pt-4 border-t border-amber-800/60 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                    <div className="text-[10px] text-amber-300 font-bold uppercase">Total Slit Rolls Stock</div>
+                    <div className="text-sm font-black text-white font-mono">
+                      {state.jobs.reduce((acc, j) => acc + (j.availableRolls || 0), 0)} Rolls
+                    </div>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                    <div className="text-[10px] text-cyan-300 font-bold uppercase">Total Cut Crates Stock</div>
+                    <div className="text-sm font-black text-white font-mono">
+                      {state.jobs.reduce((acc, j) => acc + (j.availableCuttingCrates || 0), 0)} Crates
+                    </div>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                    <div className="text-[10px] text-purple-300 font-bold uppercase">Total Formed Crates Stock</div>
+                    <div className="text-sm font-black text-white font-mono">
+                      {state.jobs.reduce((acc, j) => acc + (j.availableFormingCrates || 0), 0)} Crates
+                    </div>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                    <div className="text-[10px] text-emerald-300 font-bold uppercase">Total QC OK Crates Stock</div>
+                    <div className="text-sm font-black text-white font-mono">
+                      {state.jobs.reduce((acc, j) => acc + (j.availableQcCrates || 0), 0)} Crates
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Jobs Table Matrix */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
+                    Floor Stage Inventory Matrix ({state.jobs.length} Active Production Jobs)
+                  </h4>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Click "Reconcile" on any job to live-adjust physical stage inventory counts with audit logging
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-100 border-b border-slate-200 text-slate-700 font-black uppercase text-[10px]">
+                      <tr>
+                        <th className="p-2.5">Job ID</th>
+                        <th className="p-2.5">Product</th>
+                        <th className="p-2.5">Status</th>
+                        <th className="p-2.5 text-right bg-teal-50 text-teal-900">📜 Slit Rolls</th>
+                        <th className="p-2.5 text-right bg-blue-50 text-blue-900">✂️ Cut Crates</th>
+                        <th className="p-2.5 text-right bg-indigo-50 text-indigo-900">⚙️ Formed Crates</th>
+                        <th className="p-2.5 text-right bg-emerald-50 text-emerald-900">🔍 QC OK Crates</th>
+                        <th className="p-2.5 text-right">Total Output Pcs</th>
+                        <th className="p-2.5 text-center">Reconcile</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
+                      {state.jobs.map((job) => (
+                        <tr key={job.id} className="hover:bg-amber-50/40 transition">
+                          <td className="p-2.5 font-extrabold text-blue-900 font-mono">{job.id}</td>
+                          <td className="p-2.5 font-bold text-slate-800">
+                            {job.product}
+                            <span className="block text-[10px] text-slate-400 font-normal">
+                              {job.paperBrand || 'ITC'} • {job.gsm || 60} GSM • {job.targetLayers || 8}L
+                            </span>
+                          </td>
+                          <td className="p-2.5">
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                job.status === 'Completed'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : job.status === 'Running'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {job.status}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold bg-teal-50/50 text-teal-950">
+                            {job.availableRolls || 0}
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold bg-blue-50/50 text-blue-950">
+                            {job.availableCuttingCrates || 0}
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold bg-indigo-50/50 text-indigo-950">
+                            {job.availableFormingCrates || 0}
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold bg-emerald-50/50 text-emerald-950">
+                            {job.availableQcCrates || 0}
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-extrabold text-slate-900">
+                            {(job.totalQcPieces || job.totalFormedPieces || job.totalCutPieces || 0).toLocaleString()}
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReconcileModal(job)}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[11px] rounded-lg transition shadow-xs flex items-center justify-center gap-1 cursor-pointer mx-auto"
+                              title={`Reconcile physical stock for ${job.id}`}
+                            >
+                              <Scale className="w-3.5 h-3.5" /> Reconcile
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {state.jobs.length === 0 && (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-slate-400 font-bold">
+                            No production jobs available in database.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ------------------------------------------------------------- */}
+          {/* SUB-TAB: IN-FLIGHT BATCH CORRECTIONS & MATERIAL REVERSAL */}
+          {/* ------------------------------------------------------------- */}
+          {masterSubTab === 'batches' && (
+            <div className="space-y-4">
+              {/* Header Banner */}
+              <div className="bg-linear-to-r from-purple-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-purple-800/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-[11px] font-extrabold uppercase tracking-wider mb-1.5">
+                      <RotateCcw className="w-3.5 h-3.5 text-purple-400" />
+                      In-Flight Corrections & Material Reversal Suite
+                    </div>
+                    <h3 className="text-lg font-black tracking-tight text-white m-0">
+                      In-Flight Batch Corrections & Material Reversal Desk
+                    </h3>
+                    <p className="text-xs text-purple-200/80 mt-1 max-w-2xl">
+                      Edit timestamps, re-assign running machines, update operator IDs, and adjust piece counts on active runs. Securely reverse incorrectly assigned raw materials or cut crates back to preceding stage floor stock.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex items-center justify-between flex-wrap gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+                  <Search className="w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={batchSearchQuery}
+                    onChange={(e) => setBatchSearchQuery(e.target.value)}
+                    placeholder="Search in-flight batches by Job ID, Batch ID, Machine, or Worker..."
+                    className="w-full bg-white px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-600">Stage / Machine:</span>
+                  <select
+                    value={batchFilterStage}
+                    onChange={(e) => setBatchFilterStage(e.target.value)}
+                    className="bg-white px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold outline-none"
+                  >
+                    <option value="">All Machines / Batches</option>
+                    <option value="CUT">Cutting Batches</option>
+                    <option value="FRM">Forming Batches</option>
+                    <option value="QC">QC Batches</option>
+                    <option value="SLIT">Slitting Batches</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Batches Table */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
+                    Active & Completed Floor Batches Across All Jobs
+                  </h4>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Correct timestamps/machines or perform safe material un-issue
+                  </span>
+                </div>
+
+                {(() => {
+                  const allBatches: { jobId: string; jobProduct: string; batch: RunningBatch; bIdx: number }[] = [];
+                  state.jobs.forEach((job) => {
+                    (job.runningBatches || []).forEach((b, idx) => {
+                      allBatches.push({
+                        jobId: job.id,
+                        jobProduct: job.product,
+                        batch: b,
+                        bIdx: idx
+                      });
+                    });
+                  });
+
+                  const filteredBatches = allBatches.filter(({ jobId, batch }) => {
+                    const q = batchSearchQuery.toLowerCase();
+                    const matchesSearch =
+                      !q ||
+                      jobId.toLowerCase().includes(q) ||
+                      (batch.batchId && batch.batchId.toLowerCase().includes(q)) ||
+                      (batch.machine && batch.machine.toLowerCase().includes(q)) ||
+                      (batch.worker && batch.worker.toLowerCase().includes(q));
+
+                    const matchesFilter =
+                      !batchFilterStage ||
+                      (batchFilterStage === 'CUT' && (batch.machine?.includes('Cutting') || batch.batchId?.includes('CUT'))) ||
+                      (batchFilterStage === 'FRM' && (batch.machine?.includes('Forming') || batch.batchId?.includes('FRM') || batch.batchId?.includes('FORM'))) ||
+                      (batchFilterStage === 'QC' && (batch.machine?.includes('QC') || batch.batchId?.includes('QC'))) ||
+                      (batchFilterStage === 'SLIT' && (batch.machine?.includes('Slitting') || batch.batchId?.includes('SLIT')));
+
+                    return matchesSearch && matchesFilter;
+                  });
+
+                  return filteredBatches.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 font-bold text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      No matching in-flight or running batches found.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-slate-100 border-b border-slate-200 text-slate-700 font-black uppercase text-[10px]">
+                          <tr>
+                            <th className="p-2.5">Job ID</th>
+                            <th className="p-2.5">Batch ID</th>
+                            <th className="p-2.5">Stage / Machine</th>
+                            <th className="p-2.5">Operator</th>
+                            <th className="p-2.5">Status</th>
+                            <th className="p-2.5 text-right">Issued Qty</th>
+                            <th className="p-2.5 text-right">Output Pcs</th>
+                            <th className="p-2.5 text-right">Scrap Pcs</th>
+                            <th className="p-2.5">Start Time</th>
+                            <th className="p-2.5 text-center">Super-Admin Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
+                          {filteredBatches.map(({ jobId, jobProduct, batch, bIdx }) => (
+                            <tr key={`${jobId}-${batch.batchId || bIdx}`} className="hover:bg-purple-50/40 transition">
+                              <td className="p-2.5 font-extrabold text-blue-900 font-mono">
+                                {jobId}
+                                <span className="block text-[10px] text-slate-400 font-normal">{jobProduct}</span>
+                              </td>
+                              <td className="p-2.5 font-mono font-bold text-purple-950">
+                                {batch.batchId || `BATCH-${bIdx + 1}`}
+                              </td>
+                              <td className="p-2.5 font-bold text-slate-800">{batch.machine || '-'}</td>
+                              <td className="p-2.5 font-semibold text-slate-700">{batch.worker || '-'}</td>
+                              <td className="p-2.5">
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                    batch.status === 'Completed'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : batch.status === 'Running'
+                                      ? 'bg-blue-100 text-blue-800 animate-pulse'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {batch.status || 'Running'}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-bold text-slate-900">
+                                {batch.issuedQty || 0}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-extrabold text-emerald-700">
+                                {(batch.outputPieces || 0).toLocaleString()}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-bold text-rose-700">
+                                {batch.scrapPieces || 0}
+                              </td>
+                              <td className="p-2.5 text-slate-500 text-[11px] whitespace-nowrap">
+                                {batch.startTime || '-'}
+                              </td>
+                              <td className="p-2.5 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartCorrectBatch(jobId, batch, bIdx)}
+                                    className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] rounded-md transition flex items-center gap-1 cursor-pointer border border-blue-200"
+                                    title="Correct Machine / Operator / Counts"
+                                  >
+                                    <Edit className="w-3 h-3" /> Correct
+                                  </button>
+                                  {(batch.issuedQty || 0) > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartReverseMaterial(jobId, batch, bIdx)}
+                                      className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-[10px] rounded-md transition flex items-center gap-1 cursor-pointer border border-amber-200"
+                                      title="Reverse / Return Issued Crates or Rolls"
+                                    >
+                                      <Undo2 className="w-3 h-3" /> Reverse Issue
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleExpungeBatch(jobId, batch.batchId)}
+                                    className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition cursor-pointer"
+                                    title="Expunge Batch"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )}
 
@@ -4032,6 +4911,16 @@ ${formLines.join('\n')}
                       className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Delete Selected Order
+                    </button>
+                  )}
+                  {state.packJobs.some((o) => o.status === 'Dispatched' || o.status === 'Completed') && (
+                    <button
+                      type="button"
+                      onClick={handlePurgeDispatchedOrders}
+                      className="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
+                      title="Purge Dispatched & Completed Orders"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Purge Dispatched
                     </button>
                   )}
                   {state.packJobs.length > 0 && (
@@ -4253,15 +5142,37 @@ ${formLines.join('\n')}
                     ))}
                   </select>
                 </div>
-                {planEditForm && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePlan(planEditForm.id)}
-                    className="mt-4 px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Delete Plan
-                  </button>
-                )}
+                <div className="flex items-center gap-2 mt-4 sm:mt-0 flex-wrap">
+                  {planEditForm && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePlan(planEditForm.id)}
+                      className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Plan
+                    </button>
+                  )}
+                  {(state.productionPlans || []).some((p) => p.status === 'Completed' || p.status === 'Cancelled') && (
+                    <button
+                      type="button"
+                      onClick={handlePurgeCompletedPlans}
+                      className="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
+                      title="Purge Completed & Cancelled Production Plans"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Purge Completed/Cancelled
+                    </button>
+                  )}
+                  {(state.productionPlans || []).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handlePurgeAllPlans}
+                      className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow-xs"
+                      title="Expunge all production plans permanently"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Purge ALL ({state.productionPlans.length}) Plans
+                    </button>
+                  )}
+                </div>
               </div>
 
               {planEditForm ? (
@@ -4481,7 +5392,7 @@ ${formLines.join('\n')}
                     className="w-full bg-white px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold outline-none"
                   />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-slate-600">Stage:</span>
                   <select
                     value={logFilterStage}
@@ -4497,6 +5408,26 @@ ${formLines.join('\n')}
                     <option value="Dispatch">Dispatch</option>
                     <option value="Admin Master">Admin Master</option>
                   </select>
+                  {filteredLogs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handlePurgeFilteredLogs}
+                      className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
+                      title="Purge only the currently filtered logs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Purge Filtered ({filteredLogs.length})
+                    </button>
+                  )}
+                  {(state.logs || []).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handlePurgeAllLogs}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow-xs"
+                      title="Expunge all audit logs permanently"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Purge ALL ({state.logs.length}) Logs
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -5284,11 +6215,60 @@ ${formLines.join('\n')}
                 </div>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                   {maintSpareParts.map((part, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 text-xs">
-                      <span className="font-bold text-slate-800">{part}</span>
-                      <button type="button" onClick={() => handleRemoveSparePart(idx)} className="text-slate-400 hover:text-red-600 p-1">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <div key={idx} className="p-2 bg-white rounded-lg border border-slate-200 text-xs">
+                      {editingSparePartIdx === idx ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={editingSparePartText}
+                            onChange={(e) => setEditingSparePartText(e.target.value)}
+                            className="flex-1 px-2 py-1 bg-purple-50 border border-purple-300 rounded text-xs font-bold text-slate-800 outline-none"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEditSparePart(idx);
+                              if (e.key === 'Escape') handleCancelEditSparePart();
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEditSparePart(idx)}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition cursor-pointer"
+                            title="Save Changes"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditSparePart}
+                            className="p-1 text-slate-400 hover:bg-slate-100 rounded transition cursor-pointer"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800">{part}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditSparePart(idx)}
+                              className="text-slate-400 hover:text-blue-600 p-1 rounded transition cursor-pointer hover:bg-blue-50"
+                              title="Edit Part Name"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSparePart(idx)}
+                              className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer hover:bg-rose-50"
+                              title="Delete Part"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -5769,7 +6749,7 @@ ${formLines.join('\n')}
       {/* ========================================================================= */}
       {/* TAB 6: DEPARTMENT HEADS COORDINATION MATRIX & AUTO-ALERT RECIPIENTS */}
       {/* ========================================================================= */}
-      {activeTab === 'coordination_matrix' && (
+      {activeTab === 'staff_escalation' && (
         <div className="space-y-6" id="coordination-matrix-tab">
           <div className="flex items-center justify-between flex-wrap gap-4 pb-3 border-b border-slate-200">
             <div>

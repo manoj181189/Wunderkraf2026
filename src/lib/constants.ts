@@ -115,24 +115,12 @@ export const DEFAULT_FLOOR_WORKERS: FloorWorker[] = [
   { id: 'FW-MNT-S1', name: 'Manoj Kumar (Plant Head)', role: 'SUPERVISOR', department: 'Maintenance', shift: 'DAY', isPresent: true, inTime: '07:30 AM', notes: 'Plant Production Manager' }
 ];
 
-export const PAPER_BRANDS = ['ITC', 'CENTURY', 'JK PAPER', 'WEST COAST', 'EMAMI', 'APP (ASIA PULP)'];
+export const PAPER_BRANDS = ['Orient Paper', 'BILT'];
 
-export const TARGET_LAYERS_DEFAULT = [4, 6, 8, 9, 10, 12, 14, 16];
+export const TARGET_LAYERS_DEFAULT = [8, 9];
 export const TARGET_GSM_DEFAULT = [
   '60 GSM',
-  '80 GSM',
-  '100 GSM',
-  '120 GSM',
-  '140 GSM',
-  '160 GSM',
-  '180 GSM',
-  '200 GSM',
-  '220 GSM',
-  '250 GSM',
-  '280 GSM',
-  '300 GSM',
-  '320 GSM',
-  '350 GSM'
+  '120 GSM'
 ];
 
 export const GLUE_BRANDS = [

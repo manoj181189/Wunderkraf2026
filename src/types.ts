@@ -139,12 +139,14 @@ export interface RunningBatch {
   producedQty?: number;
   pcsPerCrate?: number;
   producedPieces?: number;
+  outputPieces?: number;
   loosePieces?: number;
   inputWeightKg?: number;
   outputWeightKg?: number;
   scrapKg?: number;
   scrapPercent?: number;
   scrapPcs?: number;
+  scrapPieces?: number;
   rejectedPieces?: number;
   pcsPerKg?: number;
   grossPieces?: number;

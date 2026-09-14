@@ -8,6 +8,7 @@ import {
   Package,
   Plus,
   Trash2,
+  Edit,
   Send,
   Download,
   Filter,
@@ -27,6 +28,7 @@ import {
   Users,
   Radio,
   Megaphone,
+  Save,
   X
 } from 'lucide-react';
 import {
@@ -282,6 +284,115 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
     alert(`✅ ${technicianName} has started working on ${attendingModalIncident.machine}.
 Status: "This person is working here" has been activated.`);
     setAttendingModalIncident(null);
+  };
+
+  // Edit & Delete Incident states and handlers
+  const [editingIncident, setEditingIncident] = useState<MaintenanceIncident | null>(null);
+  const [editSparePartName, setEditSparePartName] = useState('');
+  const [editSparePartQty, setEditSparePartQty] = useState<number>(1);
+  const [editSparePartUnit, setEditSparePartUnit] = useState('Nos');
+
+  const handleStartEditIncident = (incident: MaintenanceIncident) => {
+    setEditingIncident(JSON.parse(JSON.stringify(incident)));
+    setEditSparePartName(availableSpareParts[0] || '');
+    setEditSparePartQty(1);
+    setEditSparePartUnit('Nos');
+  };
+
+  const handleAddSparePartToEdit = () => {
+    if (!editingIncident || !editSparePartName) return;
+    const currentSpares = editingIncident.spareParts || [];
+    const newSpare: SparePartItem = {
+      name: editSparePartName,
+      qty: editSparePartQty > 0 ? editSparePartQty : 1,
+      unit: editSparePartUnit || 'Nos'
+    };
+    setEditingIncident({
+      ...editingIncident,
+      spareParts: [...currentSpares, newSpare]
+    });
+  };
+
+  const handleRemoveSparePartFromEdit = (indexToRemove: number) => {
+    if (!editingIncident) return;
+    setEditingIncident({
+      ...editingIncident,
+      spareParts: (editingIncident.spareParts || []).filter((_, idx) => idx !== indexToRemove)
+    });
+  };
+
+  const handleAutoCalcEditDowntime = () => {
+    if (!editingIncident || !editingIncident.breakdownStartTime) return;
+    const stopTime = editingIncident.breakdownStopTime || editingIncident.repairedAt;
+    if (!stopTime) {
+      const elapsed = Math.max(0, Math.round((Date.now() - new Date(editingIncident.breakdownStartTime).getTime()) / 60000));
+      setEditingIncident({ ...editingIncident, totalDowntimeMinutes: elapsed });
+    } else {
+      const diff = Math.max(0, Math.round((new Date(stopTime).getTime() - new Date(editingIncident.breakdownStartTime).getTime()) / 60000));
+      setEditingIncident({ ...editingIncident, totalDowntimeMinutes: diff });
+    }
+  };
+
+  const handleSaveEditedIncident = () => {
+    if (!editingIncident) return;
+    if (!editingIncident.machine?.trim()) {
+      alert('⚠️ Machine name is required!');
+      return;
+    }
+
+    const updated = incidents.map((inc) => {
+      if (inc.id === editingIncident.id) {
+        return editingIncident;
+      }
+      return inc;
+    });
+
+    const editLog: LogEntry = {
+      jobId: editingIncident.machine,
+      product: 'Maintenance',
+      stage: 'Maintenance Log Edited',
+      machine: editingIncident.machine,
+      action: `✏️ Maintenance Ticket [${editingIncident.id}] edited: Status=${editingIncident.status}, Tech=${editingIncident.technicianName || 'N/A'}, Downtime=${editingIncident.totalDowntimeMinutes || 0}m.`,
+      user: 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
+    };
+
+    onSaveState({
+      ...state,
+      maintenanceIncidents: updated,
+      logs: [editLog, ...(state.logs || [])]
+    });
+
+    alert(`✅ Maintenance Ticket ${editingIncident.id} updated successfully!`);
+    setEditingIncident(null);
+  };
+
+  const handleDeleteIncident = (incidentId: string) => {
+    const inc = incidents.find((i) => i.id === incidentId);
+    if (!window.confirm(`⚠️ Are you sure you want to permanently delete Maintenance Incident Ticket "${incidentId}" (${inc?.machine || ''})?\n\nThis will permanently purge this breakdown record from the logs.`)) {
+      return;
+    }
+
+    const updated = incidents.filter((i) => i.id !== incidentId);
+    const deleteLog: LogEntry = {
+      jobId: inc?.machine || 'Maintenance',
+      product: 'Maintenance',
+      stage: 'Maintenance Log Expunged',
+      machine: inc?.machine || 'N/A',
+      action: `🗑️ Maintenance Ticket [${incidentId}] permanently expunged by Super-Admin.`,
+      user: 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
+    };
+
+    onSaveState({
+      ...state,
+      maintenanceIncidents: updated,
+      logs: [deleteLog, ...(state.logs || [])]
+    });
+
+    alert(`🗑️ Maintenance Ticket ${incidentId} was permanently deleted.`);
   };
 
   // Complete Repair & Mark "Ready for Run / Certified OK"
@@ -2020,6 +2131,7 @@ Status: "This person is working here" has been activated.`);
                     <th className="py-2.5 px-3">Spare Parts Replaced</th>
                     <th className="py-2.5 px-3">Technician / Reporter</th>
                     <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -2150,6 +2262,27 @@ Status: "This person is working here" has been activated.`);
                               ✅ Production Resumed
                             </span>
                           )}
+                        </td>
+
+                        <td className="py-3 px-3 whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditIncident(inc)}
+                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                              title="Edit Incident Record / Actions"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteIncident(inc.id)}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                              title="Delete Incident Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -2906,6 +3039,300 @@ Status: "This person is working here" has been activated.`);
           availableTechnicians={contacts.map(c => c.name)}
           onConfirmAttend={handleConfirmAttend}
         />
+      )}
+
+      {/* Edit Maintenance Incident Modal */}
+      {editingIncident && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-8">
+            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 px-6 py-4 text-white flex items-center justify-between border-b border-indigo-900/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-300">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black tracking-tight text-white m-0">
+                    Edit Maintenance Incident: {editingIncident.id}
+                  </h3>
+                  <p className="text-[11px] text-indigo-200/80 m-0">
+                    Modify machine, breakdown duration, action taken, and spare parts.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingIncident(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Machine:
+                  </label>
+                  <select
+                    value={editingIncident.machine}
+                    onChange={(e) => setEditingIncident({ ...editingIncident, machine: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                  >
+                    {ALL_MACHINES_LIST.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Manufacturing Stage:
+                  </label>
+                  <select
+                    value={editingIncident.stage}
+                    onChange={(e) => setEditingIncident({ ...editingIncident, stage: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                  >
+                    <option value="Slitting">Slitting</option>
+                    <option value="Cutting">Cutting</option>
+                    <option value="Forming">Forming</option>
+                    <option value="QC">QC</option>
+                    <option value="Packing">Packing</option>
+                    <option value="Facility">Facility / General</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Status:
+                  </label>
+                  <select
+                    value={editingIncident.status}
+                    onChange={(e) => setEditingIncident({ ...editingIncident, status: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                  >
+                    <option value="OPEN">🔴 OPEN (Stopped)</option>
+                    <option value="IN_PROGRESS">🟡 IN PROGRESS (In Repair)</option>
+                    <option value="REPAIRED_READY">🟢 REPAIRED READY (Ready to Run)</option>
+                    <option value="ACKNOWLEDGED">✅ ACKNOWLEDGED (Resumed)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Breakdown Start Time:
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editingIncident.breakdownStartTime ? editingIncident.breakdownStartTime.slice(0, 16) : ''}
+                    onChange={(e) => setEditingIncident({ ...editingIncident, breakdownStartTime: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Breakdown Stop Time / Ready:
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editingIncident.breakdownStopTime ? editingIncident.breakdownStopTime.slice(0, 16) : (editingIncident.repairedAt ? editingIncident.repairedAt.slice(0, 16) : '')}
+                    onChange={(e) => setEditingIncident({ ...editingIncident, breakdownStopTime: e.target.value, repairedAt: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="flex-1">
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Total Downtime (Minutes):
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editingIncident.totalDowntimeMinutes || 0}
+                    onChange={(e) => setEditingIncident({ ...editingIncident, totalDowntimeMinutes: Number(e.target.value) })}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-black text-slate-800"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAutoCalcEditDowntime}
+                  className="mt-4 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Auto-Calculate Duration
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Root Cause / Issue Summary:
+                </label>
+                <input
+                  type="text"
+                  value={editingIncident.reason || ''}
+                  onChange={(e) => setEditingIncident({ ...editingIncident, reason: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                  placeholder="e.g. Upper Heating Element Failure"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Detailed Description & Observations:
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingIncident.description || ''}
+                  onChange={(e) => setEditingIncident({ ...editingIncident, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none resize-none"
+                  placeholder="Describe electrical readings, mechanical wear, operator notes..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Corrective Action Taken & Prevention:
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingIncident.actionTaken || ''}
+                  onChange={(e) => setEditingIncident({ ...editingIncident, actionTaken: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none resize-none"
+                  placeholder="Replaced 50mm heater band, calibrated PID controller to 185°C..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Attending Technician / Manager:
+                  </label>
+                  <input
+                    type="text"
+                    value={editingIncident.technicianName || ''}
+                    onChange={(e) => setEditingIncident({ ...editingIncident, technicianName: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                    placeholder="e.g. Ramesh K (Sr. Mechanical Tech)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Reported By (Operator):
+                  </label>
+                  <input
+                    type="text"
+                    value={editingIncident.reportedBy || ''}
+                    onChange={(e) => setEditingIncident({ ...editingIncident, reportedBy: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                    placeholder="e.g. Suresh V"
+                  />
+                </div>
+              </div>
+
+              {/* Spare Parts Section */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5 m-0">
+                    <Package className="w-3.5 h-3.5 text-indigo-600" />
+                    Spare Parts Replaced
+                  </h4>
+                  <span className="text-[11px] text-slate-500 font-semibold">
+                    {editingIncident.spareParts?.length || 0} Parts Recorded
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={editSparePartName}
+                    onChange={(e) => setEditSparePartName(e.target.value)}
+                    className="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                  >
+                    {availableSpareParts.map((sp) => (
+                      <option key={sp} value={sp}>{sp}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editSparePartQty}
+                    onChange={(e) => setEditSparePartQty(Number(e.target.value))}
+                    className="w-16 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-black text-slate-800 text-center"
+                    placeholder="Qty"
+                  />
+                  <select
+                    value={editSparePartUnit}
+                    onChange={(e) => setEditSparePartUnit(e.target.value)}
+                    className="w-20 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                  >
+                    <option value="Nos">Nos</option>
+                    <option value="Pcs">Pcs</option>
+                    <option value="Sets">Sets</option>
+                    <option value="Mtrs">Mtrs</option>
+                    <option value="Ltrs">Ltrs</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleAddSparePartToEdit}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {(editingIncident.spareParts || []).map((sp, sIdx) => (
+                    <div key={sIdx} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 text-xs">
+                      <span className="font-bold text-slate-800">
+                        {sp.name} <span className="text-indigo-600 font-extrabold ml-1">× {sp.qty} {sp.unit || 'Nos'}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSparePartFromEdit(sIdx)}
+                        className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                        title="Remove part"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {(!editingIncident.spareParts || editingIncident.spareParts.length === 0) && (
+                    <div className="text-[11px] text-slate-400 italic text-center py-1">
+                      No spare parts attached
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => handleDeleteIncident(editingIncident.id)}
+                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" /> Delete Incident
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingIncident(null)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditedIncident}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" /> Save Ticket Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -477,44 +477,33 @@ export const QCView: React.FC<QCViewProps> = ({
     const scrap = parseFloat(scrapKg) || 0;
 
     const { job, batch } = activeBatchObj;
+    const formCrateCapacity = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * effectiveQcPcs;
+    const totalInputPieces = inputCrates * formCrateCapacity;
 
-    const totalQcPcs = cratesDone * effectiveQcPcs + looseDone;
+    const approvedPcs = cratesDone * formCrateCapacity + looseDone;
     const prevProducedPieces = batch.producedPieces || 0;
     const prevProducedCrates = batch.producedQty || 0;
-    const cumulativeOutputPieces = prevProducedPieces + totalQcPcs;
+    const cumulativeOutputPieces = prevProducedPieces + approvedPcs;
     const cumulativeOutputCrates = prevProducedCrates + cratesDone;
     const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[job.product] || 450;
     const scrapPcs = Math.round(scrap * pcsPerKg);
+    const totalOutputPieces = cumulativeOutputPieces + scrapPcs;
 
-    // Hard Audit Check 1: Approved output crates > issued crates
-    if (inputCrates > 0 && cumulativeOutputCrates > inputCrates) {
+    // Single crate overload check
+    if (cratesDone === 1 && approvedPcs > formCrateCapacity) {
       setAuditMismatchError({
-        outputPcs: cumulativeOutputPieces,
-        outputCrates: cumulativeOutputCrates,
-        inputPcs: totalInputPieces,
-        inputCrates,
-        scrapPcs,
-        details: `Audit Block: Approved QC crates (${cumulativeOutputCrates} crates) exceeds issued formed input crates (${inputCrates} crates). Entry blocked.`
-      });
-      return;
-    }
-
-    // Hard Audit Check 2: Single crate output > crate capacity limit (e.g. 8,800 pcs when 1 crate of 8,000 pcs was issued)
-    if (inputCrates === 1 && totalQcPcs > effectiveQcPcs) {
-      setAuditMismatchError({
-        outputPcs: totalQcPcs,
+        outputPcs: approvedPcs,
         outputCrates: cratesDone,
-        inputPcs: effectiveQcPcs,
+        inputPcs: formCrateCapacity,
         inputCrates: 1,
         scrapPcs,
-        details: `Audit Block: Approved QC quantity (${totalQcPcs.toLocaleString()} pcs across ${cratesDone} crate + ${looseDone} loose) exceeds single crate capacity limit (${effectiveQcPcs.toLocaleString()} pcs). Entry blocked.`
+        details: `Audit Block: Single crate capacity exceeded. Approved quantity (${approvedPcs.toLocaleString()} pcs across ${cratesDone} crate + ${looseDone} loose) exceeds single crate capacity (${formCrateCapacity.toLocaleString()} pcs). Entry blocked.`
       });
       return;
     }
 
-    // Hard Audit Check 3: Cumulative approved pieces > issued input pieces
+    // Piece-based mass balance audit check: Output exceeds input pieces
     if (inputCrates > 0 && cumulativeOutputPieces > totalInputPieces) {
       setAuditMismatchError({
         outputPcs: cumulativeOutputPieces,
@@ -522,20 +511,20 @@ export const QCView: React.FC<QCViewProps> = ({
         inputPcs: totalInputPieces,
         inputCrates,
         scrapPcs,
-        details: `Audit Block: Approved QC quantity (${cumulativeOutputPieces.toLocaleString()} pcs across ${cumulativeOutputCrates} crates) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+        details: `Audit Block: Output exceeds input pieces. Approved QC quantity (${cumulativeOutputPieces.toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
       });
       return;
     }
 
-    // Hard Audit Check 4: Output + Scrap > Input pieces
-    if (inputCrates > 0 && (cumulativeOutputPieces + scrapPcs) > totalInputPieces) {
+    // Piece-based mass balance audit check: Output + Scrap exceeds input pieces
+    if (inputCrates > 0 && totalOutputPieces > totalInputPieces) {
       setAuditMismatchError({
         outputPcs: cumulativeOutputPieces,
         outputCrates: cumulativeOutputCrates,
         inputPcs: totalInputPieces,
         inputCrates,
         scrapPcs,
-        details: `Audit Block: Total QC approved quantity (${cumulativeOutputPieces.toLocaleString()} pcs) plus scrap (${scrapPcs.toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+        details: `Audit Block: Output exceeds input pieces. Total QC approved (${cumulativeOutputPieces.toLocaleString()} pcs) plus scrap (${scrapPcs.toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
       });
       return;
     }
@@ -547,7 +536,7 @@ export const QCView: React.FC<QCViewProps> = ({
       return {
         ...j,
         availableQcCrates: (j.availableQcCrates || 0) + cratesDone,
-        totalQcPieces: (j.totalQcPieces || 0) + totalQcPcs,
+        totalQcPieces: (j.totalQcPieces || 0) + approvedPcs,
         qcLoosePcs: (j.qcLoosePcs || 0) + looseDone,
         runningBatches: (j.runningBatches || []).map((b) => {
           if (b.batchId !== batch.batchId) return b;
@@ -556,8 +545,8 @@ export const QCView: React.FC<QCViewProps> = ({
             status: 'Completed',
             endTime: stopTime,
             producedQty: (b.producedQty || 0) + cratesDone,
-            pcsPerCrate: effectiveQcPcs,
-            producedPieces: totalQcPcs,
+            pcsPerCrate: formCrateCapacity,
+            producedPieces: approvedPcs,
             loosePieces: looseDone,
             scrapKg: scrap
           };
@@ -571,7 +560,7 @@ export const QCView: React.FC<QCViewProps> = ({
       stage: 'QC',
       machine: 'QC-Desk',
       shift: batch.shift,
-      action: `⏹️ Completed QC Inspection (${cratesDone} Crates = ${totalQcPcs.toLocaleString()} Pieces Approved, Scrap: ${scrap} KG)`,
+      action: `⏹️ Completed QC Inspection (${cratesDone} Crates = ${approvedPcs.toLocaleString()} Pieces Approved, Scrap: ${scrap} KG)`,
       worker: batch.worker,
       user: 'qc_user',
       startTime: batch.startTime,
@@ -590,7 +579,7 @@ export const QCView: React.FC<QCViewProps> = ({
     setLoosePiecesInput('0');
     setScrapKg('0');
     setSelectedActiveBatchId('');
-    alert(`✅ QC Inspection Finished! Approved ${cratesDone} Crates (= ${totalQcPcs.toLocaleString()} Pieces) into Finished Stock.`);
+    alert(`✅ QC Inspection Finished! Approved ${cratesDone} Crates (= ${approvedPcs.toLocaleString()} Pieces) into Finished Stock.`);
   };
 
   const handleDirectQCVoucherSubmit = (e: React.FormEvent) => {
@@ -1079,7 +1068,7 @@ export const QCView: React.FC<QCViewProps> = ({
                 onClick={() => onOpenHoldModal('QC-Desk')}
                 className="py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
               >
-                <Pause className="w-3.5 h-3.5" /> Hold / Shift
+                <Pause className="w-3.5 h-3.5" /> Call In-Charge / Report Hold
               </button>
               <button
                 type="button"

@@ -1618,7 +1618,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                   onClick={() => onOpenHoldModal(selectedMachine)}
                   className="py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                 >
-                  <Pause className="w-3.5 h-3.5" /> Hold / Shift
+                  <Pause className="w-3.5 h-3.5" /> Call In-Charge / Report Hold
                 </button>
                 <button
                   type="button"

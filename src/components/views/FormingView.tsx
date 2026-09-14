@@ -224,16 +224,16 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const { job, batch } = activeBatchObj;
     const forwardedFormedPcs = Math.round(qty * effectiveFormPcs);
 
-    // Dynamic conversion standards
-    const standardCutPcs = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 10000;
+    // Dynamic conversion standards: Cutting baseline = 10,000 pcs/crate, Forming baseline = 7,000 pcs/crate
+    const cutCrateCapacity = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 10000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * standardCutPcs;
+    const totalInputPieces = inputCrates * cutCrateCapacity;
     const prevProducedPieces = batch.producedPieces || 0;
     const prevProducedCrates = batch.producedQty || 0;
     const cumulativeOutputPieces = prevProducedPieces + forwardedFormedPcs;
     const cumulativeOutputCrates = prevProducedCrates + qty;
 
-    // Zero tolerance / Hard block validation
+    // Strict piece-count mass-balance audit check
     if (cumulativeOutputPieces > totalInputPieces) {
       setIsForwardModalOpen(false);
       setAuditMismatchError({
@@ -242,7 +242,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
         inputPcs: totalInputPieces,
         inputCrates,
         scrapPcs: 0,
-        details: `Audit Mismatch: Output quantity (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+        details: `Audit Mismatch: Output quantity (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} cut crates). Entry blocked.`
       });
       return;
     }
@@ -567,10 +567,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
     const { job, batch } = activeBatchObj;
 
-    // Dynamic conversion standards
-    const cutCrateCap = batch.pcsPerCrate || job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 8000;
+    // Dynamic conversion standards: Cutting baseline = 10,000 pcs/crate, Forming baseline = 7,000 pcs/crate
+    const cutCrateCapacity = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 10000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * cutCrateCap;
+    const totalInputPieces = inputCrates * cutCrateCapacity;
 
     const currentOutputPieces = Math.round(cratesDone * effectiveFormPcs) + looseDone;
     const prevProducedPieces = batch.producedPieces || 0;
@@ -578,33 +578,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const cumulativeOutputPieces = prevProducedPieces + currentOutputPieces;
     const cumulativeOutputCrates = prevProducedCrates + cratesDone;
 
-    // Zero Tolerance / Hard Block Audit Check 0: Output crates > Input crates
-    if (inputCrates > 0 && cumulativeOutputCrates > inputCrates) {
-      setAuditMismatchError({
-        outputPcs: cumulativeOutputPieces,
-        outputCrates: cumulativeOutputCrates,
-        inputPcs: totalInputPieces,
-        inputCrates,
-        scrapPcs: scrapPcsVal,
-        details: `Audit Mismatch: Output crates (${cumulativeOutputCrates} crates) exceeds issued cutting input crates (${inputCrates} crates). Entry blocked.`
-      });
-      return;
-    }
-
-    // Zero Tolerance / Hard Block Audit Check 0b: Single crate output > single crate capacity / issued pcs
-    if (inputCrates === 1 && currentOutputPieces > cutCrateCap) {
-      setAuditMismatchError({
-        outputPcs: currentOutputPieces,
-        outputCrates: cratesDone,
-        inputPcs: cutCrateCap,
-        inputCrates: 1,
-        scrapPcs: scrapPcsVal,
-        details: `Audit Mismatch: Output quantity (${currentOutputPieces.toLocaleString()} pcs across ${cratesDone} crate + ${looseDone} loose) exceeds issued single crate capacity (${cutCrateCap.toLocaleString()} pcs). Entry blocked.`
-      });
-      return;
-    }
-
-    // Zero Tolerance / Hard Block Audit Check 1: Output > Input
+    // Strict piece-count mass-balance audit check 1: Output Pieces > Input Pieces
     if (cumulativeOutputPieces > totalInputPieces) {
       setAuditMismatchError({
         outputPcs: cumulativeOutputPieces,
@@ -612,12 +586,12 @@ export const FormingView: React.FC<FormingViewProps> = ({
         inputPcs: totalInputPieces,
         inputCrates,
         scrapPcs: scrapPcsVal,
-        details: `Audit Mismatch: Output quantity (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+        details: `Audit Mismatch: Output quantity (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} cut crates). Entry blocked.`
       });
       return;
     }
 
-    // Zero Tolerance / Hard Block Audit Check 2: Output + Scrap > Input
+    // Strict piece-count mass-balance audit check 2: Output Pieces + Scrap Pieces > Input Pieces
     if (cumulativeOutputPieces + scrapPcsVal > totalInputPieces) {
       setAuditMismatchError({
         outputPcs: cumulativeOutputPieces,
@@ -625,7 +599,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
         inputPcs: totalInputPieces,
         inputCrates,
         scrapPcs: scrapPcsVal,
-        details: `Audit Mismatch: Output quantity (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates + ${scrapPcsVal} defect pcs) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+        details: `Audit Mismatch: Total output (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates + ${scrapPcsVal} scrap pcs) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} cut crates). Entry blocked.`
       });
       return;
     }
@@ -1220,7 +1194,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   onClick={() => onOpenHoldModal(selectedMachine)}
                   className="py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                 >
-                  <Pause className="w-3.5 h-3.5" /> Hold / Shift
+                  <Pause className="w-3.5 h-3.5" /> Call In-Charge / Report Hold
                 </button>
                 <button
                   type="button"

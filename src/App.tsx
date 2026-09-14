@@ -623,6 +623,10 @@ export const App: React.FC = () => {
             onBackToHub={() => setCurrentView('HUB')}
             onOpenStationModal={(m) => setStationDetailMachine(m)}
             onNavigateAnalytics={() => handleNavigate('ANALYTICS')}
+            onNavigateToTraceability={(q) => {
+              setAuditSearchQuery(q);
+              setCurrentView('AUDIT');
+            }}
             onSaveState={handleSaveState}
           />
         )}

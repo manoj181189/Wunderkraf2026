@@ -11,6 +11,7 @@ interface MasterExecutiveDashboardProps {
   onOpenStationModal: (machineName: string) => void;
   onOpenAttendModal?: (machineName: string, incidentId?: string) => void;
   onNavigateAnalytics?: () => void;
+  onNavigateToTraceability?: (query: string) => void;
   onSaveState?: (newState: FactoryState) => void;
 }
 
@@ -20,6 +21,7 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
   onOpenStationModal,
   onOpenAttendModal,
   onNavigateAnalytics,
+  onNavigateToTraceability,
   onSaveState
 }) => {
   const { jobs, packJobs, logs, scrapSales, maintenanceIncidents = [] } = state;
@@ -121,13 +123,34 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 p-4 rounded-xl flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center">
-            <Trash2 className="w-5 h-5" />
+        <div 
+          onClick={() => {
+            if (onNavigateToTraceability) {
+              onNavigateToTraceability('Scrap');
+            } else if (onNavigateAnalytics) {
+              onNavigateAnalytics();
+            }
+          }}
+          className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 p-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:border-rose-400 hover:shadow-md transition group"
+          title="Click to trace all scrap events by Batch, Machine, and Operator"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center group-hover:scale-105 transition">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Available Scrap</span>
+                <span className="text-[10px] text-rose-600 font-extrabold bg-rose-100 px-1.5 py-0.2 rounded border border-rose-200 group-hover:bg-rose-600 group-hover:text-white transition">
+                  🔍 Trace
+                </span>
+              </div>
+              <div className="text-xl font-extrabold text-rose-950">{availableScrap} KG</div>
+            </div>
           </div>
-          <div>
-            <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Available Scrap</span>
-            <div className="text-xl font-extrabold text-rose-950">{availableScrap} KG</div>
+          <div className="text-right hidden sm:block">
+            <span className="text-[10px] text-rose-600 font-semibold block group-hover:underline">View Traceability ➔</span>
+            <span className="text-[9px] text-rose-400">Slit Trim • Punch • QC Rejects</span>
           </div>
         </div>
       </div>

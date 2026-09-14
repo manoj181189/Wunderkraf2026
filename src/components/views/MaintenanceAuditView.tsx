@@ -738,7 +738,19 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-blue-700 font-bold uppercase block">QC Scrap Culled</span>
-                    <span className="font-bold text-rose-700">2 KG defective rejected</span>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('logs');
+                        setLogStageFilter('QC');
+                        setLogSearch('Scrap');
+                      }}
+                      className="font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-200 transition cursor-pointer text-left flex items-center gap-1"
+                      title="Click to view QC scrap logs"
+                    >
+                      <span>2 KG defective rejected</span>
+                      <span className="text-[9px] text-rose-600 underline">Trace</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -769,7 +781,19 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Forming Scrap</span>
-                    <span className="font-bold text-slate-700">2 KG trim scrap</span>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('logs');
+                        setLogStageFilter('Forming');
+                        setLogSearch('Scrap');
+                      }}
+                      className="font-bold text-slate-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 transition cursor-pointer text-left flex items-center gap-1"
+                      title="Click to filter Forming scrap logs"
+                    >
+                      <span>2 KG trim scrap</span>
+                      <span className="text-[9px] text-amber-700 underline">Trace</span>
+                    </button>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Shift & Time</span>
@@ -806,7 +830,19 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Punch Scrap</span>
-                    <span className="font-bold text-slate-700">14 KG skeleton matrix</span>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('logs');
+                        setLogStageFilter('Cutting');
+                        setLogSearch('Scrap');
+                      }}
+                      className="font-bold text-slate-800 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded border border-violet-200 transition cursor-pointer text-left flex items-center gap-1"
+                      title="Click to filter Cutting punch scrap logs"
+                    >
+                      <span>14 KG skeleton matrix</span>
+                      <span className="text-[9px] text-violet-700 underline">Trace</span>
+                    </button>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Shift & Time</span>
@@ -843,7 +879,19 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Edge Trim Scrap</span>
-                    <span className="font-bold text-slate-700">6 KG edge trim</span>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('logs');
+                        setLogStageFilter('Slitting');
+                        setLogSearch('Scrap');
+                      }}
+                      className="font-bold text-slate-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 transition cursor-pointer text-left flex items-center gap-1"
+                      title="Click to filter Slitting edge trim scrap logs"
+                    >
+                      <span>6 KG edge trim</span>
+                      <span className="text-[9px] text-amber-800 underline">Trace</span>
+                    </button>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Shift & Time</span>
@@ -856,7 +904,7 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
 
               {/* STEP 1: Origin Raw Material Paper */}
               {(() => {
-                const allReels = primaryJob ? getJobAllReels(primaryJob) : ['RL-ITC-9921'];
+                const allReels = primaryJob ? getJobAllReels(primaryJob) : ['RL-ORIENT-9921'];
                 const reelBreakdown = primaryJob ? getJobReelItemsBreakdown(primaryJob) : [];
                 return (
                   <div className="p-4 bg-amber-50/80 border-2 border-amber-300 rounded-xl space-y-3">
@@ -913,13 +961,13 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                       <div>
                         <span className="text-[10px] text-amber-800 font-bold uppercase block">Paper Manufacturer</span>
                         <span className="font-black text-slate-900">
-                          {primaryJob?.paperBrand || 'ITC CyberXL'} {primaryJob?.gsm || primaryJob?.targetGsm || ''}
+                          {primaryJob?.paperBrand || 'Orient Paper Kraft'} {primaryJob?.gsm || primaryJob?.targetGsm || ''}
                         </span>
                       </div>
                       <div>
                         <span className="text-[10px] text-amber-800 font-bold uppercase block">Paper Lot / Spec</span>
                         <span className="font-mono font-bold text-slate-800">
-                          {primaryJob?.customRemark || 'Lot #ITC-280-992'}
+                          {primaryJob?.customRemark || 'Lot #ORIENT-280-992'}
                         </span>
                       </div>
                       <div>
@@ -1095,7 +1143,7 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-1 m-0">
-                    Raw Paper: {j.paperBrand || 'ITC CyberXL'} {j.gsm || j.targetGsm || ''} • Rolls: {j.availableRolls || 0} • QC Crates:{' '}
+                    Raw Paper: {j.paperBrand || 'Orient Paper Kraft'} {j.gsm || j.targetGsm || ''} • Rolls: {j.availableRolls || 0} • QC Crates:{' '}
                     {j.availableQcCrates || 0}
                   </p>
                 </div>

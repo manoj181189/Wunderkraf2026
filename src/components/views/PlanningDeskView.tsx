@@ -26,8 +26,8 @@ import {
   Gauge,
   Download
 } from 'lucide-react';
-import { FactoryState, ProductionPlan, ProductType, MotherReelItem, PlannedLayer } from '../../types';
-import { PRODUCTS, PAPER_BRANDS, GLUE_BRANDS, PRODUCT_PREFIX_MAP, TARGET_GSM_DEFAULT } from '../../lib/constants';
+import { FactoryState, ProductionPlan, ProductType, MotherReelItem, PlannedLayer, Job } from '../../types';
+import { PRODUCTS, PAPER_BRANDS, GLUE_BRANDS, PRODUCT_PREFIX_MAP, TARGET_GSM_DEFAULT, TARGET_LAYERS_DEFAULT } from '../../lib/constants';
 import { getNumberingMaster, generateUnifiedJobId } from '../../lib/numberingMaster';
 import { getJobPlannedLayers, parseNumericGsm, normalizeGsmLabel, exportToCSV } from '../../lib/utils';
 
@@ -51,19 +51,9 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
   const productList = state.products && state.products.length > 0 ? state.products : PRODUCTS;
   const paperBrandList = state.paperBrands && state.paperBrands.length > 0 ? state.paperBrands : PAPER_BRANDS;
   const glueBrandList = state.glueBrands && state.glueBrands.length > 0 ? state.glueBrands : GLUE_BRANDS;
-  const targetLayersList = state.targetLayersMaster && state.targetLayersMaster.length > 0 ? state.targetLayersMaster : [4, 6, 8, 10, 12, 14, 16];
-  const targetGsmList = Array.from(
-    new Set([
-      '60 GSM',
-      '80 GSM',
-      '100 GSM',
-      '120 GSM',
-      ...(state.targetGsmMaster && state.targetGsmMaster.length > 0 ? state.targetGsmMaster : TARGET_GSM_DEFAULT),
-      ...TARGET_GSM_DEFAULT
-    ])
-  );
+  const targetLayersList = state.targetLayersMaster && state.targetLayersMaster.length > 0 ? state.targetLayersMaster : TARGET_LAYERS_DEFAULT;
+  const targetGsmList = state.targetGsmMaster && state.targetGsmMaster.length > 0 ? state.targetGsmMaster : TARGET_GSM_DEFAULT;
   const scrapLimitsList = state.scrapLimitsMaster && state.scrapLimitsMaster.length > 0 ? state.scrapLimitsMaster : [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0];
-  const scrapToleranceKgList = state.scrapToleranceKgMaster && state.scrapToleranceKgMaster.length > 0 ? state.scrapToleranceKgMaster : [5, 10, 15, 20, 25, 30, 40, 50];
   const defaultPlannedGsm = (state.targetGsmMaster && state.targetGsmMaster.length > 0) ? state.targetGsmMaster[0] : (targetGsmList[0] || '120 GSM');
 
   // Filter & Search
@@ -357,7 +347,25 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
       onSaveState({
         ...state,
         seriesConfig: updatedSeriesConfig,
-        productionPlans: [newPlan, ...productionPlans]
+        productionPlans: [newPlan, ...productionPlans],
+        jobs: [{
+          id: jobId,
+          planId: planId,
+          product: formProduct,
+          paperBrand: formPaperBrand,
+          gsm: combinedGsmStr,
+          targetLayers: formTargetLayers,
+          targetGsm: combinedGsmStr,
+          plannedGsms: effectiveGsms,
+          plannedLayers: effectivePlannedLayers,
+          stage: 'Planning',
+          status: 'Pending',
+          availableRolls: 0,
+          availableCuttingCrates: 0,
+          availableFormingCrates: 0,
+          availableQcCrates: 0,
+          createdAt: new Date().toISOString()
+        }, ...(state.jobs || [])]
       });
       setIsPlanModalOpen(false);
       alert(`✅ New Production Plan Created!\nPlan ID: [${planId}]\nJob ID: [${jobId}]\nTarget: ${formTargetLayers} Layers (${effectivePlannedLayers.map(l => `${l.requiredReels}x ${l.gsm} GSM ${l.type}`).join(' + ')}) | ${formTargetLengthMeters} Meters | ${formAdhesiveBrand}`);
