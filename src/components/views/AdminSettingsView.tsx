@@ -1132,14 +1132,19 @@ _If you received this message, your contact number and routing configuration are
       timestamp: new Date().toLocaleString()
     };
 
+    const nextPlan = updatedPlans[0];
     onSaveState({
       ...state,
       deletedPlanIds: Array.from(new Set([...(state.deletedPlanIds || []), planId])),
       productionPlans: updatedPlans,
       logs: [...state.logs, newLog]
     });
-    setPlanEditForm(null);
-    setSelectedPlanIdToEdit(updatedPlans[0]?.id || '');
+    if (nextPlan) {
+      handleSelectPlanToEdit(nextPlan.id, updatedPlans);
+    } else {
+      setSelectedPlanIdToEdit('');
+      setPlanEditForm(null);
+    }
     showToast(`✅ Production Plan [${planId}] deleted.`);
   };
 
@@ -2072,13 +2077,18 @@ _If you received this message, your contact number and routing configuration are
           rawDate: new Date().toISOString().split('T')[0],
           timestamp: new Date().toLocaleString()
         };
+        const nextPlan = activePlans[0];
         onSaveState({
           ...state,
           productionPlans: activePlans,
           logs: [...state.logs, newLog]
         });
-        setPlanEditForm(null);
-        setSelectedPlanIdToEdit(activePlans[0]?.id || '');
+        if (nextPlan) {
+          handleSelectPlanToEdit(nextPlan.id, activePlans);
+        } else {
+          setSelectedPlanIdToEdit('');
+          setPlanEditForm(null);
+        }
         setConfirmModal(null);
         showToast(`✅ Successfully purged ${purgedCount} completed/cancelled plans.`);
       }
@@ -2112,8 +2122,8 @@ _If you received this message, your contact number and routing configuration are
           productionPlans: [],
           logs: [...state.logs, newLog]
         });
-        setPlanEditForm(null);
         setSelectedPlanIdToEdit('');
+        setPlanEditForm(null);
         setConfirmModal(null);
         showToast(`✅ All ${totalPlans} production plans expunged.`);
       }
@@ -5125,6 +5135,20 @@ ${formLines.join('\n')}
           {/* ------------------------------------------------------------- */}
           {masterSubTab === 'plans' && (
             <div className="space-y-4">
+              {/* Auto-init plan edit form if null */}
+              {(() => {
+                if (!planEditForm && (state.productionPlans || []).length > 0) {
+                  const targetPlan = (state.productionPlans || []).find((p) => p.id === selectedPlanIdToEdit) || state.productionPlans[0];
+                  if (targetPlan) {
+                    setTimeout(() => {
+                      setSelectedPlanIdToEdit(targetPlan.id);
+                      setPlanEditForm(JSON.parse(JSON.stringify(targetPlan)));
+                    }, 0);
+                  }
+                }
+                return null;
+              })()}
+
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between flex-wrap gap-3">
                 <div className="flex-1 min-w-[200px]">
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
@@ -5135,6 +5159,9 @@ ${formLines.join('\n')}
                     onChange={(e) => handleSelectPlanToEdit(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
                   >
+                    {(state.productionPlans || []).length === 0 && (
+                      <option value="">No Production Plans Found in Database</option>
+                    )}
                     {(state.productionPlans || []).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.id} - {p.product} (Job: {p.jobId}) - Status: {p.status}
@@ -5147,9 +5174,9 @@ ${formLines.join('\n')}
                     <button
                       type="button"
                       onClick={() => handleDeletePlan(planEditForm.id)}
-                      className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow-xs"
                     >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete Plan
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Selected Plan [{planEditForm.id}]
                     </button>
                   )}
                   {(state.productionPlans || []).some((p) => p.status === 'Completed' || p.status === 'Cancelled') && (
@@ -5166,7 +5193,7 @@ ${formLines.join('\n')}
                     <button
                       type="button"
                       onClick={handlePurgeAllPlans}
-                      className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow-xs"
+                      className="px-3 py-2 bg-rose-800 hover:bg-rose-900 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow-xs"
                       title="Expunge all production plans permanently"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Purge ALL ({state.productionPlans.length}) Plans
@@ -5177,6 +5204,19 @@ ${formLines.join('\n')}
 
               {planEditForm ? (
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h5 className="text-xs font-black text-slate-800 uppercase m-0 flex items-center gap-1.5">
+                      <span>Editing Plan: {planEditForm.id}</span>
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePlan(planEditForm.id)}
+                      className="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-[11px] rounded transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" /> Delete This Plan
+                    </button>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-blue-900 uppercase mb-1">
@@ -5364,7 +5404,15 @@ ${formLines.join('\n')}
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-4 border-t border-slate-200">
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePlan(planEditForm.id)}
+                      className="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" /> Delete Plan
+                    </button>
+
                     <button
                       type="button"
                       onClick={handleSavePlanEdit}
@@ -5375,8 +5423,96 @@ ${formLines.join('\n')}
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-slate-500 text-center py-6">Select a Production Plan above to edit</div>
+                <div className="text-xs text-slate-500 text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                  No Production Plan selected or available in database.
+                </div>
               )}
+
+              {/* PRODUCTION PLANS MASTER LIST TABLE WITH DIRECT DELETE BUTTONS */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <h5 className="text-xs font-black text-slate-900 uppercase m-0 flex items-center gap-2">
+                    <span>All Production Plans Master List ({state.productionPlans?.length || 0})</span>
+                  </h5>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    1-Click Delete or Edit any plan directly
+                  </span>
+                </div>
+
+                {(state.productionPlans || []).length === 0 ? (
+                  <div className="text-center py-8 text-xs text-slate-400 font-medium bg-slate-50 rounded-lg border border-slate-200">
+                    No active production plans in factory database.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto max-h-80 border border-slate-200 rounded-lg">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-100 text-slate-700 font-extrabold uppercase text-[10px] sticky top-0 border-b border-slate-200">
+                        <tr>
+                          <th className="p-2.5">Plan ID</th>
+                          <th className="p-2.5">Job ID</th>
+                          <th className="p-2.5">Product</th>
+                          <th className="p-2.5">Target Layers / Length</th>
+                          <th className="p-2.5">Status</th>
+                          <th className="p-2.5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                        {(state.productionPlans || []).map((p) => (
+                          <tr
+                            key={p.id}
+                            className={`hover:bg-slate-50 transition ${
+                              selectedPlanIdToEdit === p.id ? 'bg-blue-50/60 font-semibold' : ''
+                            }`}
+                          >
+                            <td className="p-2.5 font-bold text-blue-900">{p.id}</td>
+                            <td className="p-2.5 font-mono text-slate-700">{p.jobId}</td>
+                            <td className="p-2.5 font-bold">{p.product}</td>
+                            <td className="p-2.5">
+                              {p.targetLayers} L | {p.targetLengthMeters} M ({p.paperBrand || 'Std'})
+                            </td>
+                            <td className="p-2.5">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  p.status === 'Completed'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : p.status === 'In-Progress'
+                                    ? 'bg-blue-100 text-blue-800 font-extrabold'
+                                    : p.status === 'Cancelled'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {p.status}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectPlanToEdit(p.id)}
+                                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-bold transition cursor-pointer"
+                                  title="Edit plan master parameters"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePlan(p.id)}
+                                  className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                  title="Delete plan from database"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {masterSubTab === 'logs' && (

@@ -36,9 +36,10 @@ export function calculateAvailableScrapKg(logs: LogEntry[], scrapSales: any[]): 
   let totalGeneratedKg = 0;
   logs.forEach((l) => {
     if (l.action) {
-      const matchScrap = l.action.match(/Scrap:\s*(\d+)\s*KG/i) || l.action.match(/Scrap:\s*(\d+)/i);
+      // Matches "Scrap: 12.5 KG" or "Extra Paper Scrap: 12.5 KG"
+      const matchScrap = l.action.match(/(?:Scrap|Extra Paper Scrap):\s*(\d+(?:\.\d+)?)\s*KG/i) || l.action.match(/(?:Scrap|Extra Paper Scrap):\s*(\d+(?:\.\d+)?)/i);
       if (matchScrap && !l.action.includes('Pieces') && !l.action.includes('Pcs')) {
-        totalGeneratedKg += parseInt(matchScrap[1], 10) || 0;
+        totalGeneratedKg += parseFloat(matchScrap[1]) || 0;
       }
     }
   });

@@ -125,7 +125,6 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       if (activeBatchObj.batch.batchId !== lastShownSpecBatchId) {
         setShowSpecModal(true);
         setLastShownSpecBatchId(activeBatchObj.batch.batchId);
-        setActualGlueConsumed(activeBatchObj.batch.glueUsageKg ? String(activeBatchObj.batch.glueUsageKg) : '');
       }
     } else {
       setShowSpecModal(false);

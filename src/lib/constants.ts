@@ -253,66 +253,6 @@ export const DEFAULT_USERS: Record<string, { pass: string; perms: string[]; name
     perms: ['*'],
     name: 'Master Administrator',
     role: 'Administrator'
-  },
-  'kavita': {
-    pass: 'kavita123',
-    perms: ['QC', 'Packing'],
-    name: 'Kavita Ben (Quality & Packing Inspector)',
-    role: 'QC & Packing Inspector'
-  },
-  'marketing': {
-    pass: 'mkt123',
-    perms: ['Marketing', 'Orders'],
-    name: 'Marketing Incharge',
-    role: 'Marketing'
-  },
-  'disp_user': {
-    pass: 'disp123',
-    perms: ['Dispatch', 'Orders'],
-    name: 'Dispatch Officer',
-    role: 'Dispatch'
-  },
-  'slit_user': {
-    pass: 'slit123',
-    perms: ['Slitting'],
-    name: 'Slitting Operator',
-    role: 'Slitting'
-  },
-  'cut_user': {
-    pass: 'cut123',
-    perms: ['Cutting'],
-    name: 'Cutting Operator',
-    role: 'Cutting'
-  },
-  'form_user': {
-    pass: 'form123',
-    perms: ['Forming'],
-    name: 'Forming Operator',
-    role: 'Forming'
-  },
-  'qc_user': {
-    pass: 'qc123',
-    perms: ['QC'],
-    name: 'QC Inspector',
-    role: 'QC'
-  },
-  'pack_user': {
-    pass: 'pack123',
-    perms: ['Packing', 'Orders'],
-    name: 'Packing Supervisor',
-    role: 'Packing'
-  },
-  'maint_user': {
-    pass: 'maint123',
-    perms: ['Maintenance'],
-    name: 'Maintenance Technician',
-    role: 'Maintenance'
-  },
-  'purchase': {
-    pass: 'pur123',
-    perms: ['Purchase'],
-    name: 'Purchase Officer',
-    role: 'Purchase'
   }
 };
 

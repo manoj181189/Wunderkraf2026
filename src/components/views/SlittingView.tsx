@@ -288,8 +288,22 @@ Only one active job can run on a machine at a time. Until the current job is Hel
 
     const master = getNumberingMaster(seriesConfig);
     const targetPlan = selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId) : null;
-    const generated = generateUnifiedJobId(product, seriesConfig, state.productPrefixMap);
-    const newJobId = generated.jobId;
+    
+    // Check if a job was already created for this plan during PPC Planning Desk step
+    const existingPlanJob = (state.jobs || []).find(
+      (j) => (targetPlan?.jobId && j.id === targetPlan.jobId) || (selectedPlanId && j.planId === selectedPlanId && j.stage === 'Planning')
+    );
+
+    let newJobId: string;
+    let nextSeriesConfig = state.seriesConfig;
+
+    if (existingPlanJob) {
+      newJobId = existingPlanJob.id;
+    } else {
+      const generated = generateUnifiedJobId(product, seriesConfig, state.productPrefixMap, state.jobs || []);
+      newJobId = generated.jobId;
+      nextSeriesConfig = generated.updatedSeriesConfig;
+    }
 
     const batchId = generateSlittingBatchId(newJobId, [], master);
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -415,11 +429,28 @@ Only one active job can run on a machine at a time. Until the current job is Hel
           return mr;
         });
 
+    let updatedJobs: Job[];
+    if (existingPlanJob) {
+      updatedJobs = state.jobs.map((j) => {
+        if (j.id !== existingPlanJob.id) return j;
+        return {
+          ...j,
+          ...newJob,
+          id: existingPlanJob.id,
+          plannedGsms: j.plannedGsms || newJob.plannedGsms,
+          plannedLayers: j.plannedLayers || newJob.plannedLayers,
+          runningBatches: [...(j.runningBatches || []), newBatch]
+        };
+      });
+    } else {
+      updatedJobs = [newJob, ...state.jobs];
+    }
+
     onSaveState({
       ...state,
-      jobs: [newJob, ...state.jobs],
+      jobs: updatedJobs,
       logs: [...state.logs, newLog],
-      seriesConfig: generated.updatedSeriesConfig,
+      seriesConfig: nextSeriesConfig,
       productionPlans: updatedPlans,
       motherReelInventory: updatedMotherReels
     });

@@ -81,7 +81,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
                 setUsername(e.target.value);
                 setError(false);
               }}
-              placeholder="e.g. admin, slit_user, cut_user, qc_user..."
+              placeholder="e.g. admin..."
               className="w-full pl-3 pr-9 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:bg-white focus:border-[#3182ce] focus:ring-2 focus:ring-blue-100 outline-none transition"
               required
             />

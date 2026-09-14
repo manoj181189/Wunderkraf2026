@@ -99,14 +99,18 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
   // Repair Resolution Form State
   const [repairTechName, setRepairTechName] = useState(contacts[0]?.name || 'Ramesh Sharma');
   const [actionTaken, setActionTaken] = useState('');
+  const availablePartsMaster = state.maintenanceSparePartsMaster && state.maintenanceSparePartsMaster.length > 0
+    ? state.maintenanceSparePartsMaster
+    : COMMON_SPARE_PARTS;
+
   const [sparePartsList, setSparePartsList] = useState<SparePartItem[]>([
-    { name: COMMON_SPARE_PARTS[0], qty: 1, unit: 'Nos', notes: '' }
+    { name: availablePartsMaster[0] || 'Band Heater Element 1500W', qty: 1, unit: 'Nos', notes: '' }
   ]);
-  const [newPartName, setNewPartName] = useState(COMMON_SPARE_PARTS[0]);
+  const [newPartName, setNewPartName] = useState(availablePartsMaster[0] || 'Band Heater Element 1500W');
   const [newPartQty, setNewPartQty] = useState('1');
   const [newPartUnit, setNewPartUnit] = useState('Nos');
   const [newPartNotes, setNewPartNotes] = useState('');
-  const [availableSpareParts, setAvailableSpareParts] = useState<string[]>(COMMON_SPARE_PARTS);
+  const [availableSpareParts, setAvailableSpareParts] = useState<string[]>(availablePartsMaster);
   const [isCustomPartModalOpen, setIsCustomPartModalOpen] = useState(false);
   const [isDirectPartInput, setIsDirectPartInput] = useState(false);
   const [directPartNameInput, setDirectPartNameInput] = useState('');
@@ -1506,7 +1510,7 @@ Status: "This person is working here" has been activated.`);
             }`}
           >
             <Phone className="w-3.5 h-3.5" />
-            <span>Contacts & Spare Catalog</span>
+            <span>Maintenance Team Directory</span>
           </button>
 
           <button
@@ -2493,33 +2497,45 @@ Status: "This person is working here" has been activated.`);
         </div>
       )}
 
-      {/* TAB 4: MAINTENANCE CONTACTS & SPARES CATALOG */}
+      {/* TAB 4: MAINTENANCE TEAM DIRECTORY & DEPT HEADS */}
       {activeTab === 'CONTACTS' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Maintenance Team Phone Directory */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          {/* Maintenance Team Phone Directory (Full Width & Admin Synced) */}
+          <div className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2 text-slate-900">
                 <Phone className="w-5 h-5 text-amber-600" />
-                <h3 className="text-sm font-bold m-0">
-                  Maintenance Team Directory
-                </h3>
+                <div>
+                  <h3 className="text-sm font-bold m-0 flex items-center gap-2">
+                    <span>Maintenance Team Directory</span>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                      Admin Master Synced
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 m-0">
+                    Direct contacts for quick-dial, SMS & WhatsApp notifications
+                  </p>
+                </div>
               </div>
-              <span className="text-xs text-slate-500">Quick-dial & WhatsApp</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-600">
+                  {contacts.length} Technicians Active
+                </span>
+              </div>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {contacts.map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between"
                 >
                   <div>
                     <div className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
                       <User className="w-3.5 h-3.5 text-slate-500" />
                       <span>{c.name}</span>
                     </div>
-                    <span className="text-[11px] text-slate-500 font-medium">
+                    <span className="text-[11px] text-slate-500 font-medium block">
                       {c.role} ({c.dept || 'Floor'})
                     </span>
                   </div>
@@ -2538,33 +2554,6 @@ Status: "This person is working here" has been activated.`);
                       <Send className="w-3 h-3" />
                     </a>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Standard Spares List */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2 text-slate-900">
-                <Package className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-sm font-bold m-0">
-                  Frequent Spare Parts Catalog
-                </h3>
-              </div>
-              <span className="text-xs text-slate-500">Fast Auto-fill</span>
-            </div>
-
-            <div className="space-y-1.5">
-              {COMMON_SPARE_PARTS.map((sp, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                >
-                  <span className="font-medium text-slate-800">{sp}</span>
-                  <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
-                    Standard Spare
-                  </span>
                 </div>
               ))}
             </div>

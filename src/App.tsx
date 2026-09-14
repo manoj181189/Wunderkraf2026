@@ -51,6 +51,19 @@ import {
   triggerWhatsAppShiftNotification
 } from './lib/whatsappReports';
 
+const LEGACY_DEFAULT_USER_KEYS = ['kavita', 'marketing', 'disp_user', 'slit_user', 'cut_user', 'form_user', 'qc_user', 'pack_user', 'maint_user', 'purchase'];
+
+function sanitizeUsersState(users?: Record<string, any>) {
+  const clean = { ...(users || DEFAULT_USERS) };
+  LEGACY_DEFAULT_USER_KEYS.forEach((k) => delete clean[k]);
+  if (!clean.admin) {
+    clean.admin = { pass: 'admin123', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
+  } else {
+    clean.admin.perms = ['*'];
+  }
+  return clean;
+}
+
 export const App: React.FC = () => {
   // User Authentication / Current Operator Desk — Locked without valid login
   const [currentUser, setCurrentUser] = useState<{ username: string; perms: string[] } | null>(() => {
@@ -84,16 +97,16 @@ export const App: React.FC = () => {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Ensure admin always has full '*' permissions in loaded state users
-        if (parsed?.users?.admin && !parsed.users.admin.perms.includes('*')) {
-          parsed.users.admin.perms = ['*'];
-        }
+        parsed.users = sanitizeUsersState(parsed.users);
         return parsed;
       }
     } catch (e) {
       console.warn('Could not read state from localStorage', e);
     }
-    return INITIAL_STATE;
+    return {
+      ...INITIAL_STATE,
+      users: sanitizeUsersState(INITIAL_STATE.users)
+    };
   });
 
   // Asynchronous IndexedDB + Central Sync Bridge hydration on app start
@@ -102,9 +115,7 @@ export const App: React.FC = () => {
     initializeFactoryState()
       .then((loadedState) => {
         if (isMounted && loadedState) {
-          if (loadedState.users?.admin && !loadedState.users.admin.perms?.includes('*')) {
-            loadedState.users.admin.perms = ['*'];
-          }
+          loadedState.users = sanitizeUsersState(loadedState.users);
           setState(loadedState);
         }
       })
@@ -116,9 +127,7 @@ export const App: React.FC = () => {
     const unsubscribe = subscribeToSyncEvents((syncedState) => {
       if (isMounted && syncedState && Array.isArray(syncedState.jobs)) {
         setState((prev) => {
-          if (syncedState.users?.admin && !syncedState.users.admin.perms?.includes('*')) {
-            syncedState.users.admin.perms = ['*'];
-          }
+          syncedState.users = sanitizeUsersState(syncedState.users);
           return syncedState;
         });
       }
@@ -303,7 +312,7 @@ export const App: React.FC = () => {
 
   // Re-hydrate and synchronize state across all devices via Central Sync Bridge & IndexedDB
   const handleRefreshState = async () => {
-    setIsRefreshingState(true);
+    if (!confirm("⚠️ WARNING: This will sync with the Central Sync Bridge. If the server is empty, it may overwrite local data. Are you sure?")) return;
     try {
       const syncResult = await forceSyncWithCentral(state);
       if (syncResult && syncResult.syncedState) {

@@ -144,19 +144,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* Global Database Re-hydration Sync / Refresh */}
-        {onRefreshState && (
-          <button
-            onClick={onRefreshState}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 bg-slate-700/80 hover:bg-slate-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
-            title="Re-hydrate & Synchronize State from IndexedDB"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-cyan-300 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isRefreshing ? 'Syncing...' : 'Sync'}</span>
-          </button>
-        )}
-
         {/* Google Drive Cloud Sync */}
         {onOpenDriveModal && (
           <button

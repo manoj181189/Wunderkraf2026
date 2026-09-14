@@ -306,8 +306,22 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
       setIsPlanModalOpen(false);
       alert(`✅ Production Plan [${editingPlanId}] & Job Card specifications updated successfully!`);
     } else {
-      // Generate Next Plan ID & Job ID
-      const nextSeq = productionPlans.length + 1;
+      // Robust sequence calculation across existing plans and deleted plan IDs
+      const allKnownPlanIds = [
+        ...(productionPlans || []).map((p) => p.id),
+        ...(state.deletedPlanIds || [])
+      ];
+      let maxPlanSeq = 0;
+      allKnownPlanIds.forEach((id) => {
+        if (id) {
+          const match = id.match(/PLAN-\d+-(\d+)/i);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxPlanSeq) maxPlanSeq = num;
+          }
+        }
+      });
+      const nextSeq = Math.max(maxPlanSeq + 1, (productionPlans || []).length + 1);
       const planId = `PLAN-${new Date().getFullYear()}-${String(nextSeq).padStart(3, '0')}`;
       
       const { jobId, updatedSeriesConfig } = generateUnifiedJobId(
@@ -347,6 +361,8 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
       onSaveState({
         ...state,
         seriesConfig: updatedSeriesConfig,
+        deletedPlanIds: (state.deletedPlanIds || []).filter((id) => id !== planId),
+        deletedJobIds: (state.deletedJobIds || []).filter((id) => id !== jobId),
         productionPlans: [newPlan, ...productionPlans],
         jobs: [{
           id: jobId,

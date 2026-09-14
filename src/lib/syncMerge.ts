@@ -98,6 +98,14 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       jobMap.set(incJob.id, {
         ...existing,
         ...incJob,
+        plannedGsms: incJob.plannedGsms || existing.plannedGsms,
+        plannedLayers: incJob.plannedLayers || existing.plannedLayers,
+        targetLayers: incJob.targetLayers || existing.targetLayers,
+        targetLengthMeters: incJob.targetLengthMeters || existing.targetLengthMeters,
+        targetGlueBrand: incJob.targetGlueBrand || existing.targetGlueBrand,
+        printedRollRequired: incJob.printedRollRequired ?? existing.printedRollRequired,
+        printedRollDesign: incJob.printedRollDesign || existing.printedRollDesign,
+        printedRollIcon: incJob.printedRollIcon || existing.printedRollIcon,
         stage: resolvedStage,
         availableRolls: Math.max(existing.availableRolls || 0, incJob.availableRolls || 0),
         availableCuttingCrates: Math.max(existing.availableCuttingCrates || 0, incJob.availableCuttingCrates || 0),
@@ -131,6 +139,16 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       planMap.set(p.id, {
         ...existing,
         ...p,
+        plannedLayers: p.plannedLayers || existing.plannedLayers,
+        plannedGsms: p.plannedGsms || existing.plannedGsms,
+        printedRollRequired: p.printedRollRequired ?? existing.printedRollRequired,
+        printedRollDesign: p.printedRollDesign || existing.printedRollDesign,
+        printedRollIcon: p.printedRollIcon || existing.printedRollIcon,
+        targetLayers: p.targetLayers || existing.targetLayers,
+        targetLengthMeters: p.targetLengthMeters || existing.targetLengthMeters,
+        paperBrand: p.paperBrand || existing.paperBrand,
+        adhesiveBrand: p.adhesiveBrand || existing.adhesiveBrand,
+        notes: p.notes || existing.notes,
         status: isCompleted ? 'Completed' : (p.status || existing.status),
         actualMetersSlit: Math.max(existing.actualMetersSlit || 0, p.actualMetersSlit || 0),
         actualLayersUsed: Math.max(existing.actualLayersUsed || 0, p.actualLayersUsed || 0),
@@ -308,8 +326,17 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     seriesConfig: mergedSeriesConfig,
     whatsappConfig: mergedWhatsappConfig,
     shiftConfig: mergedShiftConfig,
-    // Keep most recent user and master configuration lists
-    users: { ...(base.users || {}), ...(incoming.users || {}) },
+    // Keep user and master configuration lists (prune legacy demo users, retain admin)
+    users: (() => {
+      const combinedUsers = { ...(base.users || {}), ...(incoming.users || {}) };
+      const legacyKeys = ['kavita', 'marketing', 'disp_user', 'slit_user', 'cut_user', 'form_user', 'qc_user', 'pack_user', 'maint_user', 'purchase'];
+      legacyKeys.forEach((k) => delete combinedUsers[k]);
+      if (!combinedUsers.admin) {
+        combinedUsers.admin = { pass: 'admin123', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
+      }
+      combinedUsers.admin.perms = ['*'];
+      return combinedUsers;
+    })(),
     floorWorkers: incoming.floorWorkers?.length ? incoming.floorWorkers : base.floorWorkers,
     maintenanceContacts: incoming.maintenanceContacts?.length ? incoming.maintenanceContacts : base.maintenanceContacts,
     coordinationMatrix: incoming.coordinationMatrix?.length ? incoming.coordinationMatrix : base.coordinationMatrix,
