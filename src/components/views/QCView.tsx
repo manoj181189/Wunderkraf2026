@@ -109,7 +109,8 @@ export const QCView: React.FC<QCViewProps> = ({
   });
 
   const activeBatchObj =
-    activeBatches.find((item) => item.batch?.batchId === selectedActiveBatchId) || activeBatches[0];
+    activeBatches.find((item) => item.batch?.batchId === selectedActiveBatchId) ||
+    (activeBatches.length === 1 ? activeBatches[0] : null);
 
   const effectiveQcPcs = activeBatchObj?.job.pcsPerCrateForming || (activeBatchObj ? state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs : 7000) || 7000;
 
@@ -411,14 +412,15 @@ export const QCView: React.FC<QCViewProps> = ({
 
   const handleConfirmQuickUnissue = () => {
     if (!activeBatchObj) return;
-    const qty = parseInt(unissueQtyInput, 10) || 0;
-    if (qty <= 0) {
-      alert('Please enter a valid quantity of crates to return!');
-      return;
-    }
-
     const { job, batch } = activeBatchObj;
     const curIssued = batch.issuedQty || 0;
+    if (curIssued <= 0) {
+      setIsUnissueModalOpen(false);
+      setSelectedActiveBatchId('');
+      alert('⚠️ This batch has no issued crates left to return.');
+      return;
+    }
+    const qty = parseInt(unissueQtyInput, 10) || 0;
     if (qty > curIssued) {
       alert(`Cannot un-issue more than currently issued crates count (${curIssued})!`);
       return;
@@ -727,6 +729,12 @@ export const QCView: React.FC<QCViewProps> = ({
     if (!activeBatchObj) return;
     const { job, batch } = activeBatchObj;
     const cratesToReturn = batch.issuedQty || 0;
+    if (cratesToReturn <= 0) {
+      setIsCancelConfirmOpen(false);
+      setSelectedActiveBatchId('');
+      alert('⚠️ This QC batch has no issued crates to return.');
+      return;
+    }
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
