@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, SearchCheck, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, PlusCircle, Users, Box, Search, ShieldCheck, Calendar, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, SearchCheck, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, PlusCircle, Users, Box, Search, ShieldCheck, Calendar, Clock, CheckCircle2, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { FactoryState, Job, ProductType, RunningBatch } from '../../types';
 import { PRODUCTS, DEPT_WORKERS, DEFAULT_PCS_PER_KG_MAP } from '../../lib/constants';
 import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms } from '../../lib/utils';
@@ -46,6 +46,20 @@ export const QCView: React.FC<QCViewProps> = ({
   const [scrapKg, setScrapKg] = useState('0');
   const [selectedActiveBatchId, setSelectedActiveBatchId] = useState('');
   const [tableSearch, setTableSearch] = useState('');
+  const [sortColumn, setSortColumn] = useState<string>('id');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [colFilters, setColFilters] = useState({
+    id: '',
+    date: '',
+    reel: '',
+    gsm: '',
+    mill: '',
+    product: '',
+    remark: '',
+    stock: '',
+    status: '',
+  });
 
   // Dialog states for Quick Actions (Replacing window.prompt to work 100% reliably in iframe)
   const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
@@ -59,6 +73,7 @@ export const QCView: React.FC<QCViewProps> = ({
   // Top-up Modal state for adding more crates to existing inspector/batch
   const [isTopupModalOpen, setIsTopupModalOpen] = useState(false);
   const [topupQtyInput, setTopupQtyInput] = useState('2');
+  const [selectedFormingBatchId, setSelectedFormingBatchId] = useState('');
 
   // Audit Mismatch Error Modal state
   const [auditMismatchError, setAuditMismatchError] = useState<{
@@ -131,18 +146,29 @@ export const QCView: React.FC<QCViewProps> = ({
       const prevQty = existingBatch.issuedQty || 0;
       const newTotalQty = prevQty + cratesCount;
 
+      let remDeductTopup = cratesCount;
       const updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
+        const newRunBatches = (j.runningBatches || []).map((b) => {
+          if (b.batchId === existingBatch.batchId) {
+            return { ...b, issuedQty: newTotalQty };
+          }
+          if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remDeductTopup > 0) {
+            const totalP = b.producedQty || 0;
+            const consumedP = b.consumedQty || 0;
+            const remP = Math.max(0, totalP - consumedP);
+            if (remP > 0 && (!selectedFormingBatchId || b.batchId === selectedFormingBatchId)) {
+              const dec = Math.min(remP, remDeductTopup);
+              remDeductTopup -= dec;
+              return { ...b, consumedQty: consumedP + dec };
+            }
+          }
+          return b;
+        });
         return {
           ...j,
-          availableFormingCrates: (j.availableFormingCrates || 0) - cratesCount,
-          runningBatches: (j.runningBatches || []).map((b) => {
-            if (b.batchId !== existingBatch.batchId) return b;
-            return {
-              ...b,
-              issuedQty: newTotalQty
-            };
-          })
+          availableFormingCrates: Math.max(0, (j.availableFormingCrates || 0) - cratesCount),
+          runningBatches: newRunBatches
         };
       });
 
@@ -204,13 +230,27 @@ export const QCView: React.FC<QCViewProps> = ({
       user: 'qc_user'
     };
 
+    let remDeductFresh = cratesCount;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
+      const modifiedFormBatches = (j.runningBatches || []).map((b) => {
+        if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remDeductFresh > 0) {
+          const totalP = b.producedQty || 0;
+          const consumedP = b.consumedQty || 0;
+          const remP = Math.max(0, totalP - consumedP);
+          if (remP > 0 && (!selectedFormingBatchId || b.batchId === selectedFormingBatchId)) {
+            const dec = Math.min(remP, remDeductFresh);
+            remDeductFresh -= dec;
+            return { ...b, consumedQty: consumedP + dec };
+          }
+        }
+        return b;
+      });
       return {
         ...j,
         tracedLots: { ...(j.tracedLots || {}), QC: batchId },
-        availableFormingCrates: (j.availableFormingCrates || 0) - cratesCount,
-        runningBatches: [...(j.runningBatches || []), newBatch]
+        availableFormingCrates: Math.max(0, (j.availableFormingCrates || 0) - cratesCount),
+        runningBatches: [...modifiedFormBatches, newBatch]
       };
     });
 
@@ -636,7 +676,7 @@ export const QCView: React.FC<QCViewProps> = ({
         paperBrand: 'ITC',
         reelNo: `LOT-QC-DIRECT-${Date.now().toString().slice(-4)}`,
         reelNumbers: [`LOT-QC-DIRECT-${Date.now().toString().slice(-4)}`],
-        gsm: '280 GSM',
+        gsm: '120 GSM',
         customRemark: 'Direct QC Crate Approval Voucher Entry' + (directRemarks ? `: ${directRemarks}` : ''),
         stage: 'Packing', // Ready for Packing
         status: 'Ready for Packing',
@@ -1154,7 +1194,7 @@ export const QCView: React.FC<QCViewProps> = ({
                     required
                   />
                   <datalist id="qcWorkerList">
-                    {qcWorkers.map((w) => (
+                    {(state.floorWorkers || []).map(w => w.name).map((w) => (
                       <option key={w} value={w} />
                     ))}
                   </datalist>
@@ -1214,8 +1254,51 @@ export const QCView: React.FC<QCViewProps> = ({
               </div>
 
               {selectedPendingJob && (
-                <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-lg text-xs font-bold text-cyan-900">
-                  Available Formed Stock: {selectedPendingJob.availableFormingCrates} Crates [Brand: {selectedPendingJob.paperBrand || 'ITC'}]
+                <div className="space-y-2">
+                  <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-lg text-xs font-bold text-cyan-900 flex items-center justify-between">
+                    <span>Available Formed Stock: {selectedPendingJob.availableFormingCrates} Crates [Brand: {selectedPendingJob.paperBrand || 'ITC'}]</span>
+                  </div>
+                  
+                  {/* Forming Operator Lots / Batches Breakdown */}
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5">
+                    <span className="font-extrabold text-slate-700 uppercase tracking-wide block text-[11px]">
+                      🔍 Forming Operator Lots Source Breakdown (Traceability):
+                    </span>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {((selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'))).length === 0 ? (
+                        <div className="text-slate-400 italic text-[11px]">No specific forming lot metadata found (Legacy or Direct entry).</div>
+                      ) : (
+                        ((selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'))).map(fb => (
+                          <div 
+                            key={fb.batchId} 
+                            onClick={() => setSelectedFormingBatchId(fb.batchId)}
+                            className={`p-2 rounded border cursor-pointer transition flex items-center justify-between text-[11px] ${
+                              selectedFormingBatchId === fb.batchId 
+                                ? 'bg-indigo-50 border-indigo-400 text-indigo-950 font-bold shadow-2xs' 
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-bold">{fb.batchId}</span>
+                              <span className="font-extrabold">👨‍🏭 {fb.worker || 'OPERATOR'}</span>
+                              <span className="text-slate-400 font-normal">({fb.machine || 'Forming'} | ☀️ {fb.shift || 'DAY'})</span>
+                            </div>
+                            {(() => {
+                              const totalP = fb.producedQty || 0;
+                              const consumedP = fb.consumedQty || 0;
+                              const remainingP = Math.max(0, totalP - consumedP);
+                              return (
+                                <div className="font-mono text-right">
+                                  <div className="font-bold text-emerald-700">{remainingP} Crates Remaining</div>
+                                  <div className="text-slate-400 text-[10px]">({totalP} Produced)</div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1454,189 +1537,471 @@ export const QCView: React.FC<QCViewProps> = ({
       {/* ======================================================== */}
       {/* QC REELS & TRACEABILITY REGISTER (BOTTOM TEMPLATE MATCHING SLITTING) */}
       {/* ======================================================== */}
-      <div className="mt-8 pt-6 border-t-2 border-slate-200 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2 m-0">
-              <Layers className="w-5 h-5 text-teal-600" />
-              <span>QC Reels & Traceability Register</span>
-            </h3>
-            <p className="text-xs text-slate-500 m-0">
-              Reel number, GSM used in each Job ID and onward traceability status
-            </p>
-          </div>
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={tableSearch}
-              onChange={(e) => setTableSearch(e.target.value)}
-              placeholder="Search Reel No, Job ID, GSM, Mill..."
-              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 shadow-xs"
-            />
-          </div>
-        </div>
+      {/* ======================================================== */}
+      {/* QC REELS & TRACEABILITY REGISTER (BOTTOM TEMPLATE MATCHING SLITTING) */}
+      {/* ======================================================== */}
+      {(() => {
+        // Local state toggle handler
+        const handleSort = (column: string) => {
+          if (sortColumn === column) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+          } else {
+            setSortColumn(column);
+            setSortOrder('asc');
+          }
+        };
 
-        <div className="overflow-x-auto bg-white border border-slate-200 rounded-2xl shadow-xs">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-left">
-                <th className="p-3">Job ID</th>
-                <th className="p-3 text-indigo-900">Date</th>
-                <th className="p-3 text-blue-900">Reel No.</th>
-                <th className="p-3 text-amber-900">GSM</th>
-                <th className="p-3">Paper Mill</th>
-                <th className="p-3">Product</th>
-                <th className="p-3">Remarks / Lot</th>
-                <th className="p-3 text-right">Approved Stock</th>
-                <th className="p-3 text-right">In / Out / Scrap</th>
-                <th className="p-3 text-center">Stage Status</th>
-                <th className="p-3 text-center">Traceability</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {jobs
-                .filter((j) => {
-                  if (!tableSearch.trim()) return true;
-                  const q = tableSearch.toLowerCase();
-                  const allReels = getJobAllReels(j);
-                  const allGsms = getJobAllGsms(j);
-                  const qcBatches = (j.runningBatches || []).filter((b) => b.stage === 'QC' || b.machine === 'QC-Desk');
-                  return (
-                    j.id.toLowerCase().includes(q) ||
-                    allReels.some((r) => r.toLowerCase().includes(q)) ||
-                    allGsms.some((g) => g.toLowerCase().includes(q)) ||
-                    (j.paperBrand && j.paperBrand.toLowerCase().includes(q)) ||
-                    j.product.toLowerCase().includes(q) ||
-                    (j.customRemark && j.customRemark.toLowerCase().includes(q)) ||
-                    qcBatches.some((b) => (b.worker || '').toLowerCase().includes(q) || b.batchId.toLowerCase().includes(q))
-                  );
-                })
-                .map((j) => {
-                  const allReels = getJobAllReels(j);
-                  const allGsms = getJobAllGsms(j);
-                  const qcBatches = (j.runningBatches || []).filter((b) => b.stage === 'QC' || b.machine === 'QC-Desk');
-                  const formPcsStd = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
-                  const activeQcBatch = qcBatches.find((b) => b.status === 'Running' || b.status === 'Held');
-                  const qcAllocatedCrates = qcBatches.reduce((sum, b) => sum + (b.issuedQty || 0), 0);
-                  const approvedCrates = qcBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
-                  const approvedPieces = approvedCrates * formPcsStd;
-                  const totalScrapKg = qcBatches.reduce((sum, b) => sum + (b.scrapPcs || 0), 0);
+        const escapeCSV = (val: any) => {
+          if (val === null || val === undefined) return '';
+          const str = String(val);
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
 
-                  let statusBadge = (
-                    <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                      {j.stage}
-                    </span>
-                  );
+        // Memoized processed jobs
+        const processedJobs = jobs.map((j) => {
+          const allReels = getJobAllReels(j);
+          const allGsms = getJobAllGsms(j);
+          const qcBatches = (j.runningBatches || []).filter((b) => b.stage === 'QC' || b.machine === 'QC-Desk');
+          const formPcsStd = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
+          const activeQcBatch = qcBatches.find((b) => b.status === 'Running' || b.status === 'Held');
+          const qcAllocatedCrates = qcBatches.reduce((sum, b) => sum + (b.issuedQty || 0), 0);
+          const approvedCrates = qcBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
+          const approvedPieces = approvedCrates * formPcsStd;
+          const totalScrapKg = qcBatches.reduce((sum, b) => sum + (b.scrapPcs || 0), 0);
 
-                  if (activeQcBatch) {
-                    statusBadge = (
-                      <span className="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1 animate-pulse">
-                        ● In Inspection ({activeQcBatch.worker})
-                      </span>
-                    );
-                  } else if ((j.availableFormingCrates || 0) > 0) {
-                    statusBadge = (
-                      <span className="text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                        Pending QC ({j.availableFormingCrates} Crates)
-                      </span>
-                    );
-                  }
+          const latestLog = (state.logs || []).filter((l) => l.jobId === j.id).slice(-1)[0];
+          const entryDate = latestLog?.rawDate || (j.createdAt ? j.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+          const entryTime = latestLog?.startTime || (latestLog?.timestamp ? latestLog.timestamp.split(',')[1]?.trim() : '');
+          const paperBrand = j.paperBrand || 'ITC';
+          const remark = j.customRemark || 'Standard';
+          const stock = approvedCrates;
 
-                  const latestLog = (state.logs || []).filter((l) => l.jobId === j.id).slice(-1)[0];
-                  const entryDate = latestLog?.rawDate || (j.createdAt ? j.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
-                  const entryTime = latestLog?.startTime || (latestLog?.timestamp ? latestLog.timestamp.split(',')[1]?.trim() : '');
+          // Status representation
+          let statusText = j.stage || '';
+          if (activeQcBatch) {
+            statusText = `In Inspection (${activeQcBatch.worker})`;
+          } else if ((j.availableFormingCrates || 0) > 0) {
+            statusText = `Pending QC (${j.availableFormingCrates} Crates)`;
+          }
 
-                  return (
-                    <tr key={j.id} className="hover:bg-slate-50 transition">
-                      <td className="p-2.5 font-mono font-bold text-blue-800">{j.id}</td>
-                      <td className="p-2.5 whitespace-nowrap">
-                        <div className="flex items-center gap-1 font-bold text-slate-800 text-xs">
-                          <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                          <span>{entryDate}</span>
-                        </div>
-                        {entryTime && <div className="text-[10px] text-slate-400 font-mono ml-4">{entryTime}</div>}
+          return {
+            job: j,
+            id: j.id,
+            date: entryDate,
+            time: entryTime,
+            reels: allReels,
+            reelsStr: allReels.join(', '),
+            gsms: allGsms,
+            gsmsStr: allGsms.join(', '),
+            mill: paperBrand,
+            product: j.product,
+            remark: remark,
+            stock: stock,
+            approvedPieces,
+            qcAllocatedCrates,
+            totalScrapKg,
+            statusText,
+            activeQcBatch,
+            qcBatches,
+          };
+        });
+
+        // 1. Global Filter
+        let filtered = processedJobs;
+        if (tableSearch.trim()) {
+          const q = tableSearch.toLowerCase();
+          filtered = filtered.filter((item) => {
+            return (
+              item.id.toLowerCase().includes(q) ||
+              item.reelsStr.toLowerCase().includes(q) ||
+              item.gsmsStr.toLowerCase().includes(q) ||
+              item.mill.toLowerCase().includes(q) ||
+              item.product.toLowerCase().includes(q) ||
+              item.remark.toLowerCase().includes(q) ||
+              item.statusText.toLowerCase().includes(q) ||
+              item.qcBatches.some((b) => (b.worker || '').toLowerCase().includes(q) || b.batchId.toLowerCase().includes(q))
+            );
+          });
+        }
+
+        // 2. Column-Specific Filter
+        if (showFilters) {
+          filtered = filtered.filter((item) => {
+            const f = colFilters;
+            const matchId = !f.id || item.id.toLowerCase().includes(f.id.toLowerCase());
+            const matchDate = !f.date || item.date.toLowerCase().includes(f.date.toLowerCase());
+            const matchReel = !f.reel || item.reelsStr.toLowerCase().includes(f.reel.toLowerCase());
+            const matchGsm = !f.gsm || item.gsmsStr.toLowerCase().includes(f.gsm.toLowerCase());
+            const matchMill = !f.mill || item.mill.toLowerCase().includes(f.mill.toLowerCase());
+            const matchProduct = !f.product || item.product.toLowerCase().includes(f.product.toLowerCase());
+            const matchRemark = !f.remark || item.remark.toLowerCase().includes(f.remark.toLowerCase());
+            const matchStock = !f.stock || String(item.stock).toLowerCase().includes(f.stock.toLowerCase());
+            const matchStatus = !f.status || item.statusText.toLowerCase().includes(f.status.toLowerCase());
+
+            return matchId && matchDate && matchReel && matchGsm && matchMill && matchProduct && matchRemark && matchStock && matchStatus;
+          });
+        }
+
+        // 3. Sort
+        if (sortColumn) {
+          filtered.sort((a, b) => {
+            let valA: any = a[sortColumn as keyof typeof a];
+            let valB: any = b[sortColumn as keyof typeof b];
+
+            if (sortColumn === 'reels') {
+              valA = a.reelsStr.toLowerCase();
+              valB = b.reelsStr.toLowerCase();
+            } else if (sortColumn === 'gsm') {
+              valA = a.gsmsStr.toLowerCase();
+              valB = b.gsmsStr.toLowerCase();
+            } else if (sortColumn === 'status') {
+              valA = a.statusText.toLowerCase();
+              valB = b.statusText.toLowerCase();
+            } else if (typeof valA === 'string') {
+              valA = valA.toLowerCase();
+              valB = (valB || '').toLowerCase();
+            }
+
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        const exportToCSV = () => {
+          const headers = ['Job ID', 'Date', 'Time', 'Reel No.', 'GSM', 'Paper Mill', 'Product', 'Remarks / Lot', 'Approved Stock (Crates)', 'Pieces', 'In (Crates)', 'Out (Crates)', 'Scrap (KG)', 'Stage Status'];
+          const rows = filtered.map(item => [
+            escapeCSV(item.id),
+            escapeCSV(item.date),
+            escapeCSV(item.time),
+            escapeCSV(item.reelsStr),
+            escapeCSV(item.gsmsStr),
+            escapeCSV(item.mill),
+            escapeCSV(item.product),
+            escapeCSV(item.remark),
+            escapeCSV(item.stock),
+            escapeCSV(item.approvedPieces),
+            escapeCSV(item.qcAllocatedCrates),
+            escapeCSV(item.stock),
+            escapeCSV(item.totalScrapKg),
+            escapeCSV(item.statusText)
+          ]);
+
+          const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', `QC_Traceability_Register_${new Date().toISOString().split('T')[0]}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+
+        return (
+          <div className="mt-8 pt-6 border-t-2 border-slate-200 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2 m-0">
+                  <Layers className="w-5 h-5 text-teal-600" />
+                  <span>QC Reels & Traceability Register</span>
+                </h3>
+                <p className="text-xs text-slate-500 m-0">
+                  Reel number, GSM used in each Job ID and onward traceability status
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1 border transition cursor-pointer ${showFilters ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>{showFilters ? 'Hide Filters' : 'Column Filters'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={exportToCSV}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 border border-emerald-500 transition cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Export Excel</span>
+                </button>
+                <div className="relative w-full sm:w-48">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={tableSearch}
+                    onChange={(e) => setTableSearch(e.target.value)}
+                    placeholder="Quick search..."
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto bg-white border border-slate-200 rounded-2xl shadow-xs">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-left">
+                    <th className="p-3 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('id')}>
+                      <div className="flex items-center gap-1">
+                        <span>Job ID</span>
+                        {sortColumn === 'id' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-indigo-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('date')}>
+                      <div className="flex items-center gap-1">
+                        <span>Date</span>
+                        {sortColumn === 'date' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-blue-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('reels')}>
+                      <div className="flex items-center gap-1">
+                        <span>Reel No.</span>
+                        {sortColumn === 'reels' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-amber-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('gsm')}>
+                      <div className="flex items-center gap-1">
+                        <span>GSM</span>
+                        {sortColumn === 'gsm' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('mill')}>
+                      <div className="flex items-center gap-1">
+                        <span>Paper Mill</span>
+                        {sortColumn === 'mill' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('product')}>
+                      <div className="flex items-center gap-1">
+                        <span>Product</span>
+                        {sortColumn === 'product' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('remark')}>
+                      <div className="flex items-center gap-1">
+                        <span>Remarks / Lot</span>
+                        {sortColumn === 'remark' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-right cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('stock')}>
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Approved Stock</span>
+                        {sortColumn === 'stock' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-right">In / Out / Scrap</th>
+                    <th className="p-3 text-center cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('status')}>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Stage Status</span>
+                        {sortColumn === 'status' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-center">Traceability</th>
+                  </tr>
+
+                  {showFilters && (
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.id}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, id: e.target.value }))}
+                          placeholder="Filter ID..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5">
-                        <div className="flex flex-wrap gap-1 items-center max-w-[220px]">
-                          {allReels.map((r, idx) => (
-                            <span
-                              key={idx}
-                              className="font-mono font-bold text-[11px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200"
-                              title={`Parent Jumbo Reel #${idx + 1}`}
-                            >
-                              {r}
-                            </span>
-                          ))}
-                          {qcBatches.length > 0 && (
-                            <span className="font-mono text-[10px] bg-purple-50 text-purple-800 px-1 py-0.5 rounded border border-purple-200">
-                              Lot: {qcBatches[0].batchId}
-                            </span>
-                          )}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.date}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, date: e.target.value }))}
+                          placeholder="Filter Date..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5">
-                        <div className="flex flex-wrap gap-1 items-center max-w-[190px]">
-                          {allGsms.map((g, gIdx) => (
-                            <span
-                              key={gIdx}
-                              className="font-bold text-[11px] bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded border border-amber-200"
-                              title={`GSM #${gIdx + 1}`}
-                            >
-                              {g}
-                            </span>
-                          ))}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.reel}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, reel: e.target.value }))}
+                          placeholder="Filter Reel..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 font-medium text-slate-800">{j.paperBrand || 'ITC'}</td>
-                      <td className="p-2.5 font-bold text-slate-700">{j.product}</td>
-                      <td className="p-2.5 text-slate-500 max-w-[150px] truncate" title={j.customRemark}>
-                        {j.customRemark || 'Standard'}
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.gsm}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, gsm: e.target.value }))}
+                          placeholder="Filter GSM..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-right font-extrabold text-emerald-700">
-                        {approvedCrates} Crates
-                        <div className="text-[10px] text-emerald-600 font-semibold">
-                          ({approvedPieces.toLocaleString()} Pcs)
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.mill}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, mill: e.target.value }))}
+                          placeholder="Filter Mill..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-right font-mono text-xs">
-                        <div className="flex flex-col items-end">
-                          <span className="text-slate-700 font-bold">
-                            In: {qcAllocatedCrates > 0 ? `${qcAllocatedCrates} Crates` : `${j.availableFormingCrates || 0} Crates`}
-                          </span>
-                          <span className="text-blue-700 font-medium">
-                            Out: {approvedCrates} Crates
-                          </span>
-                          {totalScrapKg > 0 && (
-                            <span className="text-rose-700 font-bold text-[11px]">
-                              Scrap: {totalScrapKg} KG
-                            </span>
-                          )}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.product}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, product: e.target.value }))}
+                          placeholder="Filter Product..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-center">
-                        {statusBadge}
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.remark}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, remark: e.target.value }))}
+                          placeholder="Filter Remark..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGenealogyModalJob(j);
-                          }}
-                          className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-[11px] transition shadow-xs inline-flex items-center gap-1 cursor-pointer"
-                          title="See where this reel/lot reached in Traceability"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>Trace Lot</span>
-                        </button>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.stock}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, stock: e.target.value }))}
+                          placeholder="Filter Stock..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none text-right"
+                        />
                       </td>
+                      <td className="p-1"></td>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.status}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, status: e.target.value }))}
+                          placeholder="Filter Status..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none text-center"
+                        />
+                      </td>
+                      <td className="p-1"></td>
                     </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((item) => {
+                    const j = item.job;
+                    return (
+                      <tr key={j.id} className="hover:bg-slate-50 transition">
+                        <td className="p-2.5 font-mono font-bold text-blue-800">{j.id}</td>
+                        <td className="p-2.5 whitespace-nowrap">
+                          <div className="flex items-center gap-1 font-bold text-slate-800 text-xs">
+                            <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span>{item.date}</span>
+                          </div>
+                          {item.time && <div className="text-[10px] text-slate-400 font-mono ml-4">{item.time}</div>}
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap gap-1 items-center max-w-[220px]">
+                            {item.reels.map((r, idx) => (
+                              <span
+                                key={idx}
+                                className="font-mono font-bold text-[11px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200"
+                                title={`Parent Jumbo Reel #${idx + 1}`}
+                              >
+                                {r}
+                              </span>
+                            ))}
+                            {item.qcBatches.length > 0 && (
+                              <span className="font-mono text-[10px] bg-purple-50 text-purple-800 px-1 py-0.5 rounded border border-purple-200">
+                                Lot: {item.qcBatches[0].batchId}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap gap-1 items-center max-w-[190px]">
+                            {item.gsms.map((g, gIdx) => (
+                              <span
+                                key={gIdx}
+                                className="font-bold text-[11px] bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded border border-amber-200"
+                                title={`GSM #${gIdx + 1}`}
+                              >
+                                {g}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2.5 font-medium text-slate-800">{item.mill}</td>
+                        <td className="p-2.5 font-bold text-slate-700">{item.product}</td>
+                        <td className="p-2.5">
+                          <div className="text-slate-600 text-xs max-w-[150px] truncate" title={item.remark}>
+                            {item.remark}
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-right font-extrabold text-emerald-700">
+                          {item.stock} Crates
+                          <div className="text-[10px] text-emerald-600 font-semibold">
+                            ({item.approvedPieces.toLocaleString()} Pcs)
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-xs">
+                          <div className="flex flex-col items-end">
+                            <span className="text-slate-700 font-bold">
+                              In: {item.qcAllocatedCrates > 0 ? `${item.qcAllocatedCrates} Crates` : `${j.availableFormingCrates || 0} Crates`}
+                            </span>
+                            <span className="text-blue-700 font-medium">
+                              Out: {item.stock} Crates
+                            </span>
+                            {item.totalScrapKg > 0 && (
+                              <span className="text-rose-700 font-bold text-[11px]">
+                                Scrap: {item.totalScrapKg} KG
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-center">
+                          {item.activeQcBatch ? (
+                            <span className="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1 animate-pulse">
+                              ● In Inspection ({item.activeQcBatch.worker})
+                            </span>
+                          ) : (j.availableFormingCrates || 0) > 0 ? (
+                            <span className="text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                              Pending QC ({j.availableFormingCrates} Crates)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                              {j.stage}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGenealogyModalJob(j);
+                            }}
+                            className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-[11px] transition shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                            title="See where this reel/lot reached in Traceability"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Trace Lot</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ======================================================== */}
       {/* INLINE MODALS FOR DIALOGS (REPLACING BROWSER PROMPT) */}

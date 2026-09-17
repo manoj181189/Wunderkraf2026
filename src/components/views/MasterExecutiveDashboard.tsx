@@ -24,7 +24,9 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
   onNavigateToTraceability,
   onSaveState
 }) => {
-  const { jobs, packJobs, logs, scrapSales, maintenanceIncidents = [] } = state;
+  const { packJobs, logs, scrapSales, maintenanceIncidents = [] } = state;
+  const deletedJobIdsSet = new Set(state.deletedJobIds || []);
+  const jobs = (state.jobs || []).filter((j) => !deletedJobIdsSet.has(j.id));
 
   let totalSlitPaperKg = 0;
   let totalPackedBoxes = 0;
@@ -184,8 +186,8 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
             No active production jobs in the pipeline. Please schedule a new job in the Planning Desk.
           </div>
         ) : (
-          <div className="space-y-4">
-            {jobs.slice(0, 3).map((job) => {
+          <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
+            {[...jobs].reverse().map((job) => {
               const slitBatches = job.runningBatches?.filter((b) => b.stage === 'Slitting') || [];
               const cutBatches = job.runningBatches?.filter((b) => b.stage === 'Cutting') || [];
               const formBatches = job.runningBatches?.filter((b) => b.stage === 'Forming') || [];

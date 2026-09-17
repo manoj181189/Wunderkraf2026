@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { ArrowLeft, RefreshCw, Play, Pause, Lock, Square, XCircle, Plus, AlertCircle, Check, Search, Tag, ShieldCheck, Layers, Eye, AlertTriangle, RotateCcw, Calendar, Clock, CheckCircle2 } from 'lucide-react';
-import { FactoryState, Job, JobReelItem, ProductType, RunningBatch, OperatorRunSlice, LogEntry, PlannedLayer } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, RefreshCw, Play, Pause, Lock, Square, XCircle, Plus, AlertCircle, Check, Search, Tag, ShieldCheck, Layers, Eye, AlertTriangle, RotateCcw, Calendar, Clock, CheckCircle2, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
+import { FactoryState, Job, JobReelItem, ProductType, RunningBatch, OperatorRunSlice, LogEntry, PlannedLayer, ShiftHandoverRecord } from '../../types';
 import { PRODUCTS, PAPER_BRANDS, DEPT_WORKERS, PRODUCT_PREFIX_MAP } from '../../lib/constants';
 import {
   getCurrentExpectedShift,
@@ -17,6 +17,7 @@ import {
   normalizeGsmLabel,
   LayerFulfillmentStatus
 } from '../../lib/utils';
+import { getJobStageShiftLedger } from '../../lib/shiftSlices';
 import {
   getNumberingMaster,
   generateUnifiedJobId,
@@ -144,6 +145,20 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
 
   // Table filter search
   const [tableSearch, setTableSearch] = useState('');
+  const [sortColumn, setSortColumn] = useState<string>('id');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [colFilters, setColFilters] = useState({
+    id: '',
+    date: '',
+    reel: '',
+    gsm: '',
+    mill: '',
+    product: '',
+    remark: '',
+    stock: '',
+    status: '',
+  });
 
   // Genealogy Modal Job State
   const [genealogyModalJob, setGenealogyModalJob] = useState<Job | null>(null);
@@ -163,6 +178,27 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
   const [addReelRemarks, setAddReelRemarks] = useState('');
   const [addReelWeightKg, setAddReelWeightKg] = useState('200');
 
+  // Synchronize isPrintedRoll dynamically when selectedPlanId or selected GSM changes
+  useEffect(() => {
+    if (selectedPlanId) {
+      const sp = productionPlans.find(p => p.id === selectedPlanId);
+      if (sp && sp.plannedLayers && sp.plannedLayers.length > 0) {
+        const numericGsm = parseNumericGsm(gsm);
+        const matchedLayer = sp.plannedLayers.find(l => parseNumericGsm(l.gsm) === numericGsm);
+        if (matchedLayer) {
+          if (matchedLayer.type === 'Printed') {
+            setIsPrintedRoll(true);
+            setPrintedRollDesign(sp.printedRollDesign || 'ITC Printed Design');
+            setPrintedRollIcon(sp.printedRollIcon || 'Sparkles');
+          } else {
+            setIsPrintedRoll(false);
+            setPrintedRollDesign('');
+          }
+        }
+      }
+    }
+  }, [gsm, selectedPlanId, productionPlans]);
+
   // Find all active / held batches on Slitting-1
   const activeBatches: Array<{ job: Job; batch: RunningBatch }> = [];
   jobs.forEach((j) => {
@@ -177,6 +213,17 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
 
   const activeBatchObj =
     activeBatches.find((item) => item.batch?.batchId === selectedActiveBatchId) || activeBatches[0];
+
+  useEffect(() => {
+    if (activeBatchObj?.batch) {
+      if (activeBatchObj.batch.worker) {
+        setOperatorName(activeBatchObj.batch.worker);
+      }
+      if (activeBatchObj.batch.helpers) {
+        setAssignedHelpers(activeBatchObj.batch.helpers);
+      }
+    }
+  }, [activeBatchObj?.batch?.batchId, activeBatchObj?.batch?.worker]);
 
   // Single Active Job restriction: Only 1 job can be 'Running' on Slitting-1 at any time
   const currentRunningBatch = activeBatches.find((item) => item.batch.status === 'Running');
@@ -253,7 +300,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       onSaveState({
         ...state,
         jobs: updatedJobs,
-        floorWorkers: updatedWorkers.length > 0 ? updatedWorkers : state.floorWorkers,
+        floorWorkers: updatedWorkers,
         logs: [newLog, ...(state.logs || [])]
       });
     }
@@ -272,25 +319,36 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       return;
     }
 
-    // Strict Single Active Job Constraint
+    // Single Active Job Constraint: offer automatic Hold to switch smoothly
+    let baseJobsList = state.jobs;
     if (currentRunningBatch) {
-      alert(
-        `⚠️ Single Active Job Constraint:
-
-Job [${currentRunningBatch.job.id}] (Reel: ${currentRunningBatch.batch.reelNo || currentRunningBatch.job.reelNo}) is already running on machine [Slitting-1]!
-
-Only one active job can run on a machine at a time. Until the current job is Held or Completed, no new job should be started (Run) on that machine.
-
-👉 If you need to add an extra reel to this same job, use the 'Add Reel to Running Job' option (without stopping/holding the job).`
+      const switchConfirm = window.confirm(
+        `Job [${currentRunningBatch.job.id}] (Reel: ${currentRunningBatch.batch.reelNo || currentRunningBatch.job.reelNo}) is currently running on machine [Slitting-1].\n\nOnly one active job can run at a time.\nWould you like to put Job [${currentRunningBatch.job.id}] on HOLD and start this new job?`
       );
-      return;
+      if (!switchConfirm) return;
+
+      baseJobsList = state.jobs.map((j) => {
+        if (j.id !== currentRunningBatch.job.id) return j;
+        return {
+          ...j,
+          status: 'ON_HOLD',
+          runningBatches: (j.runningBatches || []).map((b) => {
+            if (b.batchId !== currentRunningBatch.batch.batchId) return b;
+            return {
+              ...b,
+              status: 'Held' as const,
+              holdReason: 'Auto-held to switch job'
+            };
+          })
+        };
+      });
     }
 
     const master = getNumberingMaster(seriesConfig);
     const targetPlan = selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId) : null;
     
     // Check if a job was already created for this plan during PPC Planning Desk step
-    const existingPlanJob = (state.jobs || []).find(
+    const existingPlanJob = (baseJobsList || []).find(
       (j) => (targetPlan?.jobId && j.id === targetPlan.jobId) || (selectedPlanId && j.planId === selectedPlanId && j.stage === 'Planning')
     );
 
@@ -382,6 +440,8 @@ Only one active job can run on a machine at a time. Until the current job is Hel
       scrapPercent: 0,
       runningBatches: [newBatch],
       planId: selectedPlanId || undefined,
+      plannedLayers: selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId)?.plannedLayers : undefined,
+      plannedGsms: selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId)?.plannedGsms : undefined,
       targetLayers: selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId)?.targetLayers : undefined,
       targetLengthMeters: selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId)?.targetLengthMeters : undefined,
       targetGlueBrand: selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId)?.adhesiveBrand : undefined,
@@ -431,7 +491,7 @@ Only one active job can run on a machine at a time. Until the current job is Hel
 
     let updatedJobs: Job[];
     if (existingPlanJob) {
-      updatedJobs = state.jobs.map((j) => {
+      updatedJobs = baseJobsList.map((j) => {
         if (j.id !== existingPlanJob.id) return j;
         return {
           ...j,
@@ -443,7 +503,7 @@ Only one active job can run on a machine at a time. Until the current job is Hel
         };
       });
     } else {
-      updatedJobs = [newJob, ...state.jobs];
+      updatedJobs = [newJob, ...baseJobsList];
     }
 
     onSaveState({
@@ -485,12 +545,29 @@ Only one active job can run on a machine at a time. Until the current job is Hel
       ? targetJob.reelsList
       : getJobReelItemsBreakdown(targetJob);
 
-    // If a job is currently running on Slitting-1, operator can only add reel to THAT running job!
+    // If a job is currently running on Slitting-1 and is different from target job, offer to Hold it
+    let baseJobsListForAdd = jobs;
     if (currentRunningBatch && currentRunningBatch.job.id !== targetJob.id) {
-      alert(
-        `⚠️ Single Active Job Constraint:\n\nJob [${currentRunningBatch.job.id}] is currently running on machine [Slitting-1]! You can only add-on extra reels to this active job [${currentRunningBatch.job.id}].\n\nTo run another job [${targetJob.id}], first Hold or Complete the current job!`
+      const switchConfirm = window.confirm(
+        `Job [${currentRunningBatch.job.id}] is currently running on machine [Slitting-1].\n\nOnly one active job can run at a time.\nWould you like to put Job [${currentRunningBatch.job.id}] on HOLD and switch to Job [${targetJob.id}]?`
       );
-      return;
+      if (!switchConfirm) return;
+
+      baseJobsListForAdd = jobs.map((j) => {
+        if (j.id !== currentRunningBatch.job.id) return j;
+        return {
+          ...j,
+          status: 'ON_HOLD',
+          runningBatches: (j.runningBatches || []).map((b) => {
+            if (b.batchId !== currentRunningBatch.batch.batchId) return b;
+            return {
+              ...b,
+              status: 'Held' as const,
+              holdReason: 'Auto-held to switch job'
+            };
+          })
+        };
+      });
     }
 
     const master = getNumberingMaster(seriesConfig);
@@ -552,7 +629,7 @@ Only one active job can run on a machine at a time. Until the current job is Hel
 
     const updatedReelsList = [...existingReelsList, newReelItem];
 
-    const updatedJobs = jobs.map((j) => {
+    const updatedJobs = baseJobsListForAdd.map((j) => {
       if (j.id !== targetJob.id) return j;
       const combinedRemarks = addReelRemarks.trim()
         ? j.customRemark
@@ -683,6 +760,9 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       operator: batch.worker,
       relievedByOperator: handoverData.relievedByOperator,
       shift: batch.shift || 'DAY',
+      date: new Date().toISOString().split('T')[0],
+      machine: 'Slitting-1',
+      stage: 'Slitting',
       startTime: batch.startTime,
       handoverTime: handoverData.handoverTime,
       startMeterReading: batch.startMeterReading || batch.meterReading,
@@ -690,8 +770,30 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       strokeCount: handoverData.meterReading,
       producedQty: handoverData.sliceProducedQty,
       scrapQty: handoverData.sliceScrapQty,
+      scrapKg: handoverData.sliceScrapQty,
+      helpers: batch.helpers && batch.helpers.length > 0 ? batch.helpers : assignedHelpers,
+      helperCount: (batch.helpers && batch.helpers.length > 0 ? batch.helpers : assignedHelpers).length,
       notes: handoverData.handoverNotes,
       handoverConfirmed: true
+    };
+
+    const handoverRecord: ShiftHandoverRecord = {
+      id: `HO-SLIT-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      date: new Date().toISOString().split('T')[0],
+      jobId: job.id,
+      batchId: batch.batchId,
+      department: 'Slitting',
+      machine: 'Slitting-1',
+      outgoingOperator: batch.worker,
+      relievedByOperator: handoverData.relievedByOperator,
+      currentShift: batch.shift || 'DAY',
+      nextShift: handoverData.nextShift,
+      meterReading: handoverData.meterReading,
+      producedQty: handoverData.sliceProducedQty,
+      scrapQty: handoverData.sliceScrapQty,
+      notes: handoverData.handoverNotes,
+      helpers: nextHelpers
     };
 
     const updatedBatches = (job.runningBatches || []).map((b) => {
@@ -704,6 +806,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
           startMeterReading: handoverData.meterReading,
           producedQty: (b.producedQty || 0) + handoverData.sliceProducedQty,
           scrapKg: (b.scrapKg || 0) + handoverData.sliceScrapQty,
+          helpers: nextHelpers,
+          helperCount: nextHelpers.length,
           slices: [...(b.slices || []), newSlice]
         };
       }
@@ -735,6 +839,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      shiftHandovers: [handoverRecord, ...(state.shiftHandovers || [])],
       logs: [handoverLog, ...(state.logs || [])]
     });
 
@@ -880,6 +985,21 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
         scrapPercent: totalScrapPct,
         runningBatches: (j.runningBatches || []).map((b) => {
           if (b.batchId !== batch.batchId) return b;
+          const finalSlices = [...(b.slices || [])];
+          finalSlices.push({
+            sliceId: `SLC-SLIT-${Date.now()}-${finalSlices.length + 1}`,
+            operator: b.worker,
+            shift: b.shift || 'DAY',
+            date: new Date().toISOString().split('T')[0],
+            machine: b.machine,
+            stage: 'Slitting',
+            startTime: finalSlices.length > 0 ? finalSlices[finalSlices.length - 1].handoverTime : b.startTime,
+            handoverTime: stopTime,
+            producedQty: rollsCount,
+            scrapQty: finalScrapKg,
+            scrapKg: finalScrapKg,
+            notes: finalSlices.length > 0 ? 'Incoming Shift Final Completion' : 'Single Shift Run Completion'
+          });
           return {
             ...b,
             status: 'Completed',
@@ -888,7 +1008,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
             inputWeightKg: inputWeight,
             outputWeightKg: weightKg,
             scrapKg: finalScrapKg,
-            scrapPercent: finalScrapPercent
+            scrapPercent: finalScrapPercent,
+            slices: finalSlices
           };
         })
       };
@@ -912,26 +1033,25 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     let updatedPlans = [...productionPlans];
     let updatedMotherReels = [...motherReelInventory];
 
-    if (job.planId) {
-      updatedPlans = productionPlans.map((p) => {
-        if (p.id === job.planId) {
-          const finalJobObj = updatedJobs.find((j) => j.id === job.id);
-          const finalScrapPct = finalJobObj?.scrapPercent || 0;
-          const finalScrapKg = finalJobObj?.scrapKg || 0;
-          const finalLayers = finalJobObj?.reelsList?.filter((r) => !r.isHotFoilLayer).length || 0;
+    const targetPlanId = job.planId || selectedPlanId;
+    updatedPlans = productionPlans.map((p) => {
+      if ((targetPlanId && p.id === targetPlanId) || (job.id && p.jobId === job.id)) {
+        const finalJobObj = updatedJobs.find((j) => j.id === job.id);
+        const finalScrapPct = finalJobObj?.scrapPercent || 0;
+        const finalScrapKg = finalJobObj?.scrapKg || 0;
+        const finalLayers = finalJobObj?.reelsList?.filter((r) => !r.isHotFoilLayer).length || 0;
 
-          return {
-            ...p,
-            status: 'Completed' as const,
-            actualLayersUsed: finalLayers,
-            actualMetersSlit: Number(actualSlitLengthMeters) || p.targetLengthMeters,
-            actualScrapKg: finalScrapKg,
-            actualScrapPct: finalScrapPct
-          };
-        }
-        return p;
-      });
-    }
+        return {
+          ...p,
+          status: 'Completed' as const,
+          actualLayersUsed: finalLayers,
+          actualMetersSlit: Number(actualSlitLengthMeters) || p.targetLengthMeters,
+          actualScrapKg: finalScrapKg,
+          actualScrapPct: finalScrapPct
+        };
+      }
+      return p;
+    });
 
     if (job.motherReelsAllocated && job.motherReelsAllocated.length > 0) {
       updatedMotherReels = motherReelInventory.map((mr) => {
@@ -1374,7 +1494,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                     onChange={(e) => setActualSlitLengthMeters(e.target.value)}
                     placeholder={
                       activeBatchObj?.job.planId
-                        ? `Target: ${productionPlans.find(p => p.id === activeBatchObj?.job.planId)?.targetLengthMeters || 1200} M`
+                        ? `Target: ${productionPlans.find(p => p.id === activeBatchObj?.job.planId)?.targetLengthMeters || 4000} M`
                         : "e.g. 1200 M"
                     }
                     className="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
@@ -1765,18 +1885,57 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                   Scrap Limit: <b className="text-indigo-900">≤ {sp.targetScrapLimitPct}%</b>
                 </div>
               </div>
-              {sp.printedRollRequired && (
-                <div className="pt-2 mt-1 border-t border-indigo-200 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div className="text-indigo-800">
-                    Printed Layers: <b className="text-indigo-950">{sp.printedLayersCount || 2}</b>
-                  </div>
-                  <div className="text-indigo-800">
-                    Plain Layers: <b className="text-indigo-950">{sp.plainLayersCount || (sp.targetLayers - (sp.printedLayersCount || 2))}</b>
-                  </div>
-                  <div className="text-indigo-800">
-                    Brand/Design: <b className="text-indigo-950">{sp.printedRollDesign || 'N/A'}</b>
+
+              {sp.plannedLayers && sp.plannedLayers.length > 0 ? (
+                <div className="pt-2.5 mt-1 border-t border-indigo-200">
+                  <span className="block text-[10px] font-extrabold text-indigo-900 uppercase mb-2 tracking-wider flex items-center gap-1">
+                    📋 Detailed Slitting Requirements (by Layer Setup):
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {sp.plannedLayers.map((layer, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded-xl border text-xs font-black flex flex-col justify-between shadow-3xs transition-all ${
+                          layer.type === 'Printed'
+                            ? 'bg-purple-50 text-purple-950 border-purple-200'
+                            : 'bg-emerald-50/70 text-emerald-950 border-emerald-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                          <span className={`w-1.5 h-1.5 rounded-full ${layer.type === 'Printed' ? 'bg-purple-600' : 'bg-emerald-600'}`} />
+                          <span>{layer.type === 'Printed' ? 'Printed Layer' : 'Plain Layer'}</span>
+                        </div>
+                        <div className="text-xs font-black">
+                          {layer.requiredReels} {layer.requiredReels > 1 ? 'Reels' : 'Reel'} of{' '}
+                          <span className="text-indigo-950 underline decoration-indigo-500 decoration-2 font-mono text-[13px]">
+                            {typeof layer.gsm === 'number' ? `${layer.gsm} GSM` : layer.gsm}
+                          </span>
+                        </div>
+                        {layer.type === 'Printed' && sp.printedRollDesign && (
+                          <div className="text-[10px] text-purple-800 font-bold mt-1.5 bg-purple-100/50 px-2 py-0.5 rounded truncate">
+                            🎨 {sp.printedRollDesign}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
+              ) : (
+                <>
+                  {sp.printedRollRequired && (
+                    <div className="pt-2 mt-1 border-t border-indigo-200 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="text-indigo-800">
+                        Printed Layers: <b className="text-indigo-950">{sp.printedLayersCount || 2}</b>
+                      </div>
+                      <div className="text-indigo-800">
+                        Plain Layers: <b className="text-indigo-950">{sp.plainLayersCount || (sp.targetLayers - (sp.printedLayersCount || 2))}</b>
+                      </div>
+                      <div className="text-indigo-800">
+                        Brand/Design: <b className="text-indigo-950">{sp.printedRollDesign || 'N/A'}</b>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : null;
@@ -1948,7 +2107,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 </optgroup>
               )}
               <optgroup label="Other Standard GSMs">
-                {['60 GSM', '80 GSM', '100 GSM', '115 GSM', '120 GSM', '125 GSM', '140 GSM', '150 GSM', '160 GSM', '180 GSM', '200 GSM', '220 GSM', '250 GSM', '280 GSM', '300 GSM', '320 GSM', '350 GSM']
+                {['60 GSM', '80 GSM', '100 GSM', '115 GSM', '120 GSM', '125 GSM'
+                ]
                   .filter((g) => !planAvailableGsms.includes(g))
                   .map((g) => (
                     <option key={g} value={g}>
@@ -2049,167 +2209,453 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       </form>
 
       {/* REEL NUMBER & JOB ID TRACEABILITY REGISTRY TABLE */}
-      <div className="mt-6 pt-4 border-t border-slate-200 space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide flex items-center gap-1.5 m-0">
-              <Layers className="w-4 h-4 text-blue-600" />
-              <span>Slitting Reels & Traceability Register</span>
-            </h4>
-            <p className="text-[11px] text-slate-500 m-0">
-              Reel number, GSM used in each Job ID and onward stage traceability status
-            </p>
-          </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={tableSearch}
-              onChange={(e) => setTableSearch(e.target.value)}
-              placeholder="Search Reel No, Job ID, GSM, Mill..."
-              className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
-            />
-          </div>
-        </div>
+      {(() => {
+        // Local state toggle handler
+        const handleSort = (column: string) => {
+          if (sortColumn === column) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+          } else {
+            setSortColumn(column);
+            setSortOrder('asc');
+          }
+        };
 
-        <div className="overflow-x-auto bg-white border border-slate-200 rounded-xl shadow-xs">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-left">
-                <th className="p-2.5">Job ID</th>
-                <th className="p-2.5 text-indigo-900">Date</th>
-                <th className="p-2.5 text-blue-900">Reel No.</th>
-                <th className="p-2.5 text-amber-900">GSM</th>
-                <th className="p-2.5">Paper Mill</th>
-                <th className="p-2.5">Product</th>
-                <th className="p-2.5">Remarks / Lot</th>
-                <th className="p-2.5 text-right">Rolls Stock</th>
-                <th className="p-2.5 text-right">In / Out / Scrap (KG)</th>
-                <th className="p-2.5 text-center">Stage Status</th>
-                <th className="p-2.5 text-center">Traceability</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {jobs
-                .filter((j) => {
-                  if (!tableSearch.trim()) return true;
-                  const q = tableSearch.toLowerCase();
-                  const allReels = getJobAllReels(j);
-                  const allGsms = getJobAllGsms(j);
-                  return (
-                    j.id.toLowerCase().includes(q) ||
-                    allReels.some((r) => r.toLowerCase().includes(q)) ||
-                    allGsms.some((g) => g.toLowerCase().includes(q)) ||
-                    (j.reelNo && j.reelNo.toLowerCase().includes(q)) ||
-                    (j.gsm && String(j.gsm).toLowerCase().includes(q)) ||
-                    (j.paperBrand && j.paperBrand.toLowerCase().includes(q)) ||
-                    j.product.toLowerCase().includes(q) ||
-                    (j.customRemark && j.customRemark.toLowerCase().includes(q))
-                  );
-                })
-                .map((j) => {
-                  const allReels = getJobAllReels(j);
-                  const allGsms = getJobAllGsms(j);
-                  const displayReelSummary = getJobReelsSummary(j);
-                  const inKg = j.inputWeightKg || 200;
-                  const outKg = j.outputWeightKg || 0;
-                  const scrapKg = j.scrapKg || 0;
-                  const scrapPct = j.scrapPercent || (inKg > 0 && scrapKg > 0 ? Number(((scrapKg / inKg) * 100).toFixed(1)) : 0);
+        const escapeCSV = (val: any) => {
+          if (val === null || val === undefined) return '';
+          const str = String(val);
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
 
-                  const latestLog = (state.logs || []).filter((l) => l.jobId === j.id).slice(-1)[0];
-                  const entryDate = latestLog?.rawDate || (j.createdAt ? j.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
-                  const entryTime = latestLog?.startTime || (latestLog?.timestamp ? latestLog.timestamp.split(',')[1]?.trim() : '');
+        // Memoized processed jobs
+        const processedJobs = jobs.map((j) => {
+          const allReels = getJobAllReels(j);
+          const allGsms = getJobAllGsms(j);
+          const displayReelSummary = getJobReelsSummary(j);
+          const slitStageLedger = getJobStageShiftLedger(j, 'Slitting', state);
+          const inKg = j.inputWeightKg || 200;
+          const outKg = j.outputWeightKg || 0;
+          const scrapKg = j.scrapKg || 0;
+          const scrapPct = j.scrapPercent || (inKg > 0 && scrapKg > 0 ? Number(((scrapKg / inKg) * 100).toFixed(1)) : 0);
 
-                  return (
-                    <tr key={j.id} className="hover:bg-slate-50 transition">
-                      <td className="p-2.5 font-mono font-bold text-blue-800">{j.id}</td>
-                      <td className="p-2.5 whitespace-nowrap">
-                        <div className="flex items-center gap-1 font-bold text-slate-800 text-xs">
-                          <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                          <span>{entryDate}</span>
-                        </div>
-                        {entryTime && <div className="text-[10px] text-slate-400 font-mono ml-4">{entryTime}</div>}
+          const latestLog = (state.logs || []).filter((l) => l.jobId === j.id).slice(-1)[0];
+          const entryDate = latestLog?.rawDate || (j.createdAt ? j.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+          const entryTime = latestLog?.startTime || (latestLog?.timestamp ? latestLog.timestamp.split(',')[1]?.trim() : '');
+          const paperBrand = j.paperBrand || 'ITC';
+          const remark = j.customRemark || 'Standard';
+          const stock = j.availableRolls || 0;
+
+          return {
+            job: j,
+            id: j.id,
+            date: entryDate,
+            time: entryTime,
+            reels: allReels,
+            reelsStr: allReels.join(', '),
+            gsms: allGsms,
+            gsmsStr: allGsms.join(', '),
+            mill: paperBrand,
+            product: j.product,
+            remark: remark,
+            stock: stock,
+            inKg,
+            outKg,
+            scrapKg,
+            scrapPct,
+            stage: j.stage || '',
+            slitStageLedger,
+          };
+        });
+
+        // 1. Global Filter
+        let filtered = processedJobs;
+        if (tableSearch.trim()) {
+          const q = tableSearch.toLowerCase();
+          filtered = filtered.filter((item) => {
+            return (
+              item.id.toLowerCase().includes(q) ||
+              item.reelsStr.toLowerCase().includes(q) ||
+              item.gsmsStr.toLowerCase().includes(q) ||
+              item.mill.toLowerCase().includes(q) ||
+              item.product.toLowerCase().includes(q) ||
+              item.remark.toLowerCase().includes(q) ||
+              item.stage.toLowerCase().includes(q)
+            );
+          });
+        }
+
+        // 2. Column-Specific Filter
+        if (showFilters) {
+          filtered = filtered.filter((item) => {
+            const f = colFilters;
+            const matchId = !f.id || item.id.toLowerCase().includes(f.id.toLowerCase());
+            const matchDate = !f.date || item.date.toLowerCase().includes(f.date.toLowerCase());
+            const matchReel = !f.reel || item.reelsStr.toLowerCase().includes(f.reel.toLowerCase());
+            const matchGsm = !f.gsm || item.gsmsStr.toLowerCase().includes(f.gsm.toLowerCase());
+            const matchMill = !f.mill || item.mill.toLowerCase().includes(f.mill.toLowerCase());
+            const matchProduct = !f.product || item.product.toLowerCase().includes(f.product.toLowerCase());
+            const matchRemark = !f.remark || item.remark.toLowerCase().includes(f.remark.toLowerCase());
+            const matchStock = !f.stock || String(item.stock).toLowerCase().includes(f.stock.toLowerCase());
+            const matchStatus = !f.status || item.stage.toLowerCase().includes(f.status.toLowerCase());
+
+            return matchId && matchDate && matchReel && matchGsm && matchMill && matchProduct && matchRemark && matchStock && matchStatus;
+          });
+        }
+
+        // 3. Sort
+        if (sortColumn) {
+          filtered.sort((a, b) => {
+            let valA: any = a[sortColumn as keyof typeof a];
+            let valB: any = b[sortColumn as keyof typeof b];
+
+            if (sortColumn === 'reels') {
+              valA = a.reelsStr.toLowerCase();
+              valB = b.reelsStr.toLowerCase();
+            } else if (sortColumn === 'gsm') {
+              valA = a.gsmsStr.toLowerCase();
+              valB = b.gsmsStr.toLowerCase();
+            } else if (typeof valA === 'string') {
+              valA = valA.toLowerCase();
+              valB = (valB || '').toLowerCase();
+            }
+
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        const exportToCSV = () => {
+          const headers = ['Job ID', 'Date', 'Time', 'Reel No.', 'GSM', 'Paper Mill', 'Product', 'Remarks / Lot', 'Stock (Rolls)', 'Input KG', 'Output KG', 'Scrap KG', 'Stage Status'];
+          const rows = filtered.map(item => [
+            escapeCSV(item.id),
+            escapeCSV(item.date),
+            escapeCSV(item.time),
+            escapeCSV(item.reelsStr),
+            escapeCSV(item.gsmsStr),
+            escapeCSV(item.mill),
+            escapeCSV(item.product),
+            escapeCSV(item.remark),
+            escapeCSV(item.stock),
+            escapeCSV(item.inKg),
+            escapeCSV(item.outKg),
+            escapeCSV(item.scrapKg),
+            escapeCSV(item.stage)
+          ]);
+
+          const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', `Slitting_Traceability_Register_${new Date().toISOString().split('T')[0]}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+
+        return (
+          <div className="mt-6 pt-4 border-t border-slate-200 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide flex items-center gap-1.5 m-0">
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  <span>Slitting Reels & Traceability Register</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 m-0">
+                  Reel number, GSM used in each Job ID and onward stage traceability status
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1 border transition cursor-pointer ${showFilters ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>{showFilters ? 'Hide Filters' : 'Column Filters'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={exportToCSV}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 border border-emerald-500 transition cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Export Excel</span>
+                </button>
+                <div className="relative w-full sm:w-48">
+                  <Search className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={tableSearch}
+                    onChange={(e) => setTableSearch(e.target.value)}
+                    placeholder="Quick search..."
+                    className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto bg-white border border-slate-200 rounded-xl shadow-xs">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-left">
+                    <th className="p-2.5 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('id')}>
+                      <div className="flex items-center gap-1">
+                        <span>Job ID</span>
+                        {sortColumn === 'id' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 text-indigo-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('date')}>
+                      <div className="flex items-center gap-1">
+                        <span>Date</span>
+                        {sortColumn === 'date' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 text-blue-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('reels')}>
+                      <div className="flex items-center gap-1">
+                        <span>Reel No.</span>
+                        {sortColumn === 'reels' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 text-amber-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('gsm')}>
+                      <div className="flex items-center gap-1">
+                        <span>GSM</span>
+                        {sortColumn === 'gsm' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('mill')}>
+                      <div className="flex items-center gap-1">
+                        <span>Paper Mill</span>
+                        {sortColumn === 'mill' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('product')}>
+                      <div className="flex items-center gap-1">
+                        <span>Product</span>
+                        {sortColumn === 'product' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('remark')}>
+                      <div className="flex items-center gap-1">
+                        <span>Remarks / Lot</span>
+                        {sortColumn === 'remark' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 text-right cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('stock')}>
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Rolls Stock</span>
+                        {sortColumn === 'stock' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 text-right">In / Out / Scrap (KG)</th>
+                    <th className="p-2.5 text-center cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('status')}>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Stage Status</span>
+                        {sortColumn === 'status' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-2.5 text-center">Traceability</th>
+                  </tr>
+
+                  {showFilters && (
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.id}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, id: e.target.value }))}
+                          placeholder="Filter ID..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5">
-                        <div className="flex flex-wrap gap-1 items-center max-w-[220px]">
-                          {allReels.map((r, idx) => (
-                            <span
-                              key={idx}
-                              className="font-mono font-bold text-[11px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200"
-                              title={`Jumbo Reel #${idx + 1}`}
-                            >
-                              {r}
-                            </span>
-                          ))}
-                          {allReels.length > 1 && (
-                            <span className="text-[10px] bg-blue-100 text-blue-900 font-extrabold px-1.5 py-0.2 rounded border border-blue-300">
-                              {allReels.length} Jumbo Reels
-                            </span>
-                          )}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.date}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, date: e.target.value }))}
+                          placeholder="Filter Date..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5">
-                        <div className="flex flex-wrap gap-1 items-center max-w-[190px]">
-                          {allGsms.map((g, gIdx) => (
-                            <span
-                              key={gIdx}
-                              className="font-bold text-[11px] bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded border border-amber-200"
-                              title={`GSM #${gIdx + 1}`}
-                            >
-                              {g}
-                            </span>
-                          ))}
-                          {allGsms.length > 1 && (
-                            <span className="text-[9.5px] font-extrabold bg-amber-200 text-amber-950 px-1.5 py-0.2 rounded border border-amber-300">
-                              {allGsms.length} Mixed GSM
-                            </span>
-                          )}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.reel}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, reel: e.target.value }))}
+                          placeholder="Filter Reel..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 font-medium text-slate-800">{j.paperBrand || 'ITC'}</td>
-                      <td className="p-2.5 font-bold text-slate-700">{j.product}</td>
-                      <td className="p-2.5 text-slate-500 max-w-[150px] truncate" title={j.customRemark}>
-                        {j.customRemark || 'Standard'}
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.gsm}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, gsm: e.target.value }))}
+                          placeholder="Filter GSM..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-right font-extrabold text-emerald-700">
-                        {j.availableRolls || 0} Rolls
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.mill}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, mill: e.target.value }))}
+                          placeholder="Filter Mill..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-right font-mono text-xs">
-                        <div className="flex flex-col items-end">
-                          <span className="text-slate-700 font-bold">In: {inKg} KG</span>
-                          <span className="text-blue-700 font-medium">Out: {outKg} KG</span>
-                          {scrapKg > 0 && (
-                            <span className="text-rose-700 font-bold text-[11px]">
-                              Scrap: {scrapKg} KG ({scrapPct}%)
-                            </span>
-                          )}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.product}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, product: e.target.value }))}
+                          placeholder="Filter Product..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-center">
-                        <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                          {j.stage}
-                        </span>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.remark}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, remark: e.target.value }))}
+                          placeholder="Filter Remark..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGenealogyModalJob(j);
-                          }}
-                          className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-[11px] transition shadow-xs inline-flex items-center gap-1 cursor-pointer"
-                          title="See where this reel reached in Traceability"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>Trace Reel</span>
-                        </button>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.stock}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, stock: e.target.value }))}
+                          placeholder="Filter Stock..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none text-right"
+                        />
                       </td>
+                      <td className="p-1"></td>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.status}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, status: e.target.value }))}
+                          placeholder="Filter Status..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none text-center"
+                        />
+                      </td>
+                      <td className="p-1"></td>
                     </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((item) => {
+                    const j = item.job;
+                    return (
+                      <tr key={j.id} className="hover:bg-slate-50 transition">
+                        <td className="p-2.5 font-mono font-bold text-blue-800">{j.id}</td>
+                        <td className="p-2.5 whitespace-nowrap">
+                          <div className="flex items-center gap-1 font-bold text-slate-800 text-xs">
+                            <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span>{item.date}</span>
+                          </div>
+                          {item.time && <div className="text-[10px] text-slate-400 font-mono ml-4">{item.time}</div>}
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap gap-1 items-center max-w-[220px]">
+                            {item.reels.map((r, idx) => (
+                              <span
+                                key={idx}
+                                className="font-mono font-bold text-[11px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200"
+                                title={`Jumbo Reel #${idx + 1}`}
+                              >
+                                {r}
+                              </span>
+                            ))}
+                            {item.reels.length > 1 && (
+                              <span className="text-[10px] bg-blue-100 text-blue-900 font-extrabold px-1.5 py-0.2 rounded border border-blue-300">
+                                {item.reels.length} Jumbo Reels
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap gap-1 items-center max-w-[190px]">
+                            {item.gsms.map((g, gIdx) => (
+                              <span
+                                key={gIdx}
+                                className="font-bold text-[11px] bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded border border-amber-200"
+                                title={`GSM #${gIdx + 1}`}
+                              >
+                                {g}
+                              </span>
+                            ))}
+                            {item.gsms.length > 1 && (
+                              <span className="text-[9.5px] font-extrabold bg-amber-200 text-amber-950 px-1.5 py-0.2 rounded border border-amber-300">
+                                {item.gsms.length} Mixed GSM
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5 font-medium text-slate-800">{item.mill}</td>
+                        <td className="p-2.5 font-bold text-slate-700">{item.product}</td>
+                        <td className="p-2.5">
+                          <div className="text-slate-600 text-xs max-w-[150px] truncate" title={item.remark}>
+                            {item.remark}
+                          </div>
+                          {item.slitStageLedger.totalShifts > 1 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              <span
+                                className="bg-blue-50 text-blue-900 border border-blue-200 px-1.5 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 cursor-help"
+                                title={item.slitStageLedger.items.map(it => `${it.date} | ${it.shift} (${it.operator}): ${it.producedQty} Rolls, ${it.scrapKg || 0}kg Scrap`).join(' \n ')}
+                              >
+                                <RotateCcw className="w-2.5 h-2.5 text-blue-600" />
+                                <span>{item.slitStageLedger.totalShifts} Shifts Handover</span>
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-right font-extrabold text-emerald-700">
+                          {item.stock} Rolls
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-xs">
+                          <div className="flex flex-col items-end">
+                            <span className="text-slate-700 font-bold">In: {item.inKg} KG</span>
+                            <span className="text-blue-700 font-medium">Out: {item.outKg} KG</span>
+                            {item.scrapKg > 0 && (
+                              <span className="text-rose-700 font-bold text-[11px]">
+                                Scrap: {item.scrapKg} KG ({item.scrapPct}%)
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            {item.stage}
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGenealogyModalJob(j);
+                            }}
+                            className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-[11px] transition shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                            title="Track Lot & Shift-wise Genealogy History (ऑपरेटर एवं शिफ्ट वार सम्पूर्ण विवरण)"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Track Lot</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Add Reel to Existing Job Modal */}
       {isAddReelModalOpen && (
@@ -2368,7 +2814,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                         </optgroup>
                       )}
                       <optgroup label="Standard GSMs">
-                        {['60 GSM', '80 GSM', '100 GSM', '115 GSM', '120 GSM', '125 GSM', '140 GSM', '150 GSM', '180 GSM', '200 GSM', '250 GSM', '280 GSM', '300 GSM']
+                        {['60 GSM', '80 GSM', '100 GSM', '115 GSM', '120 GSM','125 GSM']
                           .filter(g => !jobPlannedGsms.includes(g))
                           .map(g => (
                             <option key={g} value={g}>{g}</option>

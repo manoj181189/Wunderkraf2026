@@ -35,7 +35,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   onSaveState,
   compact = false
 }) => {
-  const workers: FloorWorker[] = state.floorWorkers && state.floorWorkers.length > 0
+  const workers: FloorWorker[] = state.floorWorkers !== undefined
     ? state.floorWorkers
     : DEFAULT_FLOOR_WORKERS;
 
@@ -59,7 +59,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   const [newWorkerDept, setNewWorkerDept] = useState('Cutting');
   const [newWorkerShift, setNewWorkerShift] = useState<'DAY' | 'NIGHT'>('DAY');
   const [newWorkerMachine, setNewWorkerMachine] = useState('Cutting-1');
-  const [newWorkerPairedOp, setNewWorkerPairedOp] = useState('CUT_OP1');
+  const [newWorkerPairedOp, setNewWorkerPairedOp] = useState('Operator');
 
   // Real-time calculation from workers list
   const presentWorkers = workers.filter((w) => w.isPresent);
@@ -178,18 +178,18 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
     }
   });
 
-  // Ensure default presence of key machines like Cutting-1 with its 2 helpers if empty
+  // Ensure default presence of key machines like Cutting-1 with its helpers if empty
   if (!stationMap['Cutting-1']) {
-    const opName = 'CUT_OP1';
+    const opName = 'Operator';
     const cut1Helpers = workers
-      .filter((w) => w.role === 'HELPER' && w.isPresent && (w.assignedMachine === 'Cutting-1' || w.pairedWithOperator === 'CUT_OP1') && !activeHelperToMachine[w.name])
+      .filter((w) => w.role === 'HELPER' && w.isPresent && (w.assignedMachine === 'Cutting-1' || w.pairedWithOperator === 'Operator') && !activeHelperToMachine[w.name])
       .map((w) => w.name);
 
     stationMap['Cutting-1'] = {
       machine: 'Cutting-1',
       dept: 'Cutting',
       operator: opName,
-      helpers: cut1Helpers.length > 0 ? cut1Helpers : ['SUNIL_HELPER', 'DINESH_HELPER'],
+      helpers: cut1Helpers.length > 0 ? cut1Helpers : [],
       status: 'Active',
       shift: 'DAY'
     };
@@ -349,7 +349,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
               className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
               <UserPlus className="w-4 h-4" />
-              <span>+ Add New Worker / Helper</span>
+              <span>+ Add New Employee / Helper</span>
             </button>
             <button
               onClick={generateWhatsAppAudit}
@@ -375,7 +375,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
               </span>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl font-black text-indigo-950 font-mono">{totalFloorCount}</span>
-                <span className="text-xs font-bold text-emerald-700">Worker Active</span>
+                <span className="text-xs font-bold text-emerald-700">Employee Active</span>
               </div>
             </div>
           </div>
@@ -577,7 +577,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-100/80 text-slate-700 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
               <tr>
-                <th className="p-3">Worker Name</th>
+                <th className="p-3">Employee Name</th>
                 <th className="p-3">Role</th>
                 <th className="p-3">Department</th>
                 <th className="p-3">Station / Paired Op</th>
@@ -590,7 +590,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
               {filteredWorkers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-6 text-center text-slate-400 font-medium">
-                    No workers matched the filter
+                    No employees matched the filter
                   </td>
                 </tr>
               ) : (
@@ -803,7 +803,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
                       }
                     }
                   }}
-                  placeholder="Write Helper Name (e.g. SUNIL_HELPER)..."
+                  placeholder="Write Helper Name (e.g. MUKESH_HELPER)..."
                   className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold uppercase text-slate-800 outline-none"
                 />
                 <button
@@ -880,7 +880,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">
               <div>
                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide m-0">
-                  + Add New Floor Worker / Helper
+                  + Add New Floor Employee / Helper
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5 m-0">
                   Enter new operator, helper, or supervisor in the master roster
@@ -898,13 +898,13 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Worker Name *:
+                  Employee Name *:
                 </label>
                 <input
                   type="text"
                   value={newWorkerName}
                   onChange={(e) => setNewWorkerName(e.target.value)}
-                  placeholder="e.g. SUNIL_HELPER"
+                  placeholder="e.g. MUKESH_HELPER"
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold uppercase text-slate-800 outline-none"
                   required
                 />
@@ -977,7 +977,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
                     type="text"
                     value={newWorkerPairedOp}
                     onChange={(e) => setNewWorkerPairedOp(e.target.value)}
-                    placeholder="e.g. CUT_OP1"
+                    placeholder="e.g. Operator"
                     className="w-full px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg text-xs font-bold uppercase text-amber-950 outline-none"
                   />
                 </div>
@@ -996,7 +996,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
                 type="submit"
                 className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-lg shadow-sm transition cursor-pointer"
               >
-                + Save Worker
+                + Save Employee
               </button>
             </div>
           </form>

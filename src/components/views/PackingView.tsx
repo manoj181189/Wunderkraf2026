@@ -53,7 +53,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
 
   const [selectedMachine, setSelectedMachine] = useState('Packing-1');
   const [shift, setShift] = useState<'DAY' | 'NIGHT'>(() => getCurrentExpectedShift(shiftConfig));
-  const [packerName, setPackerName] = useState(DEPT_WORKERS['Packing']?.[0] || 'PACK_SURESH');
+  const [packerName, setPackerName] = useState((state.floorWorkers || []).filter(w => w.department === 'Packing')[0]?.name || 'Operator');
   const [filterCust, setFilterCust] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [packedBoxesInput, setPackedBoxesInput] = useState('');
@@ -1236,8 +1236,8 @@ export const PackingView: React.FC<PackingViewProps> = ({
                 required
               />
               <datalist id="packWorkerList">
-                {(DEPT_WORKERS['Packing'] || []).map((w) => (
-                  <option key={w} value={w} />
+                { (state.floorWorkers || []).map((w) => (
+                  <option key={w.name} value={w.name} />
                 ))}
               </datalist>
             </div>
@@ -1948,7 +1948,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
           }}
           machine={selectedMachine}
           stageName="Packing"
-          availableWorkers={DEPT_WORKERS['Packing'] || []}
+          availableWorkers={(state.floorWorkers || []).map(w => w.name)}
           unitLabel="Boxes"
           initialProducedQty={parseFloat(packedBoxesInput) || undefined}
           onConfirmHandover={handleConfirmShiftHandover}

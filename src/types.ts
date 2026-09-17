@@ -15,6 +15,7 @@ export type CurrentView =
   | 'STOCK'
   | 'ORDERS'
   | 'ANALYTICS'
+  | 'SCRAP'
   | 'SEARCH'
   | 'AUDIT'
   | 'ADMIN'
@@ -100,6 +101,9 @@ export interface OperatorRunSlice {
   operator: string;
   relievedByOperator?: string;
   shift: 'DAY' | 'NIGHT' | string;
+  date?: string;
+  machine?: string;
+  stage?: string;
   startTime?: string;
   handoverTime: string;
   startMeterReading?: number;
@@ -119,6 +123,9 @@ export interface OperatorRunSlice {
   handoverConfirmed?: boolean;
   helpers?: string[];
   helperCount?: number;
+  glueUsageKg?: number;
+  glueBrand?: string;
+  consumedQty?: number;
 }
 
 export interface RunningBatch {
@@ -137,6 +144,7 @@ export interface RunningBatch {
   gsmsSummary?: string;
   issuedQty?: number;
   producedQty?: number;
+  consumedQty?: number;
   pcsPerCrate?: number;
   producedPieces?: number;
   outputPieces?: number;
@@ -173,6 +181,17 @@ export interface RunningBatch {
   helperCount?: number;
   glueBrand?: string;
   glueUsageKg?: number;
+  glueEntries?: {
+    id: string;
+    qty?: number;
+    quantityKg?: number;
+    brand?: string;
+    glueBrand?: string;
+    time?: string;
+    date?: string;
+    operator?: string;
+    [key: string]: any;
+  }[];
   cuttingMaterialScrapKg?: number;
   layerType?: 'Plain' | 'Printed';
   layerSegmentGsm?: string | number;
@@ -236,8 +255,21 @@ export interface Job {
   cuttingScrapPcs?: number;
   cuttingMaterialScrapKg?: number;
   cuttingRejectedPcs?: number;
+  formingScrapPcs?: number;
+  formingRejectedPcs?: number;
   glueUsageKg?: number;
   glueBrand?: string;
+  glueEntries?: {
+    id: string;
+    qty?: number;
+    quantityKg?: number;
+    brand?: string;
+    glueBrand?: string;
+    time?: string;
+    date?: string;
+    operator?: string;
+    [key: string]: any;
+  }[];
   cuttingPcsPerKg?: number;
   inputWeightKg?: number;
   outputWeightKg?: number;
@@ -337,6 +369,7 @@ export interface LogEntry {
   user: string;
   startTime?: string;
   endTime?: string;
+  date?: string;
   rawDate: string;
   timestamp: string;
 }
@@ -484,14 +517,37 @@ export interface CustomerComplaint {
   actionTakenBy?: string;
 }
 
+export interface AuditLog {
+  id: string;
+  timestamp: string; // ISO String
+  userId: string;
+  action: string; // e.g., 'SUB_LOT_FORWARD'
+  stage: string;
+  machine: string;
+  payload: Record<string, any>; // Snapshot of critical parameters
+  complianceReference: '21-CFR-P11' | 'GPCB' | 'DISH' | 'INTERNAL';
+}
+
+export interface DeletedVaultItem {
+  id: string;
+  originalId: string;
+  type: 'JOB' | 'PLAN' | 'SHIFT_HANDOVER' | 'LOG' | 'ORDER';
+  title: string;
+  deletedBy: string;
+  deletedAt: string;
+  data: any;
+}
+
 export interface FactoryState {
   lastResetTimestamp?: number;
   deletedJobIds?: string[];
   deletedOrderIds?: string[];
   deletedLogIds?: string[];
   deletedPlanIds?: string[];
+  deletedVaultItems?: DeletedVaultItem[];
   jobs: Job[];
   logs: LogEntry[];
+  auditLogs?: AuditLog[]; // Immutable compliance ledger
   packJobs: PackJob[];
   scrapSales: ScrapSale[];
   users: Record<string, UserAccount>;
@@ -595,6 +651,8 @@ export interface ShiftHandoverRecord {
   id: string; // e.g. "HO-2026-001"
   timestamp: string;
   date: string;
+  jobId?: string;
+  batchId?: string;
   department: 'Slitting' | 'Cutting' | 'Forming' | 'QC' | 'Packing' | string;
   machine: string;
   outgoingOperator: string;
@@ -630,13 +688,15 @@ export interface GlueUsageEntry {
   createdAt?: string;
 }
 
-export type WorkforceRole = 'OPERATOR' | 'HELPER' | 'SUPERVISOR' | 'MAINTENANCE' | 'QC_INSPECTOR';
+export type WorkforceRole = 'OPERATOR' | 'HELPER' | 'SUPERVISOR' | 'MAINTENANCE' | 'QC_INSPECTOR' | 'MANAGER' | 'EXECUTIVE' | 'TECHNICIAN';
 
 export interface FloorWorker {
   id: string;
   name: string;
+  staffId?: string;
+  designation?: string;
   role: WorkforceRole;
-  department: 'Slitting' | 'Cutting' | 'Forming' | 'QC' | 'Packing' | 'Maintenance' | 'Admin' | string;
+  department: 'Slitting' | 'Cutting' | 'Forming' | 'QC' | 'Packing' | 'Maintenance' | 'Admin' | 'Production' | 'Housekeeping' | 'Printing' | 'HR' | string;
   assignedMachine?: string; // e.g. "Cutting-1"
   pairedWithOperator?: string; // If role is HELPER, which operator they assist
   shift: 'DAY' | 'NIGHT' | string;

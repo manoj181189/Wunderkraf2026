@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Cog, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, Box, Wrench, Search, ShieldCheck, CheckCircle2, AlertTriangle, RotateCcw, Calendar, Clock } from 'lucide-react';
-import { FactoryState, Job, ProductType, RunningBatch, OperatorRunSlice, LogEntry } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Cog, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, Box, Wrench, Search, ShieldCheck, CheckCircle2, AlertTriangle, RotateCcw, Calendar, Clock, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, ChevronUp, ChevronDown } from 'lucide-react';
+import { FactoryState, Job, ProductType, RunningBatch, OperatorRunSlice, LogEntry, ShiftHandoverRecord } from '../../types';
 import { PRODUCTS, DEPT_WORKERS, MACHINES } from '../../lib/constants';
-import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms, getJobReelsSummary } from '../../lib/utils';
+import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms, getJobReelsSummary, getJobPlannedLayers } from '../../lib/utils';
+import { getJobStageShiftLedger } from '../../lib/shiftSlices';
 import { getNumberingMaster, generateFormingBatchId } from '../../lib/numberingMaster';
 import { MachineBreakdownBanner } from '../MachineBreakdownBanner';
 import { LotGenealogyModal } from '../LotGenealogyModal';
@@ -28,21 +29,34 @@ export const FormingView: React.FC<FormingViewProps> = ({
   onNavigateToTraceability
 }) => {
   const { jobs, shiftConfig } = state;
-  const formWorkers = state.deptWorkers?.['Forming'] || DEPT_WORKERS['Forming'] || ['FORM_OP1', 'FORM_OP2', 'KISHORE_FORM'];
+  const formWorkers = state.deptWorkers?.['Forming'] || DEPT_WORKERS['Forming'] || ['Operator'];
 
   const [filterProduct, setFilterProduct] = useState<string>('');
   const [selectedMachine, setSelectedMachine] = useState('Forming-1');
   const [shift, setShift] = useState<'DAY' | 'NIGHT'>(() => getCurrentExpectedShift(shiftConfig));
-  const [operatorName, setOperatorName] = useState(formWorkers[0] || 'FORM_OP1');
+  const [operatorName, setOperatorName] = useState(formWorkers[0] || 'Operator');
   const [selectedPendingJobId, setSelectedPendingJobId] = useState('');
   const [issueCratesQty, setIssueCratesQty] = useState('');
-
   const [outputCrates, setOutputCrates] = useState('');
   const [loosePiecesInput, setLoosePiecesInput] = useState('0');
   const [pcsPerCrateOverride, setPcsPerCrateOverride] = useState<string>('');
   const [scrapPcs, setScrapPcs] = useState('0');
   const [selectedActiveBatchId, setSelectedActiveBatchId] = useState('');
   const [tableSearch, setTableSearch] = useState('');
+  const [sortColumn, setSortColumn] = useState<string>('id');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [colFilters, setColFilters] = useState({
+    id: '',
+    date: '',
+    reel: '',
+    gsm: '',
+    mill: '',
+    product: '',
+    remark: '',
+    stock: '',
+    status: '',
+  });
 
   // Strict Quantity & Crate Audit Error Modal State
   const [auditMismatchError, setAuditMismatchError] = useState<{
@@ -68,6 +82,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
   const [isUnissueModalOpen, setIsUnissueModalOpen] = useState(false);
   const [unissueQtyInput, setUnissueQtyInput] = useState('');
+  const [selectedCuttingBatchId, setSelectedCuttingBatchId] = useState('');
 
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
@@ -94,7 +109,99 @@ export const FormingView: React.FC<FormingViewProps> = ({
   const activeBatchObj =
     activeBatches.find((item) => item.batch?.batchId === selectedActiveBatchId) || activeBatches[0];
 
-  const standardCutPcs = activeBatchObj?.job.pcsPerCrateCutting || (activeBatchObj ? state.crateCapacityMaster?.[activeBatchObj.job.product]?.cuttingPcs : 10000) || 10000;
+  useEffect(() => {
+    if (activeBatchObj?.job) {
+      const savedVal = activeBatchObj.job.pcsPerCrateForming;
+      if (savedVal) {
+        setPcsPerCrateOverride(String(savedVal));
+      } else {
+        const masterVal = state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs;
+        setPcsPerCrateOverride(masterVal ? String(masterVal) : '');
+      }
+    } else {
+      setPcsPerCrateOverride('');
+    }
+
+    if (activeBatchObj?.batch) {
+      if (activeBatchObj.batch.worker) {
+        setOperatorName(activeBatchObj.batch.worker);
+      }
+      if (activeBatchObj.batch.helpers) {
+        setAssignedHelpers(activeBatchObj.batch.helpers);
+      }
+    }
+  }, [activeBatchObj?.job?.id, activeBatchObj?.batch?.batchId, activeBatchObj?.batch?.worker]);
+
+  const handlePcsPerCrateChange = (val: string) => {
+    setPcsPerCrateOverride(val);
+    if (activeBatchObj) {
+      const parsed = parseInt(val, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        const updatedJobs = state.jobs.map((j) => {
+          if (j.id === activeBatchObj.job.id) {
+            return {
+              ...j,
+              pcsPerCrateForming: parsed
+            };
+          }
+          return j;
+        });
+        onSaveState({
+          ...state,
+          jobs: updatedJobs
+        });
+      }
+    }
+  };
+
+  // Helper function to calculate exact cutting metrics and net pieces per crate
+  const getJobCuttingMetrics = (j: Job | undefined | null) => {
+    if (!j) {
+      return {
+        totalCutCrates: 0,
+        rawStdCutPcs: 10000,
+        cuttingRejectedPcs: 0,
+        totalNetPieces: 0,
+        netPcsPerCrate: 10000,
+        hasRejectionDeduction: false
+      };
+    }
+    const cuttingBatches = (j.runningBatches || []).filter(
+      (b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
+    );
+    const totalCutCrates = cuttingBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
+    const rawStdCutPcs = j.pcsPerCrateCutting || state.crateCapacityMaster?.[j.product]?.cuttingPcs || 10000;
+    const cuttingRejectedPcs = j.cuttingRejectedPcs || j.cuttingScrapPcs || 0;
+
+    // Total net flat blanks after cutting minor rejections:
+    let totalNetPieces = 0;
+    if (j.totalCutPieces !== undefined && j.totalCutPieces > 0) {
+      totalNetPieces = j.totalCutPieces;
+    } else if (totalCutCrates > 0) {
+      totalNetPieces = Math.max(0, (totalCutCrates * rawStdCutPcs) - cuttingRejectedPcs);
+    } else {
+      totalNetPieces = (j.availableCuttingCrates || 0) * rawStdCutPcs;
+    }
+
+    // Net pieces per cutting crate (minor rejections distributed evenly across crates):
+    const netPcsPerCrate = totalCutCrates > 0
+      ? Math.round(totalNetPieces / totalCutCrates)
+      : ((j.availableCuttingCrates || 0) > 0 ? Math.round(totalNetPieces / j.availableCuttingCrates) : rawStdCutPcs);
+
+    const hasRejectionDeduction = cuttingRejectedPcs > 0 && totalNetPieces < ((totalCutCrates || j.availableCuttingCrates || 0) * rawStdCutPcs);
+
+    return {
+      totalCutCrates,
+      rawStdCutPcs,
+      cuttingRejectedPcs,
+      totalNetPieces,
+      netPcsPerCrate: Math.max(1, netPcsPerCrate),
+      hasRejectionDeduction
+    };
+  };
+
+  const activeJobMetrics = getJobCuttingMetrics(activeBatchObj?.job);
+  const standardCutPcs = activeJobMetrics.netPcsPerCrate;
   const standardFormPcs = activeBatchObj?.job.pcsPerCrateForming || (activeBatchObj ? state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs : 7000) || 7000;
   const effectiveFormPcs = pcsPerCrateOverride !== '' ? (parseInt(pcsPerCrateOverride, 10) || standardFormPcs) : standardFormPcs;
   const expansionRatio = (standardCutPcs / effectiveFormPcs).toFixed(2);
@@ -131,34 +238,87 @@ export const FormingView: React.FC<FormingViewProps> = ({
     }
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const jobMetrics = getJobCuttingMetrics(job);
+    const netCutPcsPerCrate = jobMetrics.netPcsPerCrate;
+    const issuedInputPieces = Math.round(cratesCount * netCutPcsPerCrate);
+
+    let remDeduct = cratesCount;
+    const modifiedCuttingBatches = (job.runningBatches || []).map((b) => {
+      if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remDeduct > 0) {
+        if (b.slices && b.slices.length > 0) {
+          const hasMatchingSlice = b.slices.some(s => s.sliceId === selectedCuttingBatchId);
+          const isSelectedEmptyOrMatched = !selectedCuttingBatchId || b.batchId === selectedCuttingBatchId || hasMatchingSlice;
+          
+          if (isSelectedEmptyOrMatched) {
+            const updatedSlices = b.slices.map(slice => {
+              if (remDeduct > 0 && (!selectedCuttingBatchId || slice.sliceId === selectedCuttingBatchId)) {
+                const sliceTotal = slice.producedQty || 0;
+                const sliceConsumed = slice.consumedQty || 0;
+                const sliceRem = Math.max(0, sliceTotal - sliceConsumed);
+                
+                if (sliceRem > 0) {
+                  const dec = Math.min(sliceRem, remDeduct);
+                  remDeduct -= dec;
+                  return { ...slice, consumedQty: sliceConsumed + dec };
+                }
+              }
+              return slice;
+            });
+            
+            const totalSlicesConsumed = updatedSlices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+            return {
+              ...b,
+              consumedQty: totalSlicesConsumed,
+              slices: updatedSlices
+            };
+          }
+        } else {
+          const totalP = b.producedQty || 0;
+          const consumedP = b.consumedQty || 0;
+          const remP = Math.max(0, totalP - consumedP);
+          
+          if (remP > 0 && (!selectedCuttingBatchId || b.batchId === selectedCuttingBatchId)) {
+            const dec = Math.min(remP, remDeduct);
+            remDeduct -= dec;
+            return { ...b, consumedQty: consumedP + dec };
+          }
+        }
+      }
+      return b;
+    });
+
+    if (remDeduct > 0) {
+      alert(`⚠️ Insufficient crates in selected Cutting Operator Lot! Available remaining: ${cratesCount - remDeduct}, Requested: ${cratesCount}`);
+      return;
+    }
 
     let updatedJobs: Job[] = [];
     let logMessage = '';
-
     if (activeRunning && activeRunning.job.id === job.id) {
       // Same-job Top-up
       updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
         return {
           ...j,
-          availableCuttingCrates: (j.availableCuttingCrates || 0) - cratesCount,
-          runningBatches: (j.runningBatches || []).map((b) => {
+          availableCuttingCrates: Math.max(0, (j.availableCuttingCrates || 0) - cratesCount),
+          runningBatches: modifiedCuttingBatches.map((b) => {
             if (b.batchId !== activeRunning.batch.batchId) return b;
             return {
               ...b,
-              issuedQty: (b.issuedQty || 0) + cratesCount
+              issuedQty: (b.issuedQty || 0) + cratesCount,
+              inputPieces: (b.inputPieces || 0) + issuedInputPieces,
+              pcsPerCrate: netCutPcsPerCrate
             };
           })
         };
       });
-      logMessage = `Forming Top-up on ${selectedMachine} (+${cratesCount} Crates Added to Running Batch)`;
-      alert(`✅ Top-up Successful! Added ${cratesCount} more crates to running Job ${job.id} on ${selectedMachine}.`);
+      logMessage = `Forming Top-up on ${selectedMachine} (+${cratesCount} Crates = +${issuedInputPieces.toLocaleString()} Net Blanks Added to Running Batch)`;
+      alert(`✅ Top-up Successful! Added ${cratesCount} more crates (+${issuedInputPieces.toLocaleString()} Net Blanks @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate) to running Job ${job.id} on ${selectedMachine}.`);
     } else {
       // Fresh batch
       const master = getNumberingMaster(state.seriesConfig);
       const batchId = generateFormingBatchId(job.id, job.runningBatches || [], master);
       const upstreamBatchId = job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
-      const cutCrateCap = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 8000;
       const newBatch: RunningBatch = {
         batchId,
         stage: 'Forming',
@@ -168,25 +328,26 @@ export const FormingView: React.FC<FormingViewProps> = ({
         status: 'Running',
         parentBatchId: upstreamBatchId,
         issuedQty: cratesCount,
+        inputCrates: cratesCount,
+        inputPieces: issuedInputPieces,
         producedQty: 0,
-        pcsPerCrate: cutCrateCap,
+        pcsPerCrate: netCutPcsPerCrate,
         worker: operatorName.trim().toUpperCase(),
         user: 'form_user'
       };
-
       updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
         return {
           ...j,
           tracedLots: { ...(j.tracedLots || {}), Forming: batchId },
-          availableCuttingCrates: (j.availableCuttingCrates || 0) - cratesCount,
-          runningBatches: [...(j.runningBatches || []), newBatch]
+          availableCuttingCrates: Math.max(0, (j.availableCuttingCrates || 0) - cratesCount),
+          runningBatches: [...modifiedCuttingBatches, newBatch]
         };
       });
-
-      logMessage = `Started Forming on ${selectedMachine} (${cratesCount} Crates Issued) | Worker: ${operatorName.toUpperCase()}`;
+      logMessage = `Started Forming on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks Issued @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate) | Worker: ${operatorName.toUpperCase()}`;
       setSelectedActiveBatchId(batchId);
-      alert(`✅ Forming Job ${job.id} Loaded on ${selectedMachine} (${cratesCount} Crates)!`);
+      alert(`✅ Forming Job ${job.id} Loaded on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate)!`);
+      alert(`✅ Forming Job ${job.id} Loaded on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate)!`);
     }
 
     const newLog = {
@@ -225,27 +386,14 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const forwardedFormedPcs = Math.round(qty * effectiveFormPcs);
 
     // Dynamic conversion standards: Forming capacity per crate
-    const formingCrateCapacity = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * formingCrateCapacity;
+    const totalInputPieces = batch.inputPieces || (inputCrates * standardCutPcs);
     const prevProducedPieces = batch.producedPieces || 0;
     const prevProducedCrates = batch.producedQty || 0;
     const cumulativeOutputPieces = prevProducedPieces + forwardedFormedPcs;
     const cumulativeOutputCrates = prevProducedCrates + qty;
 
-    // Strict piece-count mass-balance audit check
-    if (cumulativeOutputPieces > totalInputPieces) {
-      setIsForwardModalOpen(false);
-      setAuditMismatchError({
-        outputPcs: cumulativeOutputPieces,
-        outputCrates: cumulativeOutputCrates,
-        inputPcs: totalInputPieces,
-        inputCrates,
-        scrapPcs: 0,
-        details: `Audit Mismatch: Output quantity (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} cut crates). Entry blocked.`
-      });
-      return;
-    }
+    // Strict piece-count mass-balance audit check removed to allow volume expansion flexibility.
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
@@ -297,25 +445,32 @@ export const FormingView: React.FC<FormingViewProps> = ({
       alert('Please enter a valid quantity of crates to return!');
       return;
     }
-
     const { job, batch } = activeBatchObj;
     const curIssued = batch.issuedQty || 0;
     if (qty > curIssued) {
       alert(`Cannot un-issue more than issued crates count (${curIssued})!`);
       return;
     }
-
     const remaining = curIssued - qty;
-
+    let remAddUnissue = qty;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
       const updatedBatches = (j.runningBatches || [])
         .map((b) => {
-          if (b.batchId !== batch.batchId) return b;
-          return { ...b, issuedQty: remaining };
+          if (b.batchId === batch.batchId) {
+            return { ...b, issuedQty: remaining };
+          }
+          if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remAddUnissue > 0) {
+            const consumedP = b.consumedQty || 0;
+            const restore = Math.min(consumedP, remAddUnissue);
+            if (restore > 0) {
+              remAddUnissue -= restore;
+              return { ...b, consumedQty: consumedP - restore };
+            }
+          }
+          return b;
         })
-        .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0);
-
+        .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0 || (b.consumedQty || 0) > 0);
       return {
         ...j,
         availableCuttingCrates: (j.availableCuttingCrates || 0) + qty,
@@ -365,24 +520,50 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const { job, batch } = activeBatchObj;
 
     const nextHelpers = handoverData.helpers && handoverData.helpers.length > 0 ? handoverData.helpers : assignedHelpers;
+    const producedPiecesSlice = handoverData.sliceProducedPieces || (handoverData.sliceProducedQty * effectiveFormPcs);
+
     const newSlice: OperatorRunSlice = {
       sliceId: `SLICE-FORM-${Date.now()}`,
       operator: batch.worker,
       relievedByOperator: handoverData.relievedByOperator,
       shift: batch.shift || 'DAY',
+      date: new Date().toISOString().split('T')[0],
+      machine: selectedMachine,
+      stage: 'Forming',
       startTime: batch.startTime,
       handoverTime: handoverData.handoverTime,
       startMeterReading: batch.startMeterReading || batch.meterReading,
       endMeterReading: handoverData.meterReading,
       strokeCount: handoverData.meterReading,
       producedQty: handoverData.sliceProducedQty,
-      producedPieces: handoverData.sliceProducedPieces || (handoverData.sliceProducedQty * effectiveFormPcs),
+      producedPieces: producedPiecesSlice,
       scrapQty: handoverData.sliceScrapQty,
+      scrapPcs: handoverData.sliceScrapQty,
       notes: handoverData.handoverNotes,
+      helpers: nextHelpers,
+      helperCount: nextHelpers.length,
       handoverConfirmed: true
     };
 
-    const producedPiecesSlice = handoverData.sliceProducedPieces || (handoverData.sliceProducedQty * effectiveFormPcs);
+    const handoverRecord: ShiftHandoverRecord = {
+      id: `HO-FORM-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      date: new Date().toISOString().split('T')[0],
+      jobId: job.id,
+      batchId: batch.batchId,
+      department: 'Forming',
+      machine: selectedMachine,
+      outgoingOperator: batch.worker,
+      relievedByOperator: handoverData.relievedByOperator,
+      currentShift: batch.shift || 'DAY',
+      nextShift: handoverData.nextShift,
+      meterReading: handoverData.meterReading,
+      producedQty: handoverData.sliceProducedQty,
+      producedPieces: producedPiecesSlice,
+      scrapQty: handoverData.sliceScrapQty,
+      notes: handoverData.handoverNotes,
+      helpers: nextHelpers
+    };
 
     const updatedBatches = (job.runningBatches || []).map((b) => {
       if (b.batchId === batch.batchId) {
@@ -395,6 +576,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
           producedQty: (b.producedQty || 0) + handoverData.sliceProducedQty,
           producedPieces: (b.producedPieces || 0) + producedPiecesSlice,
           scrapPcs: (b.scrapPcs || 0) + handoverData.sliceScrapQty,
+          helpers: nextHelpers,
+          helperCount: nextHelpers.length,
           slices: [...(b.slices || []), newSlice]
         };
       }
@@ -407,6 +590,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
         ...j,
         availableFormingCrates: (j.availableFormingCrates || 0) + handoverData.sliceProducedQty,
         totalFormedPieces: (j.totalFormedPieces || 0) + producedPiecesSlice,
+        formingScrapPcs: (j.formingScrapPcs || 0) + handoverData.sliceScrapQty,
+        formingRejectedPcs: (j.formingRejectedPcs || 0) + handoverData.sliceScrapQty,
         runningBatches: updatedBatches
       };
     });
@@ -427,6 +612,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      shiftHandovers: [handoverRecord, ...(state.shiftHandovers || [])],
       logs: [handoverLog, ...(state.logs || [])]
     });
 
@@ -435,7 +621,6 @@ export const FormingView: React.FC<FormingViewProps> = ({
     setScrapPcs('0');
     setOperatorName(handoverData.relievedByOperator);
     if (handoverData.helpers && handoverData.helpers.length > 0) setAssignedHelpers(handoverData.helpers);
-    if (handoverData.helpers && handoverData.helpers.length > 0) setAssignedHelpers(handoverData.helpers);
     setShift(handoverData.nextShift as 'DAY' | 'NIGHT');
     setIsShiftHandoverModalOpen(false);
     alert(`✅ Shift Handover Complete! Ongoing batch transferred from ${batch.worker} to ${handoverData.relievedByOperator} without stopping. ${handoverData.sliceProducedQty} Formed Crates locked to ${batch.worker}.`);
@@ -443,7 +628,13 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
 
   const handleConfirmCrew = (operator: string, helpers: string[]) => {
+    setOperatorName(operator);
+    setAssignedHelpers(helpers);
+    setIsCrewModalOpen(false);
+
+    // If there is an active batch on this machine, update it immediately
     if (!activeBatchObj) return;
+    
     const { job, batch } = activeBatchObj;
 
     const updatedJobs = state.jobs.map((j) => {
@@ -511,7 +702,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     onSaveState({
       ...state,
       jobs: updatedJobs,
-      floorWorkers: updatedWorkers.length > 0 ? updatedWorkers : state.floorWorkers,
+      floorWorkers: updatedWorkers,
       logs: [newLog, ...(state.logs || [])]
     });
     alert('Crew assigned successfully!');
@@ -565,58 +756,30 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const looseDone = parseInt(loosePiecesInput, 10) || 0;
     const scrapPcsVal = parseInt(scrapPcs, 10) || 0;
 
+    if (cratesDone <= 0 && looseDone <= 0) {
+      alert('⚠️ Cannot finish run: Please enter Actual Formed Crates or Loose Pieces produced!');
+      return;
+    }
+
     const { job, batch } = activeBatchObj;
 
-    // Dynamic conversion standards: Forming capacity per crate
-    const formingCrateCapacity = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * formingCrateCapacity;
-
+    const totalInputPieces = batch.inputPieces || (inputCrates * standardCutPcs);
     const currentOutputPieces = Math.round(cratesDone * effectiveFormPcs) + looseDone;
     const prevProducedPieces = batch.producedPieces || 0;
     const prevProducedCrates = batch.producedQty || 0;
     const cumulativeOutputPieces = prevProducedPieces + currentOutputPieces;
     const cumulativeOutputCrates = prevProducedCrates + cratesDone;
 
-    // Strict piece-count mass-balance audit check 1: Output Pieces > Input Pieces
-    if (cumulativeOutputPieces > totalInputPieces) {
-      setAuditMismatchError({
-        outputPcs: cumulativeOutputPieces,
-        outputCrates: cumulativeOutputCrates,
-        inputPcs: totalInputPieces,
-        inputCrates,
-        scrapPcs: scrapPcsVal,
-        details: `Audit Mismatch: Output quantity (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} cut crates). Entry blocked.`
-      });
+    // Strict piece-count validation: Output cannot exceed input by more than 100 pieces
+    if (cumulativeOutputPieces > totalInputPieces + 100) {
+      alert(`❌ Submission Blocked (जमा करने से रोका गया):\nYour reported OK output pieces (${cumulativeOutputPieces.toLocaleString()}) exceed the total input pieces (${totalInputPieces.toLocaleString()}) from the issued cutting crates by more than 100 pieces! Please check your crate or loose piece entries.`);
       return;
     }
 
-    // Strict piece-count mass-balance audit check 2: Output Pieces + Scrap Pieces > Input Pieces
-    if (cumulativeOutputPieces + scrapPcsVal > totalInputPieces) {
-      setAuditMismatchError({
-        outputPcs: cumulativeOutputPieces,
-        outputCrates: cumulativeOutputCrates,
-        inputPcs: totalInputPieces,
-        inputCrates,
-        scrapPcs: scrapPcsVal,
-        details: `Audit Mismatch: Total output (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates + ${scrapPcsVal} scrap pcs) exceeds issued input quantity (${(totalInputPieces ?? 0).toLocaleString()} pcs across ${inputCrates} cut crates). Entry blocked.`
-      });
-      return;
-    }
-
-    // Audit Check 3: Unexplained Discrepancy without logged scrap
-    const unaccountedGap = totalInputPieces - (cumulativeOutputPieces + scrapPcsVal);
-    if (unaccountedGap > 100 && scrapPcsVal === 0 && (cratesDone > 0 || prevProducedCrates > 0)) {
-      setAuditMismatchError({
-        outputPcs: cumulativeOutputPieces,
-        outputCrates: cumulativeOutputCrates,
-        inputPcs: totalInputPieces,
-        inputCrates,
-        scrapPcs: scrapPcsVal,
-        details: `Audit Mismatch: Output quantity (${(cumulativeOutputPieces ?? 0).toLocaleString()} pcs across ${cumulativeOutputCrates} crates) has ${(unaccountedGap ?? 0).toLocaleString()} unaccounted pieces missing from issued ${inputCrates} crates without logged scrap/rejection. Entry blocked.`
-      });
-      return;
-    }
+    // Zero-tolerance auto-calculation: Any remaining difference is counted as rejection scrap
+    const autoRejectionPieces = Math.max(0, totalInputPieces - cumulativeOutputPieces);
+    const finalScrapPcs = Math.max(scrapPcsVal, autoRejectionPieces);
 
     const totalFormedPcs = Math.round(cratesDone * effectiveFormPcs) + looseDone;
     const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -629,21 +792,26 @@ export const FormingView: React.FC<FormingViewProps> = ({
         availableFormingCrates: (j.availableFormingCrates || 0) + cratesDone,
         totalFormedPieces: (j.totalFormedPieces || 0) + totalFormedPcs,
         formingLoosePcs: (j.formingLoosePcs || 0) + looseDone,
+        formingScrapPcs: (j.formingScrapPcs || 0) + finalScrapPcs,
+        formingRejectedPcs: (j.formingRejectedPcs || 0) + finalScrapPcs,
         runningBatches: (j.runningBatches || []).map((b) => {
           if (b.batchId !== batch.batchId) return b;
           const finalSlices = [...(b.slices || [])];
-          if (finalSlices.length > 0) {
-            finalSlices.push({
-              sliceId: `SLC-${Date.now()}-${finalSlices.length + 1}`,
-              operator: b.worker,
-              shift: b.shift,
-              producedQty: cratesDone,
-              producedPieces: totalFormedPcs,
-              scrapQty: scrapPcsVal,
-              handoverTime: stopTime,
-              notes: 'Final Run Completion'
-            });
-          }
+          finalSlices.push({
+            sliceId: `SLC-FORM-${Date.now()}-${finalSlices.length + 1}`,
+            operator: b.worker,
+            shift: b.shift || 'DAY',
+            date: new Date().toISOString().split('T')[0],
+            machine: selectedMachine,
+            stage: 'Forming',
+            startTime: finalSlices.length > 0 ? finalSlices[finalSlices.length - 1].handoverTime : b.startTime,
+            handoverTime: stopTime,
+            producedQty: cratesDone,
+            producedPieces: totalFormedPcs,
+            scrapQty: finalScrapPcs,
+            scrapPcs: finalScrapPcs,
+            notes: finalSlices.length > 0 ? 'Incoming Shift Final Completion' : 'Single Shift Run Completion'
+          });
           return {
             ...b,
             status: 'Completed',
@@ -652,7 +820,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
             pcsPerCrate: effectiveFormPcs,
             producedPieces: (b.producedPieces || 0) + totalFormedPcs,
             loosePieces: looseDone,
-            scrapPcs: scrapPcsVal,
+            scrapPcs: finalScrapPcs,
             slices: finalSlices
           };
         })
@@ -665,7 +833,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
       stage: 'Forming',
       machine: selectedMachine,
       shift: batch.shift,
-      action: `⏹️ Finished Forming Batch ${batch.batchId} (${cratesDone} Crates = ${(totalFormedPcs ?? 0).toLocaleString()} 3D Pieces, Defect Pieces: ${scrapPcsVal})`,
+      action: `⏹️ Finished Forming Batch ${batch.batchId} (${cratesDone} Crates = ${(totalFormedPcs ?? 0).toLocaleString()} 3D Pieces, Auto Rejection/Defect: ${finalScrapPcs.toLocaleString()} Pieces)`,
       worker: batch.worker,
       user: 'form_user',
       startTime: batch.startTime,
@@ -692,13 +860,26 @@ export const FormingView: React.FC<FormingViewProps> = ({
     if (!activeBatchObj) return;
     const { job, batch } = activeBatchObj;
     const cratesToReturn = batch.issuedQty || 0;
-
+    let remCancelReturn = cratesToReturn;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
+      const updatedBatches = (j.runningBatches || [])
+        .map((b) => {
+          if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remCancelReturn > 0) {
+            const consumedP = b.consumedQty || 0;
+            const restore = Math.min(consumedP, remCancelReturn);
+            if (restore > 0) {
+              remCancelReturn -= restore;
+              return { ...b, consumedQty: consumedP - restore };
+            }
+          }
+          return b;
+        })
+        .filter((b) => b.batchId !== batch.batchId);
       return {
         ...j,
         availableCuttingCrates: (j.availableCuttingCrates || 0) + cratesToReturn,
-        runningBatches: (j.runningBatches || []).filter((b) => b.batchId !== batch.batchId)
+        runningBatches: updatedBatches
       };
     });
 
@@ -999,6 +1180,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   </span>
                 </div>
               )}
+
             </div>
 
             {/* Crate Capacity & 3D Expansion Banner */}
@@ -1013,7 +1195,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   <input
                     type="number"
                     value={pcsPerCrateOverride !== '' ? pcsPerCrateOverride : standardFormPcs}
-                    onChange={(e) => setPcsPerCrateOverride(e.target.value)}
+                    onChange={(e) => handlePcsPerCrateChange(e.target.value)}
                     className="w-24 px-2 py-1 bg-white border border-amber-300 rounded text-xs font-black text-slate-800 outline-none text-right"
                     title="Job-level override: Change pieces per crate for this forming job"
                   />
@@ -1023,20 +1205,27 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-amber-900 bg-amber-100/60 p-2 rounded-lg border border-amber-200/80">
+              <div className="flex items-center justify-between text-[11px] text-amber-900 bg-amber-100/60 p-2 rounded-lg border border-amber-200/80 flex-wrap gap-2">
                 <span>
-                  📐 <b>3D Volume Expansion:</b> 1 Cut Crate ({(standardCutPcs ?? 0).toLocaleString()} flat) expands to ≈ <b>{expansionRatio} Formed Crates</b> ({(effectiveFormPcs ?? 0).toLocaleString()} 3D pcs/crate).
+                  📐 <b>3D Volume Expansion:</b> 1 Cut Crate ({(standardCutPcs ?? 0).toLocaleString()} net flat) expands to ≈ <b>{expansionRatio} Formed Crates</b> ({(effectiveFormPcs ?? 0).toLocaleString()} 3D pcs/crate).
                 </span>
-                <span className="font-bold text-slate-600">
-                  Input Issued: <b>{activeBatchObj.batch.issuedQty || 0} Cut Crates</b> (≈ {(((activeBatchObj.batch.issuedQty || 0) * standardCutPcs) || 0).toLocaleString()} Flat Blanks)
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {activeJobMetrics.hasRejectionDeduction && (
+                    <span className="text-[10px] font-black bg-rose-100 text-rose-800 px-2 py-0.5 rounded border border-rose-300">
+                      ✂️ -{(activeJobMetrics.cuttingRejectedPcs ?? 0).toLocaleString()} Cutting Minor Rejection Deducted
+                    </span>
+                  )}
+                  <span className="font-bold text-slate-700">
+                    Input Issued: <b>{activeBatchObj.batch.issuedQty || 0} Cut Crates</b> (≈ {(activeBatchObj.batch.inputPieces || ((activeBatchObj.batch.issuedQty || 0) * standardCutPcs) || 0).toLocaleString()} Net Flat Blanks @ {(standardCutPcs ?? 0).toLocaleString()} pcs/crate)
+                  </span>
+                </div>
               </div>
 
               {/* Live pieces calculation preview & Dynamic Packing Audit Check */}
               {activeBatchObj && (
                 (() => {
                   const inputCrates = activeBatchObj.batch.issuedQty || 0;
-                  const totalInputPieces = inputCrates * standardCutPcs;
+                  const totalInputPieces = activeBatchObj.batch.inputPieces || (inputCrates * standardCutPcs);
                   const enterCrates = parseFloat(outputCrates) || 0;
                   const enterLoose = parseInt(loosePiecesInput, 10) || 0;
                   const enterScrap = parseInt(scrapPcs, 10) || 0;
@@ -1054,7 +1243,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
                           {enterLoose > 0 && <span> + {enterLoose} Loose</span>}
                         </div>
                         <div className="text-amber-950 font-black bg-amber-100 px-2.5 py-1 rounded-md text-xs border border-amber-300">
-                          Claimed: {(cumulativeOutPcs ?? 0).toLocaleString()} / Issued: {(totalInputPieces ?? 0).toLocaleString()} Pcs
+                          Claimed: {(cumulativeOutPcs ?? 0).toLocaleString()} / Issued: {(totalInputPieces ?? 0).toLocaleString()} Net Blanks
                         </div>
                       </div>
 
@@ -1080,14 +1269,28 @@ export const FormingView: React.FC<FormingViewProps> = ({
                           </span>
                         </div>
                       ) : (enterCrates > 0 || prevPcs > 0) ? (
-                        <div className="bg-emerald-50 border border-emerald-300 text-emerald-950 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span>✅ AUDIT VERIFIED: Output quantity is strictly within issued {inputCrates} Cut Crates envelope.</span>
-                          </span>
-                          <span className="text-[11px] text-emerald-800 font-mono">
-                            Yield: {((cumulativeOutPcs / (totalInputPieces || 1)) * 100).toFixed(1)}%
-                          </span>
+                        <div className="space-y-2">
+                          <div className="bg-emerald-50 border border-emerald-300 text-emerald-950 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>✅ AUDIT VERIFIED: Output quantity is strictly within issued {inputCrates} Cut Crates envelope.</span>
+                            </span>
+                            <span className="text-[11px] text-emerald-800 font-mono">
+                              Yield: {((cumulativeOutPcs / (totalInputPieces || 1)) * 100).toFixed(1)}%
+                            </span>
+                          </div>
+
+                          {totalInputPieces > cumulativeOutPcs && (
+                            <div className="bg-amber-50 border border-amber-300 text-amber-950 px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between animate-fade-in">
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-amber-600 text-sm">📉</span>
+                                <span>ZERO-TOLERANCE REJECTION: <b>{(totalInputPieces - cumulativeOutPcs).toLocaleString()} Pcs</b> will be automatically logged as scrap.</span>
+                              </span>
+                              <span className="text-[9px] font-black uppercase text-amber-700 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                                Auto-Calculated
+                              </span>
+                            </div>
+                          )}
                         </div>
                       ) : null}
                     </div>
@@ -1111,6 +1314,23 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 <p className="text-blue-900 text-[11px] m-0 leading-relaxed">
                   👉 <b>Enter ONLY the new crates produced in YOUR current shift below.</b> Do not add the previous {activeBatchObj.batch.producedQty} crates. The system automatically calculates total batch output: <b>{activeBatchObj.batch.producedQty} + {parseFloat(outputCrates) || 0} = {((activeBatchObj.batch.producedQty || 0) + (parseFloat(outputCrates) || 0))} Crates</b>.
                 </p>
+              </div>
+            )}
+
+            {/* Target Crate Guidance based on Cutting Input Pieces */}
+            {activeBatchObj?.batch && (
+              <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-2 text-emerald-950">
+                  <span className="text-base">🎯</span>
+                  <div>
+                    <b>Target Crate Guidance:</b> Cutting Input = <span className="font-mono font-bold">{(activeBatchObj.batch.inputPieces || (activeBatchObj.batch.issuedQty * standardCutPcs)).toLocaleString()} Pcs</span> @ <span className="font-mono font-bold">{effectiveFormPcs.toLocaleString()} Pcs/Crate</span>.
+                    <br />
+                    Ideal Expected Total Output: <b className="text-emerald-700 font-mono text-sm">{((activeBatchObj.batch.inputPieces || (activeBatchObj.batch.issuedQty * standardCutPcs)) / effectiveFormPcs).toFixed(2)} Crates</b>.
+                  </div>
+                </div>
+                <div className="bg-white px-3 py-1.5 rounded-lg border border-emerald-300 font-mono text-emerald-900 font-bold text-xs shadow-2xs">
+                  Produced So Far: {(activeBatchObj.batch.producedQty || 0).toLocaleString()} Crates
+                </div>
               </div>
             )}
 
@@ -1346,19 +1566,158 @@ export const FormingView: React.FC<FormingViewProps> = ({
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
             >
               <option value="">-- SELECT CUT CRATES QUEUE --</option>
-              {pendingCutJobs.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.id} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {j.availableCuttingCrates} Crates)
-                </option>
-              ))}
+              {pendingCutJobs.map((j) => {
+                const jm = getJobCuttingMetrics(j);
+                return (
+                  <option key={j.id} value={j.id}>
+                    {j.id} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {j.availableCuttingCrates} Crates = {jm.totalNetPieces.toLocaleString()} Net Blanks @ {jm.netPcsPerCrate.toLocaleString()} pcs/crate{jm.hasRejectionDeduction ? ` [-${jm.cuttingRejectedPcs} cutting defect pcs]` : ''})
+                  </option>
+                );
+              })}
             </select>
           </div>
 
-          {selectedPendingJob && (
-            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-900">
-              Available Stock: {selectedPendingJob.availableCuttingCrates} Crates [Brand: {selectedPendingJob.paperBrand || 'ITC'}]
-            </div>
-          )}
+          {selectedPendingJob && (() => {
+            const jm = getJobCuttingMetrics(selectedPendingJob);
+            const inputCratesNum = parseInt(issueCratesQty, 10) || 0;
+            const issuingPcs = inputCratesNum * jm.netPcsPerCrate;
+            return (
+              <div className="space-y-2">
+                <div className="p-3.5 bg-indigo-50/90 border border-indigo-200 rounded-xl space-y-2 text-xs text-indigo-950 shadow-2xs">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm text-indigo-900">
+                        📦 Available Stock: {selectedPendingJob.availableCuttingCrates} Cut Crates
+                      </span>
+                      <span className="bg-indigo-200/80 text-indigo-900 font-black px-2 py-0.5 rounded text-[11px]">
+                        {jm.totalNetPieces.toLocaleString()} Net Flat Blanks
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-600">
+                      Packing: <b>{jm.netPcsPerCrate.toLocaleString()} Net Pcs / Crate</b> (Brand: {selectedPendingJob.paperBrand || 'ITC'})
+                    </span>
+                  </div>
+                  {jm.hasRejectionDeduction && (
+                    <div className="bg-white/90 border border-amber-300 px-3 py-1.5 rounded-lg text-amber-900 text-[11px] font-bold flex items-center justify-between flex-wrap gap-1">
+                      <span>
+                        ✂️ <b>Cutting Minor Rejection Deducted:</b> {jm.cuttingRejectedPcs.toLocaleString()} defect pieces were subtracted across {jm.totalCutCrates || selectedPendingJob.availableCuttingCrates} cut crates.
+                      </span>
+                      <span className="font-mono text-[10px] bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                        Net: {jm.netPcsPerCrate.toLocaleString()} pcs/crate (vs {jm.rawStdCutPcs.toLocaleString()} gross std)
+                      </span>
+                    </div>
+                  )}
+                  {inputCratesNum > 0 && (
+                    <div className="pt-1 border-t border-indigo-200/80 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-600 font-semibold">
+                        Currently Issuing: <b>{inputCratesNum} Cut Crates</b>
+                      </span>
+                      <span className="font-extrabold text-indigo-900">
+                        = <b>{issuingPcs.toLocaleString()} Net Flat Blanks</b> entering Forming
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5">
+                  <span className="font-extrabold text-slate-700 uppercase tracking-wide block text-[11px]">
+                    🔍 Cutting Operator Lots Source Breakdown (Traceability):
+                  </span>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {(() => {
+                      const cuttingBatches = (selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
+                      
+                      const selectableLots: {
+                        id: string;
+                        batchId: string;
+                        sliceId?: string;
+                        worker: string;
+                        shift: string;
+                        machine: string;
+                        totalQty: number;
+                        consumedQty: number;
+                        remainingQty: number;
+                        date?: string;
+                      }[] = [];
+
+                      cuttingBatches.forEach(cb => {
+                        const totalP = cb.producedQty || 0;
+                        const consumedP = cb.consumedQty || 0;
+                        
+                        if (cb.slices && cb.slices.length > 0) {
+                          cb.slices.forEach(slice => {
+                            const sliceTotal = slice.producedQty || 0;
+                            const sliceConsumed = slice.consumedQty || 0;
+                            const sliceRemaining = Math.max(0, sliceTotal - sliceConsumed);
+                            selectableLots.push({
+                              id: slice.sliceId,
+                              batchId: cb.batchId,
+                              sliceId: slice.sliceId,
+                              worker: slice.operator,
+                              shift: slice.shift,
+                              machine: cb.machine || slice.machine || 'Cutting',
+                              totalQty: sliceTotal,
+                              consumedQty: sliceConsumed,
+                              remainingQty: sliceRemaining,
+                              date: slice.date
+                            });
+                          });
+                        } else {
+                          selectableLots.push({
+                            id: cb.batchId,
+                            batchId: cb.batchId,
+                            worker: cb.worker,
+                            shift: cb.shift,
+                            machine: cb.machine || 'Cutting',
+                            totalQty: totalP,
+                            consumedQty: consumedP,
+                            remainingQty: Math.max(0, totalP - consumedP)
+                          });
+                        }
+                      });
+
+                      if (selectableLots.length === 0) {
+                        return <div className="text-slate-400 italic text-[11px]">No specific cutting lot metadata found (Legacy or Direct entry).</div>;
+                      }
+
+                      return selectableLots.map(lot => {
+                        const isSelected = selectedCuttingBatchId === lot.id || 
+                          (!selectedCuttingBatchId && lot.remainingQty > 0);
+                        
+                        return (
+                          <div 
+                            key={lot.id} 
+                            onClick={() => setSelectedCuttingBatchId(lot.id)}
+                            className={`p-2.5 rounded-lg border cursor-pointer transition flex items-center justify-between text-[11px] ${
+                              isSelected 
+                                ? 'bg-indigo-100 border-indigo-500 text-indigo-950 font-bold shadow-xs' 
+                                : lot.remainingQty === 0
+                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono bg-indigo-50 text-indigo-900 border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold">
+                                {lot.sliceId ? 'Slice' : 'Batch'}: {lot.id.substring(0, 12)}
+                              </span>
+                              <span className="font-extrabold text-slate-900">👨‍🏭 {lot.worker}</span>
+                              <span className="text-slate-500 font-normal">({lot.machine} | ☀️ {lot.shift})</span>
+                            </div>
+                            <div className="font-mono text-right shrink-0">
+                              <div className={`font-black ${lot.remainingQty > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                {lot.remainingQty} Crates Remaining
+                              </div>
+                              <div className="text-slate-400 text-[9px] font-medium">({lot.totalQty} Produced, {lot.consumedQty} Consumed)</div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -1405,175 +1764,475 @@ export const FormingView: React.FC<FormingViewProps> = ({
       {/* ======================================================== */}
       {/* FORMING REELS & TRACEABILITY REGISTER (BOTTOM TEMPLATE MATCHING SLITTING) */}
       {/* ======================================================== */}
-      <div className="mt-8 pt-6 border-t-2 border-slate-200 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2 m-0">
-              <Layers className="w-5 h-5 text-teal-600" />
-              <span>Forming Reels & Traceability Register</span>
-            </h3>
-            <p className="text-xs text-slate-500 m-0">
-              Reel number, GSM, and forward traceability status for each forming job ID
-            </p>
-          </div>
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={tableSearch}
-              onChange={(e) => setTableSearch(e.target.value)}
-              placeholder="Search Reel No, Job ID, GSM, Mill..."
-              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 shadow-xs"
-            />
-          </div>
-        </div>
+      {/* ======================================================== */}
+      {/* FORMING REELS & TRACEABILITY REGISTER (BOTTOM TEMPLATE MATCHING SLITTING) */}
+      {/* ======================================================== */}
+      {(() => {
+        // Local state toggle handler
+        const handleSort = (column: string) => {
+          if (sortColumn === column) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+          } else {
+            setSortColumn(column);
+            setSortOrder('asc');
+          }
+        };
 
-        <div className="overflow-x-auto bg-white border border-slate-200 rounded-2xl shadow-xs">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-left">
-                <th className="p-3">Job ID</th>
-                <th className="p-3 text-indigo-900">Date</th>
-                <th className="p-3 text-blue-900">Reel No.</th>
-                <th className="p-3 text-amber-900">GSM</th>
-                <th className="p-3">Paper Mill</th>
-                <th className="p-3">Product</th>
-                <th className="p-3">Remarks / Lot</th>
-                <th className="p-3 text-right">Formed Stock</th>
-                <th className="p-3 text-right">In / Out / Scrap</th>
-                <th className="p-3 text-center">Stage Status</th>
-                <th className="p-3 text-center">Traceability</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {jobs
-                .filter((j) => {
-                  if (!tableSearch.trim()) return true;
-                  const q = tableSearch.toLowerCase();
-                  const allReels = getJobAllReels(j);
-                  const allGsms = getJobAllGsms(j);
-                  const formBatches = (j.runningBatches || []).filter((b) => b.stage === 'Forming' || b.machine.startsWith('Forming'));
-                  return (
-                    j.id.toLowerCase().includes(q) ||
-                    allReels.some((r) => r.toLowerCase().includes(q)) ||
-                    allGsms.some((g) => g.toLowerCase().includes(q)) ||
-                    (j.paperBrand && j.paperBrand.toLowerCase().includes(q)) ||
-                    j.product.toLowerCase().includes(q) ||
-                    (j.customRemark && j.customRemark.toLowerCase().includes(q)) ||
-                    formBatches.some((b) => (b.worker || '').toLowerCase().includes(q) || b.machine.toLowerCase().includes(q) || b.batchId.toLowerCase().includes(q))
-                  );
-                })
-                .map((j) => {
-                  const allReels = getJobAllReels(j);
-                  const allGsms = getJobAllGsms(j);
-                  const formBatches = (j.runningBatches || []).filter((b) => b.stage === 'Forming' || b.machine.startsWith('Forming'));
-                  const formPcsStd = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
-                  const totalFormedPcs = j.totalFormedPieces || ((j.availableFormingCrates || 0) * formPcsStd);
-                  const totalDefects = formBatches.reduce((sum, b) => sum + (b.scrapPcs || 0), 0);
-                  const totalInCrates = formBatches.reduce((sum, b) => sum + (b.issuedQty || 0), 0);
+        const escapeCSV = (val: any) => {
+          if (val === null || val === undefined) return '';
+          const str = String(val);
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
 
-                  const latestLog = (state.logs || []).filter((l) => l.jobId === j.id).slice(-1)[0];
-                  const entryDate = latestLog?.rawDate || (j.createdAt ? j.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
-                  const entryTime = latestLog?.startTime || (latestLog?.timestamp ? latestLog.timestamp.split(',')[1]?.trim() : '');
+        // Memoized processed jobs
+        const processedJobs = jobs.map((j) => {
+          const allReels = getJobAllReels(j);
+          const allGsms = getJobAllGsms(j);
+          const formBatches = (j.runningBatches || []).filter((b) => b.stage === 'Forming' || b.machine.startsWith('Forming'));
+          const formStageLedger = getJobStageShiftLedger(j, 'Forming', state);
+          const formPcsStd = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
+          const totalFormedPcs = j.totalFormedPieces || ((j.availableFormingCrates || 0) * formPcsStd);
+          const totalDefects = formBatches.reduce((sum, b) => sum + (b.scrapPcs || 0), 0);
+          const totalInCrates = formBatches.reduce((sum, b) => sum + (b.issuedQty || 0), 0);
 
-                  return (
-                    <tr key={j.id} className="hover:bg-slate-50 transition">
-                      <td className="p-2.5 font-mono font-bold text-blue-800">{j.id}</td>
-                      <td className="p-2.5 whitespace-nowrap">
-                        <div className="flex items-center gap-1 font-bold text-slate-800 text-xs">
-                          <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                          <span>{entryDate}</span>
-                        </div>
-                        {entryTime && <div className="text-[10px] text-slate-400 font-mono ml-4">{entryTime}</div>}
+          const latestLog = (state.logs || []).filter((l) => l.jobId === j.id).slice(-1)[0];
+          const entryDate = latestLog?.rawDate || (j.createdAt ? j.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+          const entryTime = latestLog?.startTime || (latestLog?.timestamp ? latestLog.timestamp.split(',')[1]?.trim() : '');
+          const paperBrand = j.paperBrand || 'ITC';
+          const remark = j.customRemark || 'Standard';
+          const stock = j.availableFormingCrates || 0;
+
+          // Status representation
+          let statusText = j.stage || '';
+          if (stock > 0) {
+            statusText = `Pending QC (${stock} Crates)`;
+          }
+
+          return {
+            job: j,
+            id: j.id,
+            date: entryDate,
+            time: entryTime,
+            reels: allReels,
+            reelsStr: allReels.join(', '),
+            gsms: allGsms,
+            gsmsStr: allGsms.join(', '),
+            mill: paperBrand,
+            product: j.product,
+            remark: remark,
+            stock: stock,
+            totalFormedPcs,
+            totalDefects,
+            totalInCrates,
+            statusText,
+            formStageLedger,
+            formBatches,
+          };
+        });
+
+        // 1. Global Filter
+        let filtered = processedJobs;
+        if (tableSearch.trim()) {
+          const q = tableSearch.toLowerCase();
+          filtered = filtered.filter((item) => {
+            return (
+              item.id.toLowerCase().includes(q) ||
+              item.reelsStr.toLowerCase().includes(q) ||
+              item.gsmsStr.toLowerCase().includes(q) ||
+              item.mill.toLowerCase().includes(q) ||
+              item.product.toLowerCase().includes(q) ||
+              item.remark.toLowerCase().includes(q) ||
+              item.statusText.toLowerCase().includes(q) ||
+              item.formBatches.some((b) => (b.worker || '').toLowerCase().includes(q) || b.machine.toLowerCase().includes(q) || b.batchId.toLowerCase().includes(q))
+            );
+          });
+        }
+
+        // 2. Column-Specific Filter
+        if (showFilters) {
+          filtered = filtered.filter((item) => {
+            const f = colFilters;
+            const matchId = !f.id || item.id.toLowerCase().includes(f.id.toLowerCase());
+            const matchDate = !f.date || item.date.toLowerCase().includes(f.date.toLowerCase());
+            const matchReel = !f.reel || item.reelsStr.toLowerCase().includes(f.reel.toLowerCase());
+            const matchGsm = !f.gsm || item.gsmsStr.toLowerCase().includes(f.gsm.toLowerCase());
+            const matchMill = !f.mill || item.mill.toLowerCase().includes(f.mill.toLowerCase());
+            const matchProduct = !f.product || item.product.toLowerCase().includes(f.product.toLowerCase());
+            const matchRemark = !f.remark || item.remark.toLowerCase().includes(f.remark.toLowerCase());
+            const matchStock = !f.stock || String(item.stock).toLowerCase().includes(f.stock.toLowerCase());
+            const matchStatus = !f.status || item.statusText.toLowerCase().includes(f.status.toLowerCase());
+
+            return matchId && matchDate && matchReel && matchGsm && matchMill && matchProduct && matchRemark && matchStock && matchStatus;
+          });
+        }
+
+        // 3. Sort
+        if (sortColumn) {
+          filtered.sort((a, b) => {
+            let valA: any = a[sortColumn as keyof typeof a];
+            let valB: any = b[sortColumn as keyof typeof b];
+
+            if (sortColumn === 'reels') {
+              valA = a.reelsStr.toLowerCase();
+              valB = b.reelsStr.toLowerCase();
+            } else if (sortColumn === 'gsm') {
+              valA = a.gsmsStr.toLowerCase();
+              valB = b.gsmsStr.toLowerCase();
+            } else if (sortColumn === 'status') {
+              valA = a.statusText.toLowerCase();
+              valB = b.statusText.toLowerCase();
+            } else if (typeof valA === 'string') {
+              valA = valA.toLowerCase();
+              valB = (valB || '').toLowerCase();
+            }
+
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        const exportToCSV = () => {
+          const headers = ['Job ID', 'Date', 'Time', 'Reel No.', 'GSM', 'Paper Mill', 'Product', 'Remarks / Lot', 'Stock (Crates)', 'Pieces', 'In (Crates)', 'Out (Crates)', 'Scrap (Pcs)', 'Stage Status'];
+          const rows = filtered.map(item => [
+            escapeCSV(item.id),
+            escapeCSV(item.date),
+            escapeCSV(item.time),
+            escapeCSV(item.reelsStr),
+            escapeCSV(item.gsmsStr),
+            escapeCSV(item.mill),
+            escapeCSV(item.product),
+            escapeCSV(item.remark),
+            escapeCSV(item.stock),
+            escapeCSV(item.totalFormedPcs),
+            escapeCSV(item.totalInCrates),
+            escapeCSV(item.stock),
+            escapeCSV(item.totalDefects),
+            escapeCSV(item.statusText)
+          ]);
+
+          const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', `Forming_Traceability_Register_${new Date().toISOString().split('T')[0]}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        };
+
+        return (
+          <div className="mt-8 pt-6 border-t-2 border-slate-200 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2 m-0">
+                  <Layers className="w-5 h-5 text-teal-600" />
+                  <span>Forming Reels & Traceability Register</span>
+                </h3>
+                <p className="text-xs text-slate-500 m-0">
+                  Reel number, GSM, and forward traceability status for each forming job ID
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1 border transition cursor-pointer ${showFilters ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>{showFilters ? 'Hide Filters' : 'Column Filters'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={exportToCSV}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 border border-emerald-500 transition cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Export Excel</span>
+                </button>
+                <div className="relative w-full sm:w-48">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={tableSearch}
+                    onChange={(e) => setTableSearch(e.target.value)}
+                    placeholder="Quick search..."
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto bg-white border border-slate-200 rounded-2xl shadow-xs">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-left">
+                    <th className="p-3 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('id')}>
+                      <div className="flex items-center gap-1">
+                        <span>Job ID</span>
+                        {sortColumn === 'id' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-indigo-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('date')}>
+                      <div className="flex items-center gap-1">
+                        <span>Date</span>
+                        {sortColumn === 'date' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-blue-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('reels')}>
+                      <div className="flex items-center gap-1">
+                        <span>Reel No.</span>
+                        {sortColumn === 'reels' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-amber-900 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('gsm')}>
+                      <div className="flex items-center gap-1">
+                        <span>GSM</span>
+                        {sortColumn === 'gsm' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('mill')}>
+                      <div className="flex items-center gap-1">
+                        <span>Paper Mill</span>
+                        {sortColumn === 'mill' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('product')}>
+                      <div className="flex items-center gap-1">
+                        <span>Product</span>
+                        {sortColumn === 'product' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('remark')}>
+                      <div className="flex items-center gap-1">
+                        <span>Remarks / Lot</span>
+                        {sortColumn === 'remark' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-right cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('stock')}>
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Formed Stock</span>
+                        {sortColumn === 'stock' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-right">In / Out / Scrap</th>
+                    <th className="p-3 text-center cursor-pointer select-none hover:bg-slate-200 transition" onClick={() => handleSort('status')}>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Stage Status</span>
+                        {sortColumn === 'status' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                      </div>
+                    </th>
+                    <th className="p-3 text-center">Traceability</th>
+                  </tr>
+
+                  {showFilters && (
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.id}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, id: e.target.value }))}
+                          placeholder="Filter ID..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5">
-                        <div className="flex flex-wrap gap-1 items-center max-w-[220px]">
-                          {allReels.map((r, idx) => (
-                            <span
-                              key={idx}
-                              className="font-mono font-bold text-[11px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200"
-                              title={`Parent Jumbo Reel #${idx + 1}`}
-                            >
-                              {r}
-                            </span>
-                          ))}
-                          {formBatches.length > 0 && (
-                            <span className="font-mono text-[10px] bg-purple-50 text-purple-800 px-1 py-0.5 rounded border border-purple-200">
-                              Lot: {formBatches[0].batchId}
-                            </span>
-                          )}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.date}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, date: e.target.value }))}
+                          placeholder="Filter Date..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5">
-                        <div className="flex flex-wrap gap-1 items-center max-w-[190px]">
-                          {allGsms.map((g, gIdx) => (
-                            <span
-                              key={gIdx}
-                              className="font-bold text-[11px] bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded border border-amber-200"
-                              title={`GSM #${gIdx + 1}`}
-                            >
-                              {g}
-                            </span>
-                          ))}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.reel}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, reel: e.target.value }))}
+                          placeholder="Filter Reel..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 font-medium text-slate-800">{j.paperBrand || 'ITC'}</td>
-                      <td className="p-2.5 font-bold text-slate-700">{j.product}</td>
-                      <td className="p-2.5 text-slate-500 max-w-[150px] truncate" title={j.customRemark}>
-                        {j.customRemark || 'Standard'}
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.gsm}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, gsm: e.target.value }))}
+                          placeholder="Filter GSM..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-right font-extrabold text-emerald-700">
-                        {j.availableFormingCrates || 0} Crates
-                        <div className="text-[10px] text-emerald-600 font-semibold">
-                          ({totalFormedPcs.toLocaleString()} 3D Pcs)
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.mill}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, mill: e.target.value }))}
+                          placeholder="Filter Mill..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-right font-mono text-xs">
-                        <div className="flex flex-col items-end">
-                          <span className="text-slate-700 font-bold">
-                            In: {totalInCrates > 0 ? `${totalInCrates} Crates` : `${j.availableCuttingCrates || 0} Crates`}
-                          </span>
-                          <span className="text-blue-700 font-medium">
-                            Out: {j.availableFormingCrates || 0} Crates
-                          </span>
-                          {totalDefects > 0 && (
-                            <span className="text-rose-700 font-bold text-[11px]">
-                              Scrap: {totalDefects} Pcs
-                            </span>
-                          )}
-                        </div>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.product}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, product: e.target.value }))}
+                          placeholder="Filter Product..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-center">
-                        {(j.availableFormingCrates || 0) > 0 ? (
-                          <span className="text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                            Pending QC ({j.availableFormingCrates} Crates)
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                            {j.stage}
-                          </span>
-                        )}
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.remark}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, remark: e.target.value }))}
+                          placeholder="Filter Remark..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none"
+                        />
                       </td>
-                      <td className="p-2.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGenealogyModalJob(j);
-                          }}
-                          className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-[11px] transition shadow-xs inline-flex items-center gap-1 cursor-pointer"
-                          title="View genealogy traceability for this reel and batch lot"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>Trace Lot</span>
-                        </button>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.stock}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, stock: e.target.value }))}
+                          placeholder="Filter Stock..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none text-right"
+                        />
                       </td>
+                      <td className="p-1"></td>
+                      <td className="p-1">
+                        <input
+                          type="text"
+                          value={colFilters.status}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, status: e.target.value }))}
+                          placeholder="Filter Status..."
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-[10px] font-bold text-slate-700 focus:border-blue-500 outline-none text-center"
+                        />
+                      </td>
+                      <td className="p-1"></td>
                     </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((item) => {
+                    const j = item.job;
+                    return (
+                      <tr key={j.id} className="hover:bg-slate-50 transition">
+                        <td className="p-2.5 font-mono font-bold text-blue-800">{j.id}</td>
+                        <td className="p-2.5 whitespace-nowrap">
+                          <div className="flex items-center gap-1 font-bold text-slate-800 text-xs">
+                            <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span>{item.date}</span>
+                          </div>
+                          {item.time && <div className="text-[10px] text-slate-400 font-mono ml-4">{item.time}</div>}
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap gap-1 items-center max-w-[220px]">
+                            {item.reels.map((r, idx) => (
+                              <span
+                                key={idx}
+                                className="font-mono font-bold text-[11px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200"
+                                title={`Parent Jumbo Reel #${idx + 1}`}
+                              >
+                                {r}
+                              </span>
+                            ))}
+                            {item.formBatches.length > 0 && (
+                              <span className="font-mono text-[10px] bg-purple-50 text-purple-800 px-1 py-0.5 rounded border border-purple-200">
+                                Lot: {item.formBatches[0].batchId}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap gap-1 items-center max-w-[190px]">
+                            {item.gsms.map((g, gIdx) => (
+                              <span
+                                key={gIdx}
+                                className="font-bold text-[11px] bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded border border-amber-200"
+                                title={`GSM #${gIdx + 1}`}
+                              >
+                                {g}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2.5 font-medium text-slate-800">{item.mill}</td>
+                        <td className="p-2.5 font-bold text-slate-700">{item.product}</td>
+                        <td className="p-2.5">
+                          <div className="text-slate-600 text-xs max-w-[150px] truncate" title={item.remark}>
+                            {item.remark}
+                          </div>
+                          {item.formStageLedger.totalShifts > 1 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              <span
+                                className="bg-blue-50 text-blue-900 border border-blue-200 px-1.5 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 cursor-help"
+                                title={item.formStageLedger.items.map(it => `${it.date} | ${it.shift} (${it.operator}): ${it.producedQty} Crates (${it.producedPieces?.toLocaleString() || 0} Pcs), ${it.scrapPcs || 0} Scrap Pcs`).join(' \n ')}
+                              >
+                                <RotateCcw className="w-2.5 h-2.5 text-blue-600" />
+                                <span>{item.formStageLedger.totalShifts} Shifts Handover</span>
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-right font-extrabold text-emerald-700">
+                          {item.stock} Crates
+                          <div className="text-[10px] text-emerald-600 font-semibold">
+                            ({item.totalFormedPcs.toLocaleString()} 3D Pcs)
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-xs">
+                          <div className="flex flex-col items-end">
+                            <span className="text-slate-700 font-bold">
+                              In: {item.totalInCrates > 0 ? `${item.totalInCrates} Crates` : `${j.availableCuttingCrates || 0} Crates`}
+                            </span>
+                            <span className="text-blue-700 font-medium">
+                              Out: {item.stock} Crates
+                            </span>
+                            {item.totalDefects > 0 && (
+                              <span className="text-rose-700 font-bold text-[11px]">
+                                Scrap: {item.totalDefects} Pcs
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-center">
+                          {item.stock > 0 ? (
+                            <span className="text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                              Pending QC ({item.stock} Crates)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                              {j.stage}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGenealogyModalJob(j);
+                            }}
+                            className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-[11px] transition shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                            title="Track Lot & Shift-wise Genealogy History (ऑपरेटर एवं शिफ्ट वार सम्पूर्ण विवरण)"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Track Lot</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ======================================================== */}
       {/* INLINE MODALS FOR FORWARD, UNISSUE & CANCEL */}
@@ -1813,19 +2472,6 @@ export const FormingView: React.FC<FormingViewProps> = ({
         onClose={() => setGenealogyModalJob(null)}
         job={genealogyModalJob}
         state={state}
-      />
-
-      {/* Station Crew Assignment Modal */}
-      <StationCrewModal
-        isOpen={isCrewModalOpen}
-        onClose={() => setIsCrewModalOpen(false)}
-        machine={selectedMachine}
-        stage="Forming"
-        shift={activeBatchObj?.batch.shift || 'DAY'}
-        currentOperator={activeBatchObj?.batch.worker || ''}
-        currentHelpers={activeBatchObj?.batch.helpers || []}
-        state={state}
-        onConfirmCrew={handleConfirmCrew}
       />
 
       {/* Station Crew Assignment Modal */}

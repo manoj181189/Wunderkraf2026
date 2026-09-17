@@ -278,7 +278,7 @@ export const GlueUsageModal: React.FC<GlueUsageModalProps> = ({
                 required
                 value={operatorInput}
                 onChange={(e) => setOperatorInput(e.target.value)}
-                placeholder="e.g. CUT_OP1"
+                placeholder="e.g. Operator"
                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none focus:border-blue-600 uppercase text-xs"
               />
             </div>

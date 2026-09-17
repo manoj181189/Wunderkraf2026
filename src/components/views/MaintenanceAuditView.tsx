@@ -38,7 +38,7 @@ interface MaintenanceAuditViewProps {
   initialSearchQuery?: string;
 }
 
-type AuditTab = 'traceability' | 'batch_report' | 'complaints' | 'logs';
+type AuditTab = 'traceability' | 'batch_report' | 'complaints' | 'logs' | 'handovers';
 
 export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
   state,
@@ -46,7 +46,9 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
   onSaveState,
   initialSearchQuery = ''
 }) => {
-  const { logs, jobs, packJobs, customerComplaints = [] } = state;
+  const { logs, packJobs, customerComplaints = [] } = state;
+  const deletedJobIdsSet = new Set(state.deletedJobIds || []);
+  const jobs = (state.jobs || []).filter((j) => !deletedJobIdsSet.has(j.id));
 
   const [activeTab, setActiveTab] = useState<AuditTab>('traceability');
 
@@ -260,16 +262,16 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
       { Stage: 'Customer Delivery', Parameter: 'Vehicle / GT No', Value: matchedOrder?.dispatchLogs?.[0]?.gtNo || 'N/A' },
       { Stage: 'Customer Delivery', Parameter: 'Boxes Dispatched', Value: matchedOrder?.dispatchedBoxes || 0 },
       { Stage: 'Packing Station', Parameter: 'Order ID', Value: matchedOrder?.id || 'N/A' },
-      { Stage: 'Packing Station', Parameter: 'Packer', Value: packLog?.worker || matchedOrder?.worker || 'PACK_SURESH' },
+      { Stage: 'Packing Station', Parameter: 'Packer', Value: packLog?.worker || matchedOrder?.worker || 'Operator' },
       { Stage: 'Packing Station', Parameter: 'Packed Boxes', Value: matchedOrder?.packedBoxes || 0 },
       { Stage: 'QC Inspection', Parameter: 'Inspector', Value: qcLog?.worker || 'QC_RAMESH' },
       { Stage: 'QC Inspection', Parameter: 'QC Action', Value: qcLog?.action || 'Approved' },
       { Stage: 'Forming', Parameter: 'Machine', Value: formLog?.machine || 'Forming-1' },
-      { Stage: 'Forming', Parameter: 'Operator', Value: formLog?.worker || 'FORM_OP1' },
+      { Stage: 'Forming', Parameter: 'Operator', Value: formLog?.worker || 'Operator' },
       { Stage: 'Cutting', Parameter: 'Machine', Value: cutLog?.machine || 'Cutting-1' },
-      { Stage: 'Cutting', Parameter: 'Operator', Value: cutLog?.worker || 'CUT_OP1' },
+      { Stage: 'Cutting', Parameter: 'Operator', Value: cutLog?.worker || 'Operator' },
       { Stage: 'Slitting', Parameter: 'Machine', Value: slitLog?.machine || 'Slitting-1' },
-      { Stage: 'Slitting', Parameter: 'Operator', Value: slitLog?.worker || 'RAMESH_SLIT' },
+      { Stage: 'Slitting', Parameter: 'Operator', Value: slitLog?.worker || 'Operator' },
       { Stage: 'Raw Material', Parameter: 'Paper Brand', Value: `${primaryJob?.paperBrand || 'ITC CyberXL'} ${primaryJob?.gsm || primaryJob?.targetGsm || ''}`.trim() },
       { Stage: 'Raw Material', Parameter: 'Lot / Remark', Value: primaryJob?.customRemark || 'Standard Reel' }
     ];
@@ -361,6 +363,18 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
         >
           <FileText className="w-4 h-4 text-slate-600" />
           <span>Immutable Shift Logs ({logs.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('handovers')}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'handovers'
+              ? 'border-blue-600 text-blue-700 bg-blue-50/50'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Clock className="w-4 h-4 text-amber-600" />
+          <span>Shift Custody Handovers ({(state.shiftHandovers || []).length})</span>
         </button>
       </div>
 
@@ -686,7 +700,7 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Packer Name</span>
                     <span className="font-bold text-slate-800">
-                      {packLog?.worker || matchedOrder?.worker || 'PACK_SURESH'}
+                      {packLog?.worker || matchedOrder?.worker || 'Operator'}
                     </span>
                   </div>
                   <div>
@@ -773,7 +787,7 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Forming Operator</span>
-                    <span className="font-bold text-slate-800">{formLog?.worker || 'FORM_OP1'}</span>
+                    <span className="font-bold text-slate-800">{formLog?.worker || 'Operator'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Mould Temperature</span>
@@ -822,7 +836,7 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Cutting Operator</span>
-                    <span className="font-bold text-slate-800">{cutLog?.worker || 'CUT_OP1'}</span>
+                    <span className="font-bold text-slate-800">{cutLog?.worker || 'Operator'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Cut Crates Produced</span>
@@ -871,7 +885,7 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Slitting Operator</span>
-                    <span className="font-bold text-slate-800">{slitLog?.worker || 'RAMESH_SLIT'}</span>
+                    <span className="font-bold text-slate-800">{slitLog?.worker || 'Operator'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Slit Output</span>
@@ -1263,6 +1277,97 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: SHIFT CUSTODY & HANDOVERS */}
+      {activeTab === 'handovers' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide m-0">
+                Shift Custody & Operator Handovers
+              </h4>
+              <p className="text-xs text-slate-500 m-0">
+                Official supervisor & operator custody handovers, checklist statuses, and production run outputs
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                const rows = (state.shiftHandovers || []).map((h) => ({
+                  ID: h.id,
+                  Date: h.date,
+                  Department: h.department,
+                  Machine: h.machine,
+                  OutgoingOperator: h.outgoingOperator,
+                  RelievingOperator: h.relievedByOperator,
+                  ProducedQty: h.producedQty,
+                  ScrapQty: h.scrapQty,
+                  ChecklistPassed: h.checklistPassed ? 'YES' : 'NO'
+                }));
+                exportToCSV(`shift_handovers_audit_${new Date().toISOString().split('T')[0]}.csv`, rows);
+              }}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" /> Export Handovers
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(state.shiftHandovers || []).length === 0 ? (
+              <div className="col-span-full text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
+                No shift handovers logged yet in the system.
+              </div>
+            ) : (
+              (state.shiftHandovers || []).map((ho) => (
+                <div key={ho.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3 hover:border-blue-300 hover:shadow-xs transition">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-black text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[11px]">
+                      {ho.id}
+                    </span>
+                    <div className="flex items-center gap-1 text-[11px] text-slate-400 font-bold">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>{ho.date}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">
+                      {ho.department} • {ho.machine}
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${
+                      ho.checklistPassed 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                    }`}>
+                      {ho.checklistPassed ? '✓ Checklist Passed' : '✗ Audit Flagged'}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-medium">
+                    <div className="text-slate-600">
+                      Outgoing: <b className="text-slate-950 font-bold">{ho.outgoingOperator}</b>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                    <div className="text-slate-600">
+                      Relieving: <b className="text-blue-700 font-bold">{ho.relievedByOperator}</b>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-xs text-slate-500 font-bold">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Produced</span>
+                      <span className="text-slate-800">{ho.producedQty} {ho.department === 'Slitting' ? 'Rolls' : 'Crates'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Scrap</span>
+                      <span className="text-rose-600">{ho.scrapQty} KG</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

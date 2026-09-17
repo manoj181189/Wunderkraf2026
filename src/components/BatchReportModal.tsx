@@ -443,10 +443,10 @@ export const BatchReportModal: React.FC<BatchReportModalProps> = ({
                       {slitCompleted ? (slitLog?.machine || 'Slitting-1') : '—'}
                     </td>
                     <td className="p-2.5 font-medium">
-                      {slitCompleted ? (slitLog?.worker || targetJob?.runningBatches?.[0]?.worker || 'RAMESH_SLIT') : '—'}
+                      {slitCompleted ? (slitLog?.worker || targetJob?.runningBatches?.[0]?.worker || 'Operator') : '—'}
                     </td>
                     <td className="p-2.5 text-slate-600">
-                      {slitCompleted ? (slitLog?.startTime ? `${slitLog.shift || 'DAY'} (${slitLog.startTime} - ${slitLog.endTime || 'Done'})` : 'Completed') : '—'}
+                      {slitCompleted ? `${slitLog?.rawDate || targetJob?.createdAt || '2026-09-14'} • ${slitLog?.shift || 'DAY'} (${slitLog?.startTime || '09:00'})` : '—'}
                     </td>
                     <td className="p-2.5 font-medium text-slate-800">
                       {slitCompleted ? (
@@ -481,10 +481,10 @@ export const BatchReportModal: React.FC<BatchReportModalProps> = ({
                       {cutCompleted ? (cutLog?.machine || 'Cutting-1') : cutRunning ? (runningCuttingBatch?.machine || 'Cutting-1') : '—'}
                     </td>
                     <td className="p-2.5 font-medium">
-                      {cutCompleted ? (cutLog?.worker || 'CUT_OP1') : cutRunning ? (runningCuttingBatch?.worker || 'Operator') : '—'}
+                      {cutCompleted ? (cutLog?.worker || 'Operator') : cutRunning ? (runningCuttingBatch?.worker || 'Operator') : '—'}
                     </td>
                     <td className="p-2.5 text-slate-600">
-                      {cutCompleted ? (cutLog?.startTime ? `${cutLog.shift || 'DAY'} (${cutLog.startTime} - ${cutLog.endTime || 'Done'})` : 'Completed') : cutRunning ? `Running since ${runningCuttingBatch?.startTime}` : '—'}
+                      {cutCompleted ? `${cutLog?.rawDate || targetJob?.createdAt || '2026-09-14'} • ${cutLog?.shift || 'DAY'} (${cutLog?.startTime || '11:00'})` : cutRunning ? `Running since ${runningCuttingBatch?.startTime}` : '—'}
                     </td>
                     <td className="p-2.5 font-medium text-slate-800">
                       {cutCompleted ? (
@@ -524,7 +524,7 @@ export const BatchReportModal: React.FC<BatchReportModalProps> = ({
                       {formCompleted ? (formLog?.machine || 'Forming-1') : formRunning ? (runningFormingBatch?.machine || 'Forming-1') : '—'}
                     </td>
                     <td className="p-2.5 font-medium">
-                      {formCompleted ? (formLog?.worker || 'FORM_OP1') : formRunning ? (runningFormingBatch?.worker || 'Operator') : '—'}
+                      {formCompleted ? (formLog?.worker || 'Operator') : formRunning ? (runningFormingBatch?.worker || 'Operator') : '—'}
                     </td>
                     <td className="p-2.5 text-slate-600">
                       {formCompleted ? (formLog?.startTime ? `${formLog.shift || 'DAY'} (${formLog.startTime} - ${formLog.endTime || 'Done'})` : 'Completed') : formRunning ? `Running since ${runningFormingBatch?.startTime}` : '—'}
@@ -604,7 +604,7 @@ export const BatchReportModal: React.FC<BatchReportModalProps> = ({
                       {packCompleted ? (packLog?.machine || selectedOrder?.machine || 'Packing-1') : '—'}
                     </td>
                     <td className="p-2.5 font-medium">
-                      {packCompleted ? (packLog?.worker || selectedOrder?.worker || 'PACK_SURESH') : '—'}
+                      {packCompleted ? (packLog?.worker || selectedOrder?.worker || 'Operator') : '—'}
                     </td>
                     <td className="p-2.5 text-slate-600">
                       {packCompleted ? (selectedOrder?.shift || 'DAY') : '—'}

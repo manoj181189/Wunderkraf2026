@@ -422,7 +422,7 @@ export const MaterialRequisitionModal: React.FC<MaterialRequisitionModalProps> =
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. K-Type, 160mm, 280 GSM, 65 Micron"
+                        placeholder="e.g. K-Type, 160mm, 120 GSM, 65 Micron"
                         value={partNo}
                         onChange={(e) => setPartNo(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:border-blue-500"

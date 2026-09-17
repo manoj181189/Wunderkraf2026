@@ -21,6 +21,7 @@ export const StationDetailModal: React.FC<StationDetailModalProps> = ({
   if (!isOpen || !machineName) return null;
 
   interface RecordItem {
+    date: string;
     jobId: string;
     product: string;
     worker: string;
@@ -56,6 +57,7 @@ export const StationDetailModal: React.FC<StationDetailModalProps> = ({
           if (!hr.machine || hr.machine === machineName) {
             const runInput = hr.issuedRawMaterial || (hr.issuedCrates ? Object.entries(hr.issuedCrates).map(([j, c]) => `${j}: ${c} Crates`).join(', ') : rawMatDesc);
             records.push({
+              date: hr.date || pj.startTime?.split('T')[0] || new Date().toISOString().split('T')[0],
               jobId: pj.id,
               product: pj.kitType,
               worker: hr.worker || pj.worker || 'Packing Team',
@@ -71,6 +73,7 @@ export const StationDetailModal: React.FC<StationDetailModalProps> = ({
         });
       } else if ((pj.status === 'Running' || pj.status === 'Held') && pj.machine === machineName) {
         records.push({
+          date: pj.startTime?.split('T')[0] || new Date().toISOString().split('T')[0],
           jobId: pj.id,
           product: pj.kitType,
           worker: pj.worker || 'Packing Team',
@@ -111,6 +114,7 @@ export const StationDetailModal: React.FC<StationDetailModalProps> = ({
             }
 
             records.push({
+              date: b.startTime?.split('T')[0] || new Date().toISOString().split('T')[0],
               jobId: j.id,
               product: `${j.product} (${j.paperBrand || 'ITC'})`,
               worker: b.worker || 'Operator',
@@ -129,12 +133,12 @@ export const StationDetailModal: React.FC<StationDetailModalProps> = ({
   }
 
   const exportStationCSV = () => {
-    let csv = 'Job_ID,Product_Origin,Operator_Name,Raw_Material_Issued,Output_Produced,Start_Time,End_Time,Duration,Stage_Status,Logged_By\r\n';
+    let csv = 'Date,Job_ID,Product_Origin,Operator_Name,Raw_Material_Issued,Output_Produced,Start_Time,End_Time,Duration,Stage_Status,Logged_By\r\n';
     records
       .slice()
       .reverse()
       .forEach((r) => {
-        csv += `"${r.jobId}","${r.product}","${r.worker}","${r.inputText}","${r.outputText}","${r.startTime}","${r.endTime}","${r.duration}","${r.stageStatus}","${r.loggedBy}"\r\n`;
+        csv += `"${r.date}","${r.jobId}","${r.product}","${r.worker}","${r.inputText}","${r.outputText}","${r.startTime}","${r.endTime}","${r.duration}","${r.stageStatus}","${r.loggedBy}"\r\n`;
       });
     downloadCSV(csv, `Station_Log_${machineName}_${new Date().toISOString().split('T')[0]}.csv`);
   };
@@ -192,6 +196,7 @@ export const StationDetailModal: React.FC<StationDetailModalProps> = ({
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200">
+                    <th className="p-2.5 text-left">Date</th>
                     <th className="p-2.5 text-left">Job ID / Order</th>
                     <th className="p-2.5 text-left">Product</th>
                     <th className="p-2.5 text-left">Operator</th>
@@ -214,6 +219,7 @@ export const StationDetailModal: React.FC<StationDetailModalProps> = ({
                     .reverse()
                     .map((r, idx) => (
                       <tr key={idx} className="hover:bg-slate-50 transition">
+                        <td className="p-2.5 font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap">{r.date}</td>
                         <td className="p-2.5 font-bold text-blue-800 whitespace-nowrap">{r.jobId}</td>
                         <td className="p-2.5 font-medium text-slate-800">{r.product}</td>
                         <td className="p-2.5 font-medium text-slate-700">{r.worker}</td>

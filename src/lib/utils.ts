@@ -578,4 +578,200 @@ export function isJobLayersFullySlit(
   return matrix.every((item) => item.isComplete);
 }
 
+/**
+ * Audit information of all downstream processes linked to a specific Job.
+ */
+export interface JobDeletionWarning {
+  hasSlitting: boolean;
+  slittingCount: number;
+  hasCutting: boolean;
+  cuttingCount: number;
+  hasForming: boolean;
+  formingCount: number;
+  hasPacking: boolean;
+  packingCount: number;
+  description: string;
+}
+
+export function getJobDeletionWarningInfo(jobId: string, state: FactoryState): JobDeletionWarning {
+  const job = state.jobs.find((j) => j.id === jobId);
+  if (!job) {
+    return {
+      hasSlitting: false,
+      slittingCount: 0,
+      hasCutting: false,
+      cuttingCount: 0,
+      hasForming: false,
+      formingCount: 0,
+      hasPacking: false,
+      packingCount: 0,
+      description: 'Job not found in database.'
+    };
+  }
+
+  const slittingCount = (job.runningBatches || []).filter(
+    (b) => b.stage === 'Slitting' || b.machine?.startsWith('Slitting')
+  ).length;
+
+  const cuttingCount = (job.runningBatches || []).filter(
+    (b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
+  ).length;
+
+  const formingCount = (job.runningBatches || []).filter(
+    (b) => b.stage === 'Forming' || b.machine?.startsWith('Forming')
+  ).length;
+
+  // Check customer packing orders using crates issued from this Job
+  const linkedPackingOrders = (state.packJobs || []).filter(
+    (pj) => pj.issuedCrates && pj.issuedCrates[jobId] !== undefined && pj.issuedCrates[jobId] > 0
+  );
+  const packingCount = linkedPackingOrders.length;
+
+  const parts: string[] = [];
+  if (slittingCount > 0) parts.push(`✂️ Slitting (${slittingCount} runs)`);
+  if (cuttingCount > 0) parts.push(`🔪 Cutting (${cuttingCount} runs)`);
+  if (formingCount > 0) parts.push(`🌀 Forming (${formingCount} runs)`);
+  if (packingCount > 0) parts.push(`📦 Customer Packing (${packingCount} linked orders)`);
+
+  const description = parts.length > 0
+    ? `⚠️ Material from this job has already progressed to: ${parts.join(', ')}.`
+    : 'No active material runs or downstream entries found. This job is safe to delete.';
+
+  return {
+    hasSlitting: slittingCount > 0,
+    slittingCount,
+    hasCutting: cuttingCount > 0,
+    cuttingCount,
+    hasForming: formingCount > 0,
+    formingCount,
+    hasPacking: packingCount > 0,
+    packingCount,
+    description
+  };
+}
+
+/**
+ * Performs cascade deletion of a Job and its plan, downsizes mother reels status,
+ * logs traceables, and saves an isolated JSON backup to localStorage repository.
+ */
+export function performCascadeDeleteAndBackup(
+  jobId: string,
+  state: FactoryState,
+  username: string
+): FactoryState {
+  const targetJob = state.jobs.find((j) => j.id === jobId);
+  const linkedPlan = (state.productionPlans || []).find((p) => p.jobId === jobId || p.id === targetJob?.planId);
+  const planId = linkedPlan?.id || targetJob?.planId || '';
+
+  // 1. Gather all logs referencing this jobId to purge/backup
+  const logsToPurge = state.logs.filter((l) => l.jobId === jobId);
+  const updatedLogs = state.logs.filter((l) => l.jobId !== jobId);
+
+  // 2. Identify mother reels to release back to "Available"
+  const updatedMotherReels = (state.motherReelInventory || []).map((mr) => {
+    if (
+      mr.allocatedJobId === jobId ||
+      (targetJob?.motherReelsAllocated && targetJob.motherReelsAllocated.includes(mr.id))
+    ) {
+      return {
+        ...mr,
+        status: 'Available' as const,
+        allocatedJobId: undefined,
+        allocatedDate: undefined
+      };
+    }
+    return mr;
+  });
+
+  // 3. Purge the production plan completely
+  const updatedPlans = (state.productionPlans || []).filter((p) => p.jobId !== jobId && p.id !== planId);
+
+  // 4. Clean up glue logs
+  const updatedGlueLogs = (state.glueUsageLogs || []).filter((g) => g.jobId !== jobId);
+
+  // 5. Clean issued crates references from Packing orders
+  const updatedPackJobs = (state.packJobs || []).map((pj) => {
+    if (pj.issuedCrates && pj.issuedCrates[jobId] !== undefined) {
+      const nextCrates = { ...pj.issuedCrates };
+      delete nextCrates[jobId];
+      return { ...pj, issuedCrates: nextCrates };
+    }
+    return pj;
+  });
+
+  // 6. Build a complete backup record of the sequence
+  const backupId = `BCK-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const backupRecord = {
+    backupId,
+    timestamp: new Date().toISOString(),
+    deletedAt: new Date().toLocaleString(),
+    deletedBy: username,
+    jobId,
+    planId,
+    job: targetJob,
+    productionPlan: linkedPlan,
+    logsPurgedCount: logsToPurge.length,
+    glueLogsPurgedCount: (state.glueUsageLogs || []).filter((g) => g.jobId === jobId).length,
+    date: targetJob?.date || linkedPlan?.plannedDate
+  };
+
+  const vaultItem = {
+    id: `VAULT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    originalId: jobId,
+    type: 'JOB' as const,
+    title: `Job [${jobId}] - ${targetJob?.product || 'Production Job'} (Plan: ${planId || 'N/A'})`,
+    deletedBy: username,
+    deletedAt: new Date().toLocaleString(),
+    data: {
+      job: targetJob,
+      productionPlan: linkedPlan
+    }
+  };
+
+  // Persist the backup in localStorage so it can never be lost on accidental deletion
+  try {
+    const existingRaw = localStorage.getItem('paperware_deleted_backups');
+    const existingList = existingRaw ? JSON.parse(existingRaw) : [];
+    existingList.unshift(backupRecord);
+    localStorage.setItem('paperware_deleted_backups', JSON.stringify(existingList));
+  } catch (err) {
+    console.error('Failed to write deleted backup to localStorage:', err);
+  }
+
+  // 7. Remove the Job
+  const updatedJobs = state.jobs.filter((j) => j.id !== jobId);
+
+  // 8. Add cascade delete log entry
+  const slittingCount = targetJob ? (targetJob.runningBatches || []).filter(b => b.stage === 'Slitting' || b.machine?.startsWith('Slitting')).length : 0;
+  const cuttingCount = targetJob ? (targetJob.runningBatches || []).filter(b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')).length : 0;
+  const formingCount = targetJob ? (targetJob.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming')).length : 0;
+
+  const cascadeSummary = `Cascaded Purge: ${slittingCount} Slitting, ${cuttingCount} Cutting, ${formingCount} Forming. Backup #${backupId} saved.`;
+
+  const newLog: LogEntry = {
+    jobId: jobId,
+    stage: 'Admin Master',
+    machine: 'CASCADE-DELETE',
+    shift: 'DAY',
+    action: `🗑️ [BACKUP & CASCADE DELETE] Job [${jobId}] and Plan [${planId}] permanently deleted by ${username}. ${cascadeSummary}`,
+    worker: 'ADMIN',
+    user: username,
+    rawDate: new Date().toISOString().split('T')[0],
+    timestamp: new Date().toLocaleString()
+  };
+
+  return {
+    ...state,
+    deletedJobIds: Array.from(new Set([...(state.deletedJobIds || []), jobId])),
+    deletedPlanIds: planId ? Array.from(new Set([...(state.deletedPlanIds || []), planId])) : state.deletedPlanIds,
+    deletedVaultItems: [vaultItem, ...(state.deletedVaultItems || [])],
+    jobs: updatedJobs,
+    logs: [...updatedLogs, newLog],
+    motherReelInventory: updatedMotherReels,
+    productionPlans: updatedPlans,
+    glueUsageLogs: updatedGlueLogs,
+    packJobs: updatedPackJobs
+  };
+}
+
 

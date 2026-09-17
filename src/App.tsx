@@ -21,6 +21,7 @@ import { PackingView } from './components/views/PackingView';
 import { StockMatrixView } from './components/views/StockMatrixView';
 import { CustomerOrdersView } from './components/views/CustomerOrdersView';
 import { AnalyticsView } from './components/views/AnalyticsView';
+import { ScrapManagementView } from './components/views/ScrapManagementView';
 import { UniversalSearchView } from './components/views/UniversalSearchView';
 import { MaintenanceAuditView } from './components/views/MaintenanceAuditView';
 import { AdminSettingsView } from './components/views/AdminSettingsView';
@@ -57,7 +58,7 @@ function sanitizeUsersState(users?: Record<string, any>) {
   const clean = { ...(users || DEFAULT_USERS) };
   LEGACY_DEFAULT_USER_KEYS.forEach((k) => delete clean[k]);
   if (!clean.admin) {
-    clean.admin = { pass: 'admin123', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
+    clean.admin = { pass: '1811', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
   } else {
     clean.admin.perms = ['*'];
   }
@@ -762,6 +763,14 @@ export const App: React.FC = () => {
           />
         )}
 
+        {currentView === 'SCRAP' && (
+          <ScrapManagementView
+            state={state}
+            onBackToHub={() => setCurrentView('HUB')}
+            onSaveState={handleSaveState}
+          />
+        )}
+
         {currentView === 'SEARCH' && (
           <UniversalSearchView
             state={state}
@@ -840,6 +849,7 @@ export const App: React.FC = () => {
             state={state}
             onBackToHub={() => setCurrentView('HUB')}
             onSaveState={handleSaveState}
+            onNavigateToView={(view) => setCurrentView(view)}
           />
         )}
           </>

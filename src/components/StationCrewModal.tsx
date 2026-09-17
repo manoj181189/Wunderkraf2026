@@ -26,7 +26,7 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
   state,
   onConfirmCrew
 }) => {
-  const allWorkers: FloorWorker[] = state.floorWorkers && state.floorWorkers.length > 0
+  const allWorkers: FloorWorker[] = state.floorWorkers !== undefined
     ? state.floorWorkers
     : DEFAULT_FLOOR_WORKERS;
 
@@ -36,7 +36,7 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
 
   useEffect(() => {
     setOperator(currentOperator || '');
-    setSelectedHelpers(currentHelpers && currentHelpers.length > 0 ? currentHelpers : ['SUNIL_HELPER', 'DINESH_HELPER']);
+    setSelectedHelpers(currentHelpers || []);
   }, [currentOperator, currentHelpers, isOpen]);
 
   if (!isOpen) return null;
@@ -117,33 +117,18 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
             </label>
             <div className="flex gap-2">
               <input
-                type="text"
+                list="operator-pool"
                 required
                 value={operator}
                 onChange={(e) => setOperator(e.target.value)}
-                placeholder="e.g. CUT_OP1"
+                placeholder="Type to search Operator..."
                 className="flex-1 p-2.5 bg-white border-2 border-purple-300 rounded-xl font-bold text-slate-900 outline-none focus:border-purple-600 uppercase text-xs"
               />
+              <datalist id="operator-pool">
+                {operatorPool.map(op => <option key={op} value={op} />)}
+              </datalist>
             </div>
-            {operatorPool.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                <span className="text-[10px] text-slate-500 font-semibold self-center">Quick Select:</span>
-                {operatorPool.slice(0, 5).map((op) => (
-                  <button
-                    key={op}
-                    type="button"
-                    onClick={() => setOperator(op)}
-                    className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold border cursor-pointer transition ${
-                      operator === op
-                        ? 'bg-purple-700 text-white border-purple-700'
-                        : 'bg-white text-purple-800 border-purple-200 hover:bg-purple-100'
-                    }`}
-                  >
-                    {op}
-                  </button>
-                ))}
-              </div>
-            )}
+            
           </div>
 
           {/* Helpers Selection */}
@@ -184,23 +169,9 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
               })}
             </div>
 
-            {/* Add Custom Helper Input */}
-            <form onSubmit={handleAddCustomHelper} className="flex gap-2 pt-1">
-              <input
-                type="text"
-                value={customHelperName}
-                onChange={(e) => setCustomHelperName(e.target.value)}
-                placeholder="Enter new helper name (e.g. BABLU_HELPER)"
-                className="flex-1 p-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none uppercase"
-              />
-              <button
-                type="submit"
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add</span>
-              </button>
-            </form>
+            <div className="text-[10px] text-amber-700 bg-amber-50 p-2 border border-amber-200 rounded-lg mt-2 flex items-center gap-2 font-semibold">
+              <span>⚠️ Need to add a new person? Add them to the Master Directory first to maintain a single source of truth.</span>
+            </div>
           </div>
 
           {/* Real-time Visual Deployment Preview */}

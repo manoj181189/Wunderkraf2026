@@ -29,7 +29,8 @@ interface ShiftHandoverHistoryModalProps {
 export const ShiftHandoverHistoryModal: React.FC<ShiftHandoverHistoryModalProps> = ({
   isOpen,
   onClose,
-  state
+  state,
+  onSaveState
 }) => {
   const [filterDept, setFilterDept] = useState<string>('ALL');
   const [filterShift, setFilterShift] = useState<string>('ALL');
@@ -188,6 +189,34 @@ export const ShiftHandoverHistoryModal: React.FC<ShiftHandoverHistoryModalProps>
                         Flagged
                       </span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!confirm(`Are you sure you want to delete shift handover [${record.id}]? It will be moved to the Admin Deletion Vault.`)) return;
+                        const nextHandovers = (state.shiftHandovers || []).filter((h) => h.id !== record.id);
+                        const vaultItem = {
+                          id: `VAULT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                          originalId: record.id,
+                          type: 'SHIFT_HANDOVER' as const,
+                          title: `Shift Handover [${record.id}] - ${record.department} (${record.machine})`,
+                          deletedBy: 'admin',
+                          deletedAt: new Date().toLocaleString(),
+                          data: record
+                        };
+                        const nextVault = [vaultItem, ...(state.deletedVaultItems || [])];
+                        if (onSaveState) {
+                          onSaveState({
+                            ...state,
+                            shiftHandovers: nextHandovers,
+                            deletedVaultItems: nextVault
+                          });
+                        }
+                      }}
+                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-extrabold transition cursor-pointer"
+                      title="Delete Shift Handover Record"
+                    >
+                      🗑️ Delete
+                    </button>
                   </div>
                 </div>
 

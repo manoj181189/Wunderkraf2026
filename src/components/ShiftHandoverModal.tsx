@@ -43,6 +43,7 @@ export interface ShiftHandoverModalProps {
     sliceLoosePieces?: number; // Loose pieces
     sliceProducedPieces?: number; // (Crates * piecesPerUnit) + loose pieces
     sliceScrapQty: number; // Scrap Kg or Defect Pcs
+    sliceRejectedPcs?: number; // Rejected pieces count
     handoverNotes: string;
     helpers?: string[];
   }) => void;
@@ -56,7 +57,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
   machine,
   stageName,
   availableWorkers,
-  availableHelpers = ['SUNIL_HELPER', 'DINESH_HELPER', 'MUKESH_HELPER', 'PRAKASH_HELPER', 'BABLU_HELPER', 'CHANDAN_HELPER', 'SANTOSH_HELPER', 'RAJU_HELPER'],
+  availableHelpers = ['MUKESH_HELPER', 'PRAKASH_HELPER', 'BABLU_HELPER', 'CHANDAN_HELPER', 'SANTOSH_HELPER', 'RAJU_HELPER'],
   unitLabel = 'Crates',
   piecesPerUnit = 0,
   initialProducedQty,
@@ -91,6 +92,9 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
     : (batch.loosePieces || 0);
   const [sliceLoosePiecesInput, setSliceLoosePiecesInput] = useState<string>(String(defaultLoose));
 
+  // Rejected pieces produced during this shift (specifically for Cutting)
+  const [sliceRejectedPcsInput, setSliceRejectedPcsInput] = useState<string>('0');
+
   // Scrap / Rejection produced during this shift
   const fallbackScrap = stageName === 'Slitting' || stageName === 'Cutting' ? (batch.scrapKg || 0) : (batch.scrapPcs || 0);
   const defaultScrap = initialScrapQty !== undefined ? initialScrapQty : fallbackScrap;
@@ -114,9 +118,10 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
 
   const parsedProduced = parseFloat(sliceProducedQtyInput) || 0;
   const parsedLoose = parseInt(sliceLoosePiecesInput, 10) || 0;
+  const parsedRejectedPcs = stageName === 'Cutting' ? (parseInt(sliceRejectedPcsInput, 10) || 0) : 0;
   const calculatedPieces = piecesPerUnit > 0
-    ? Math.round(parsedProduced * piecesPerUnit) + parsedLoose
-    : (parsedLoose > 0 ? parsedLoose : undefined);
+    ? Math.max(0, Math.round(parsedProduced * piecesPerUnit) + parsedLoose - parsedRejectedPcs)
+    : (parsedLoose > 0 ? Math.max(0, parsedLoose - parsedRejectedPcs) : undefined);
   const parsedScrap = parseFloat(sliceScrapQtyInput) || 0;
   const parsedMeter = parseFloat(meterReadingInput) || 0;
 
@@ -162,6 +167,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
       sliceLoosePieces: parsedLoose,
       sliceProducedPieces: calculatedPieces,
       sliceScrapQty: parsedScrap,
+      sliceRejectedPcs: parsedRejectedPcs,
       handoverNotes: handoverNotes.trim(),
       helpers: incomingHelpers
     });
@@ -230,7 +236,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                 <>
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Target Length:</span>
                   <span className="font-bold text-emerald-800">
-                    {job.planId ? '1200 Meters' : 'Standard Length'}
+                    {job.planId ? '4000 Meters' : 'Standard Length'}
                   </span>
                 </>
               ) : stageName === 'Packing' ? (
@@ -509,7 +515,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
             ) : (
               <>
                 {/* Default Grid (Cutting & Forming) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div className={`grid grid-cols-1 ${stageName === 'Cutting' ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'} gap-3 pt-1`}>
                   {/* Crates Produced */}
                   <div>
                     <label className="block text-[11px] font-extrabold text-emerald-900 uppercase mb-1 flex items-center gap-1">
@@ -551,6 +557,29 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                     </span>
                   </div>
 
+                  {/* Rejected Pieces (Pcs) - Only for Cutting */}
+                  {stageName === 'Cutting' && (
+                    <div>
+                      <label className="block text-[11px] font-extrabold text-rose-900 uppercase mb-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Rejected Pieces (Pcs):</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={sliceRejectedPcsInput}
+                        onChange={(e) => setSliceRejectedPcsInput(e.target.value)}
+                        placeholder="e.g. 150"
+                        className="w-full px-3 py-2 bg-white border border-rose-300 rounded-lg text-sm font-black text-rose-950 outline-none focus:ring-2 focus:ring-rose-500"
+                        required
+                      />
+                      <span className="text-[10px] text-rose-700 font-bold mt-0.5 block">
+                        Defective blanks (Will be MINUSED)
+                      </span>
+                    </div>
+                  )}
+
                   {/* Scrap / Rejection */}
                   <div>
                     <label className="block text-[11px] font-extrabold text-rose-900 uppercase mb-1 flex items-center gap-1">
@@ -586,7 +615,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                     <span>
                       <b>Total Produced Flat Blanks:</b>{' '}
                       <span className="font-mono font-bold">
-                        {parsedProduced} Crates × {piecesPerUnit > 0 ? piecesPerUnit.toLocaleString() : 0} + {parsedLoose} Loose =
+                        {parsedProduced} Crates × {piecesPerUnit > 0 ? piecesPerUnit.toLocaleString() : 0} + {parsedLoose} Loose{parsedRejectedPcs > 0 ? ` - ${parsedRejectedPcs} Rejected` : ''} =
                       </span>
                     </span>
                   </div>
@@ -634,7 +663,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                   <div>
                     <b>Record Lock Notice:</b> Upon submission, against operator <b>{batch.worker}</b>'s name{' '}
                     <span className="font-bold underline">
-                      {parsedProduced} Crates + {parsedLoose} loose pieces ({calculatedPieces?.toLocaleString()} pieces)
+                      {parsedProduced} Crates + {parsedLoose} loose pieces{parsedRejectedPcs > 0 ? ` - ${parsedRejectedPcs} rejected` : ''} ({calculatedPieces?.toLocaleString()} pieces)
                     </span>{' '}
                     and <span className="font-bold underline">{parsedScrap} kg scrap</span> will be permanently recorded.
                   </div>

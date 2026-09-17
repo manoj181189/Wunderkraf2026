@@ -71,11 +71,12 @@ import {
   TARGET_GSM_DEFAULT
 } from '../../lib/constants';
 import { triggerWhatsAppShiftNotification } from '../../lib/whatsappReports';
-import { exportToJSON, getCurrentExpectedShift, exportToCSV } from '../../lib/utils';
+import { exportToJSON, getCurrentExpectedShift, exportToCSV, getJobDeletionWarningInfo, performCascadeDeleteAndBackup } from '../../lib/utils';
 import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState, getCentralSyncEndpoint, setCustomSyncEndpoint, forceSyncWithCentral, getPendingSyncCount, getCloudSyncStatus } from '../../lib/storage';
 import { syncStateToCloud, isFirebaseConfigured } from '../../lib/firebaseSync';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
 import { OpeningStockModal } from '../OpeningStockModal';
+import { EmployeeMasterView } from './EmployeeMasterView';
 
 interface AdminSettingsViewProps {
   state: FactoryState;
@@ -84,8 +85,8 @@ interface AdminSettingsViewProps {
   currentUser?: { username: string; perms: string[] } | null;
 }
 
-type AdminTab = 'brand_items_paper' | 'crate_master' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward';
-type MasterDataSubTab = 'plans' | 'jobs' | 'reconcile' | 'batches' | 'orders' | 'logs' | 'numbering';
+type AdminTab = 'brand_items_paper' | 'crate_master' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward' | 'employee_master';
+type MasterDataSubTab = 'plans' | 'jobs' | 'reconcile' | 'batches' | 'orders' | 'logs' | 'numbering' | 'vault';
 
 export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   state,
@@ -458,8 +459,8 @@ _If you received this message, your contact number and routing configuration are
   const [editCutPcs, setEditCutPcs] = useState<number>(10000);
   const [editFormPcs, setEditFormPcs] = useState<number>(7000);
   const [newCrateProd, setNewCrateProd] = useState<string>('');
-  const [newCrateCutPcs, setNewCrateCutPcs] = useState<string>('10000');
-  const [newCrateFormPcs, setNewCrateFormPcs] = useState<string>('7000');
+  const [newCrateCutPcs, setNewCrateCutPcs] = useState<string>('');
+  const [newCrateFormPcs, setNewCrateFormPcs] = useState<string>('');
 
   const handleSaveCrateRow = (prod: string, cut: number, form: number) => {
     const updated = {
@@ -509,21 +510,21 @@ _If you received this message, your contact number and routing configuration are
       confirmLabel: 'Yes, Reset to Defaults',
       isDanger: true,
       onConfirm: () => {
-        setCrateMaster(DEFAULT_CRATE_CAPACITY_MASTER);
+        setCrateMaster({});
         const newLog: LogEntry = {
           stage: 'Admin Settings',
           machine: 'ADMIN_DESK',
-          action: '🧺 Reset Crate Capacity Master to Factory Defaults',
+          action: '🧺 Reset Crate Capacity Master to Empty',
           user: 'admin',
           rawDate: new Date().toISOString().split('T')[0],
           timestamp: new Date().toLocaleString()
         };
         onSaveState({
           ...state,
-          crateCapacityMaster: DEFAULT_CRATE_CAPACITY_MASTER,
+          crateCapacityMaster: {},
           logs: [...state.logs, newLog]
         });
-        showToast('✅ Crate Master successfully restored to factory defaults!');
+        showToast('✅ Crate Master successfully cleared!');
       }
     });
   };
@@ -533,10 +534,18 @@ _If you received this message, your contact number and routing configuration are
       showToast('Please select or type a product name!', 'error');
       return;
     }
-    const cut = parseInt(newCrateCutPcs, 10) || 10000;
-    const form = parseInt(newCrateFormPcs, 10) || 7000;
+    const cut = parseInt(newCrateCutPcs, 10);
+    const form = parseInt(newCrateFormPcs, 10);
+    
+    if (isNaN(cut) || isNaN(form)) {
+      showToast('Please enter valid capacity numbers!', 'error');
+      return;
+    }
+
     handleSaveCrateRow(newCrateProd.trim(), cut, form);
     setNewCrateProd('');
+    setNewCrateCutPcs('');
+    setNewCrateFormPcs('');
   };
 
   // In-app Alert / Toast notification (replaces window.alert)
@@ -610,6 +619,34 @@ _If you received this message, your contact number and routing configuration are
   const [logFilterStage, setLogFilterStage] = useState('');
   const [editingLogIndex, setEditingLogIndex] = useState<number | null>(null);
   const [logEditForm, setLogEditForm] = useState<LogEntry | null>(null);
+
+  // Keep form editors synchronized when selection changes or original state is updated by parent
+  useEffect(() => {
+    const foundJob = state.jobs.find((j) => j.id === selectedJobIdToEdit);
+    if (foundJob) {
+      setJobEditForm(JSON.parse(JSON.stringify(foundJob)));
+    } else {
+      setJobEditForm(null);
+    }
+  }, [state.jobs, selectedJobIdToEdit]);
+
+  useEffect(() => {
+    const foundPlan = (state.productionPlans || []).find((p) => p.id === selectedPlanIdToEdit);
+    if (foundPlan) {
+      setPlanEditForm(JSON.parse(JSON.stringify(foundPlan)));
+    } else {
+      setPlanEditForm(null);
+    }
+  }, [state.productionPlans, selectedPlanIdToEdit]);
+
+  useEffect(() => {
+    const foundOrder = state.packJobs.find((o) => o.id === selectedOrderIdToEdit);
+    if (foundOrder) {
+      setOrderEditForm(JSON.parse(JSON.stringify(foundOrder)));
+    } else {
+      setOrderEditForm(null);
+    }
+  }, [state.packJobs, selectedOrderIdToEdit]);
 
   // ==========================================
   // DIRECT STOCK RECONCILIATION SUITE STATE
@@ -1003,78 +1040,32 @@ _If you received this message, your contact number and routing configuration are
   };
 
   const executeDeleteJob = (jobId: string) => {
-    const targetJob = state.jobs.find((j) => j.id === jobId);
-    const updatedJobs = state.jobs.filter((j) => j.id !== jobId);
-    // Cascade remove all audit logs referencing this jobId
-    const updatedLogs = state.logs.filter((l) => l.jobId !== jobId);
+    const updatedState = performCascadeDeleteAndBackup(jobId, state, currentUser?.username || 'admin');
+    onSaveState(updatedState);
 
-    // Rollback any mother reels allocated to this job back to Available
-    const updatedMotherReels = (state.motherReelInventory || []).map((mr) => {
-      if (
-        mr.allocatedJobId === jobId ||
-        (targetJob?.motherReelsAllocated && targetJob.motherReelsAllocated.includes(mr.id))
-      ) {
-        return {
-          ...mr,
-          status: 'Available' as const,
-          allocatedJobId: undefined,
-          allocatedDate: undefined
-        };
-      }
-      return mr;
-    });
-
-    // Update linked production plans back to Scheduled
-    const updatedPlans = (state.productionPlans || []).map((p) => {
-      if (p.jobId === jobId) {
-        return {
-          ...p,
-          status: 'Scheduled' as const,
-          actualLayersUsed: 0,
-          actualMetersSlit: 0,
-          actualScrapKg: 0,
-          actualScrapPct: 0
-        };
-      }
-      return p;
-    });
-
-    // Clean up glue usage logs for this job
-    const updatedGlueLogs = (state.glueUsageLogs || []).filter((g) => g.jobId !== jobId);
-
-    const newLog: LogEntry = {
-      jobId: jobId,
-      stage: 'Admin Master',
-      machine: 'MASTER-OVERWRITE',
-      shift: 'DAY',
-      action: `🗑️ Cascading Deletion of Job [${jobId}] | Purged from Jobs, Logs, Traceability Trees, and Rolled Back Mother Reels to Available Stock`,
-      worker: 'ADMIN',
-      user: 'admin',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
-
-    onSaveState({
-      ...state,
-      deletedJobIds: Array.from(new Set([...(state.deletedJobIds || []), jobId])),
-      jobs: updatedJobs,
-      logs: [...updatedLogs, newLog],
-      motherReelInventory: updatedMotherReels,
-      productionPlans: updatedPlans,
-      glueUsageLogs: updatedGlueLogs
-    });
-
-    const nextJob = updatedJobs[0]?.id || '';
-    handleSelectJobToEdit(nextJob);
-    showToast(`✅ Cascading Deletion of Job [${jobId}] completed! Rolled back mother reels & purged traceability trees.`);
+    const nextJob = updatedState.jobs[0]?.id || '';
+    handleSelectJobToEdit(nextJob, updatedState.jobs);
+    showToast(`✅ Cascading Deletion & Backup of Job [${jobId}] completed! Rolled back mother reels & purged all downstream runs.`);
   };
 
   const handleDeleteJob = (jobId: string) => {
+    const pass = prompt(`Enter Master Password 'MANOJ' to Delete Job [${jobId}]:`);
+    if (pass !== 'MANOJ') {
+      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
+      return;
+    }
+    const warningInfo = getJobDeletionWarningInfo(jobId, state);
+    const hasDownstream = warningInfo.hasSlitting || warningInfo.hasCutting || warningInfo.hasForming || warningInfo.hasPacking;
+    
+    const message = hasDownstream
+      ? `⚠️ CASCADE WARNING (कैस्केड चेतावनी):\n${warningInfo.description}\n\nयह जॉब आगे की प्रोडक्शन स्टेज में सक्रिय है। यदि आप इसे डिलीट करते हैं, तो स्लिटिंग, कटिंग, फॉर्मिंग और पैकिंग के सभी रन पूरी तरह से डिलीट हो जाएंगे।\n\nAre you sure you want to CASCADE delete everything? A secure backup will be saved automatically.`
+      : `Are you sure you want to permanently delete Job [${jobId}] completely from the factory database? This action will back up and remove the job record safely.`;
+
     setConfirmModal({
       isOpen: true,
-      title: 'Delete Production Job',
-      message: `Are you sure you want to permanently delete Job [${jobId}] completely from the factory database? All associated running batches will also be removed.`,
-      confirmLabel: 'Yes, Delete Job',
+      title: hasDownstream ? '🚨 Warning: Delete Active Job' : 'Delete Production Job',
+      message: message,
+      confirmLabel: 'Yes, Delete & Cascade Everything',
       isDanger: true,
       onConfirm: () => {
         executeDeleteJob(jobId);
@@ -1149,6 +1140,11 @@ _If you received this message, your contact number and routing configuration are
   };
 
   const handleDeletePlan = (planId: string) => {
+    const pass = prompt(`Enter Master Password 'MANOJ' to Delete Plan [${planId}]:`);
+    if (pass !== 'MANOJ') {
+      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
+      return;
+    }
     setConfirmModal({
       isOpen: true,
       title: 'Delete Production Plan',
@@ -1231,6 +1227,11 @@ _If you received this message, your contact number and routing configuration are
   };
 
   const handleDeleteOrder = (ordId: string) => {
+    const pass = prompt(`Enter Master Password 'MANOJ' to Delete Order [${ordId}]:`);
+    if (pass !== 'MANOJ') {
+      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
+      return;
+    }
     setConfirmModal({
       isOpen: true,
       title: 'Delete Customer Order',
@@ -1246,6 +1247,11 @@ _If you received this message, your contact number and routing configuration are
 
   const handleDeleteAllOrders = () => {
     if (state.packJobs.length === 0) return;
+    const pass = prompt(`Enter Master Password 'MANOJ' to Delete ALL Customer Packing Orders:`);
+    if (pass !== 'MANOJ') {
+      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
+      return;
+    }
     const allOrdIds = state.packJobs.map((o) => o.id);
     setConfirmModal({
       isOpen: true,
@@ -2066,6 +2072,11 @@ _If you received this message, your contact number and routing configuration are
       confirmLabel: `Purge ${purgedCount} Plans`,
       isDanger: true,
       onConfirm: () => {
+        const pass = prompt("Enter Master Password 'MANOJ' to Confirm Purge of Completed Plans:");
+        if (pass !== 'MANOJ') {
+          showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
+          return;
+        }
         const newLog: LogEntry = {
           jobId: 'PLAN-PURGE',
           stage: 'Admin Master',
@@ -2106,6 +2117,11 @@ _If you received this message, your contact number and routing configuration are
       confirmLabel: 'Yes, Purge ALL Plans',
       isDanger: true,
       onConfirm: () => {
+        const pass = prompt("Enter Master Password 'MANOJ' to Purge ALL Production Plans:");
+        if (pass !== 'MANOJ') {
+          showToast('❌ Incorrect Master Password! Expunge aborted.', 'error');
+          return;
+        }
         const newLog: LogEntry = {
           jobId: 'ALL-PLANS',
           stage: 'Admin Master',
@@ -2147,6 +2163,11 @@ _If you received this message, your contact number and routing configuration are
       confirmLabel: `Purge ${purgedCount} Orders`,
       isDanger: true,
       onConfirm: () => {
+        const pass = prompt("Enter Master Password 'MANOJ' to Purge Dispatched Orders:");
+        if (pass !== 'MANOJ') {
+          showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
+          return;
+        }
         const newLog: LogEntry = {
           jobId: 'ORDER-PURGE',
           stage: 'Admin Master',
@@ -2183,6 +2204,11 @@ _If you received this message, your contact number and routing configuration are
       confirmLabel: `Purge ${filteredLogs.length} Logs`,
       isDanger: true,
       onConfirm: () => {
+        const pass = prompt("Enter Master Password 'MANOJ' to Purge Filtered Logs:");
+        if (pass !== 'MANOJ') {
+          showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
+          return;
+        }
         const newLog: LogEntry = {
           jobId: 'LOG-PURGE',
           stage: 'Admin Master',
@@ -2213,6 +2239,11 @@ _If you received this message, your contact number and routing configuration are
       confirmLabel: 'Yes, Expunge ALL Logs',
       isDanger: true,
       onConfirm: () => {
+        const pass = prompt("Enter Master Password 'MANOJ' to Expunge ALL Audit Logs:");
+        if (pass !== 'MANOJ') {
+          showToast('❌ Incorrect Master Password! Expunge aborted.', 'error');
+          return;
+        }
         const freshLog: LogEntry = {
           jobId: 'SYSTEM-PURGE',
           stage: 'Admin Master',
@@ -2926,6 +2957,18 @@ ${formLines.join('\n')}
           <Database className="w-4 h-4" />
           <span>💾 Database Backup & JSON Recovery</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('employee_master')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+            activeTab === 'employee_master'
+              ? 'bg-[#1a365d] text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Users className="w-4 h-4 text-emerald-500" />
+          <span>👥 Employee Master</span>
+        </button>
       </div>
 
       {/* ========================================================================= */}
@@ -3607,7 +3650,7 @@ ${formLines.join('\n')}
                   type="number"
                   value={newCrateCutPcs}
                   onChange={(e) => setNewCrateCutPcs(e.target.value)}
-                  placeholder="10000"
+                  placeholder="Enter cutting pieces"
                   className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
                 />
               </div>
@@ -3619,7 +3662,7 @@ ${formLines.join('\n')}
                   type="number"
                   value={newCrateFormPcs}
                   onChange={(e) => setNewCrateFormPcs(e.target.value)}
-                  placeholder="7000"
+                  placeholder="Enter forming pieces"
                   className="w-full px-3 py-2 bg-white border border-indigo-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
                 />
               </div>
@@ -4020,6 +4063,15 @@ ${formLines.join('\n')}
                 <Sliders className="w-3.5 h-3.5" />
                 Auto-Numbering Master
               </button>
+              <button
+                type="button"
+                onClick={() => setMasterSubTab('vault')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  masterSubTab === 'vault' ? 'bg-rose-600 text-white shadow-xs' : 'text-rose-700 hover:text-rose-900 hover:bg-rose-50'
+                }`}
+              >
+                🗑️ Deletion Vault ({(state.deletedVaultItems || []).length})
+              </button>
             </div>
           </div>
 
@@ -4133,7 +4185,7 @@ ${formLines.join('\n')}
                           type="text"
                           value={jobEditForm.gsm || ''}
                           onChange={(e) => setJobEditForm({ ...jobEditForm, gsm: e.target.value })}
-                          placeholder="e.g. 280 GSM"
+                          placeholder="e.g. 120 GSM"
                           className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
                         />
                       </div>
@@ -4542,145 +4594,158 @@ ${formLines.join('\n')}
           {/* ------------------------------------------------------------- */}
           {masterSubTab === 'reconcile' && (
             <div className="space-y-4">
-              {/* Header Banner */}
-              <div className="bg-linear-to-r from-amber-900 via-amber-950 to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-amber-800/40">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[11px] font-extrabold uppercase tracking-wider mb-1.5">
-                      <Scale className="w-3.5 h-3.5 text-amber-400" />
-                      Physical Stage Inventory Reconciler
-                    </div>
-                    <h3 className="text-lg font-black tracking-tight text-white m-0">
-                      Direct Stage Stock Reconciliation & Reason Audit
-                    </h3>
-                    <p className="text-xs text-amber-200/80 mt-1 max-w-2xl">
-                      Live-reconcile physical stage floor inventories (Slit Rolls, Cut Crates, Formed Crates, QC Crates, Finished Cartons) with mandatory reason audit logging.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="bg-white/10 px-3 py-2 rounded-xl text-center backdrop-blur-xs border border-white/10">
-                      <div className="text-[10px] text-amber-200 uppercase font-bold">Total Jobs in Floor</div>
-                      <div className="text-base font-black text-amber-300">{state.jobs.length}</div>
-                    </div>
-                  </div>
-                </div>
+              {(() => {
+                const deletedJobIdsSet = new Set(state.deletedJobIds || []);
+                const activeJobs = (state.jobs || []).filter((j) => !deletedJobIdsSet.has(j.id));
+                const totalRolls = activeJobs.reduce((acc, j) => acc + (j.availableRolls || 0), 0);
+                const totalCutCrates = activeJobs.reduce((acc, j) => acc + (j.availableCuttingCrates || 0), 0);
+                const totalFormedCrates = activeJobs.reduce((acc, j) => acc + (j.availableFormingCrates || 0), 0);
+                const totalQcCrates = activeJobs.reduce((acc, j) => acc + (j.availableQcCrates || 0), 0);
 
-                {/* Aggregate Summary */}
-                <div className="mt-4 pt-4 border-t border-amber-800/60 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                    <div className="text-[10px] text-amber-300 font-bold uppercase">Total Slit Rolls Stock</div>
-                    <div className="text-sm font-black text-white font-mono">
-                      {state.jobs.reduce((acc, j) => acc + (j.availableRolls || 0), 0)} Rolls
-                    </div>
-                  </div>
-                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                    <div className="text-[10px] text-cyan-300 font-bold uppercase">Total Cut Crates Stock</div>
-                    <div className="text-sm font-black text-white font-mono">
-                      {state.jobs.reduce((acc, j) => acc + (j.availableCuttingCrates || 0), 0)} Crates
-                    </div>
-                  </div>
-                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                    <div className="text-[10px] text-purple-300 font-bold uppercase">Total Formed Crates Stock</div>
-                    <div className="text-sm font-black text-white font-mono">
-                      {state.jobs.reduce((acc, j) => acc + (j.availableFormingCrates || 0), 0)} Crates
-                    </div>
-                  </div>
-                  <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                    <div className="text-[10px] text-emerald-300 font-bold uppercase">Total QC OK Crates Stock</div>
-                    <div className="text-sm font-black text-white font-mono">
-                      {state.jobs.reduce((acc, j) => acc + (j.availableQcCrates || 0), 0)} Crates
-                    </div>
-                  </div>
-                </div>
-              </div>
+                return (
+                  <>
+                    {/* Header Banner */}
+                    <div className="bg-linear-to-r from-amber-900 via-amber-950 to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-amber-800/40">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[11px] font-extrabold uppercase tracking-wider mb-1.5">
+                            <Scale className="w-3.5 h-3.5 text-amber-400" />
+                            Physical Stage Inventory Reconciler
+                          </div>
+                          <h3 className="text-lg font-black tracking-tight text-white m-0">
+                            Direct Stage Stock Reconciliation & Reason Audit
+                          </h3>
+                          <p className="text-xs text-amber-200/80 mt-1 max-w-2xl">
+                            Live-reconcile physical stage floor inventories (Slit Rolls, Cut Crates, Formed Crates, QC Crates, Finished Cartons) with mandatory reason audit logging.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="bg-white/10 px-3 py-2 rounded-xl text-center backdrop-blur-xs border border-white/10">
+                            <div className="text-[10px] text-amber-200 uppercase font-bold">Total Jobs in Floor</div>
+                            <div className="text-base font-black text-amber-300">{activeJobs.length}</div>
+                          </div>
+                        </div>
+                      </div>
 
-              {/* Jobs Table Matrix */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
-                    Floor Stage Inventory Matrix ({state.jobs.length} Active Production Jobs)
-                  </h4>
-                  <span className="text-[11px] font-bold text-slate-500">
-                    Click "Reconcile" on any job to live-adjust physical stage inventory counts with audit logging
-                  </span>
-                </div>
+                      {/* Aggregate Summary */}
+                      <div className="mt-4 pt-4 border-t border-amber-800/60 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                          <div className="text-[10px] text-amber-300 font-bold uppercase">Total Slit Rolls Stock</div>
+                          <div className="text-sm font-black text-white font-mono">
+                            {totalRolls} Rolls
+                          </div>
+                        </div>
+                        <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                          <div className="text-[10px] text-cyan-300 font-bold uppercase">Total Cut Crates Stock</div>
+                          <div className="text-sm font-black text-white font-mono">
+                            {totalCutCrates} Crates
+                          </div>
+                        </div>
+                        <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                          <div className="text-[10px] text-purple-300 font-bold uppercase">Total Formed Crates Stock</div>
+                          <div className="text-sm font-black text-white font-mono">
+                            {totalFormedCrates} Crates
+                          </div>
+                        </div>
+                        <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                          <div className="text-[10px] text-emerald-300 font-bold uppercase">Total QC OK Crates Stock</div>
+                          <div className="text-sm font-black text-white font-mono">
+                            {totalQcCrates} Crates
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-slate-100 border-b border-slate-200 text-slate-700 font-black uppercase text-[10px]">
-                      <tr>
-                        <th className="p-2.5">Job ID</th>
-                        <th className="p-2.5">Product</th>
-                        <th className="p-2.5">Status</th>
-                        <th className="p-2.5 text-right bg-teal-50 text-teal-900">📜 Slit Rolls</th>
-                        <th className="p-2.5 text-right bg-blue-50 text-blue-900">✂️ Cut Crates</th>
-                        <th className="p-2.5 text-right bg-indigo-50 text-indigo-900">⚙️ Formed Crates</th>
-                        <th className="p-2.5 text-right bg-emerald-50 text-emerald-900">🔍 QC OK Crates</th>
-                        <th className="p-2.5 text-right">Total Output Pcs</th>
-                        <th className="p-2.5 text-center">Reconcile</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
-                      {state.jobs.map((job) => (
-                        <tr key={job.id} className="hover:bg-amber-50/40 transition">
-                          <td className="p-2.5 font-extrabold text-blue-900 font-mono">{job.id}</td>
-                          <td className="p-2.5 font-bold text-slate-800">
-                            {job.product}
-                            <span className="block text-[10px] text-slate-400 font-normal">
-                              {job.paperBrand || 'ITC'} • {job.gsm || 60} GSM • {job.targetLayers || 8}L
-                            </span>
-                          </td>
-                          <td className="p-2.5">
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                                job.status === 'Completed'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : job.status === 'Running'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              {job.status}
-                            </span>
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-bold bg-teal-50/50 text-teal-950">
-                            {job.availableRolls || 0}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-bold bg-blue-50/50 text-blue-950">
-                            {job.availableCuttingCrates || 0}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-bold bg-indigo-50/50 text-indigo-950">
-                            {job.availableFormingCrates || 0}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-bold bg-emerald-50/50 text-emerald-950">
-                            {job.availableQcCrates || 0}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-extrabold text-slate-900">
-                            {(job.totalQcPieces || job.totalFormedPieces || job.totalCutPieces || 0).toLocaleString()}
-                          </td>
-                          <td className="p-2.5 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenReconcileModal(job)}
-                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[11px] rounded-lg transition shadow-xs flex items-center justify-center gap-1 cursor-pointer mx-auto"
-                              title={`Reconcile physical stock for ${job.id}`}
-                            >
-                              <Scale className="w-3.5 h-3.5" /> Reconcile
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {state.jobs.length === 0 && (
-                        <tr>
-                          <td colSpan={9} className="p-8 text-center text-slate-400 font-bold">
-                            No production jobs available in database.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                    {/* Jobs Table Matrix */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
+                          Floor Stage Inventory Matrix ({activeJobs.length} Active Production Jobs)
+                        </h4>
+                        <span className="text-[11px] font-bold text-slate-500">
+                          Click "Reconcile" on any job to live-adjust physical stage inventory counts with audit logging
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="bg-slate-100 border-b border-slate-200 text-slate-700 font-black uppercase text-[10px]">
+                            <tr>
+                              <th className="p-2.5">Job ID</th>
+                              <th className="p-2.5">Product</th>
+                              <th className="p-2.5">Status</th>
+                              <th className="p-2.5 text-right bg-teal-50 text-teal-900">📜 Slit Rolls</th>
+                              <th className="p-2.5 text-right bg-blue-50 text-blue-900">✂️ Cut Crates</th>
+                              <th className="p-2.5 text-right bg-indigo-50 text-indigo-900">⚙️ Formed Crates</th>
+                              <th className="p-2.5 text-right bg-emerald-50 text-emerald-900">🔍 QC OK Crates</th>
+                              <th className="p-2.5 text-right">Total Output Pcs</th>
+                              <th className="p-2.5 text-center">Reconcile</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
+                            {activeJobs.map((job) => (
+                              <tr key={job.id} className="hover:bg-amber-50/40 transition">
+                                <td className="p-2.5 font-extrabold text-blue-900 font-mono">{job.id}</td>
+                                <td className="p-2.5 font-bold text-slate-800">
+                                  {job.product}
+                                  <span className="block text-[10px] text-slate-400 font-normal">
+                                    {job.paperBrand || 'ITC'} • {job.gsm || 60} GSM • {job.targetLayers || 8}L
+                                  </span>
+                                </td>
+                                <td className="p-2.5">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                      job.status === 'Completed'
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : job.status === 'Running'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-slate-100 text-slate-700'
+                                    }`}
+                                  >
+                                    {job.status}
+                                  </span>
+                                </td>
+                                <td className="p-2.5 text-right font-mono font-bold bg-teal-50/50 text-teal-950">
+                                  {job.availableRolls || 0}
+                                </td>
+                                <td className="p-2.5 text-right font-mono font-bold bg-blue-50/50 text-blue-950">
+                                  {job.availableCuttingCrates || 0}
+                                </td>
+                                <td className="p-2.5 text-right font-mono font-bold bg-indigo-50/50 text-indigo-950">
+                                  {job.availableFormingCrates || 0}
+                                </td>
+                                <td className="p-2.5 text-right font-mono font-bold bg-emerald-50/50 text-emerald-950">
+                                  {job.availableQcCrates || 0}
+                                </td>
+                                <td className="p-2.5 text-right font-mono font-extrabold text-slate-900">
+                                  {(job.totalQcPieces || job.totalFormedPieces || job.totalCutPieces || 0).toLocaleString()}
+                                </td>
+                                <td className="p-2.5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenReconcileModal(job)}
+                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[11px] rounded-lg transition shadow-xs flex items-center justify-center gap-1 cursor-pointer mx-auto"
+                                    title={`Reconcile physical stock for ${job.id}`}
+                                  >
+                                    <Scale className="w-3.5 h-3.5" /> Reconcile
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {activeJobs.length === 0 && (
+                              <tr>
+                                <td colSpan={9} className="p-8 text-center text-slate-400 font-bold">
+                                  No production jobs available in database.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 
@@ -6090,6 +6155,104 @@ ${formLines.join('\n')}
               </div>
             </div>
           )}
+
+          {/* ------------------------------------------------------------- */}
+          {/* SUB-TAB: DELETION VAULT & RECYCLE BIN */}
+          {/* ------------------------------------------------------------- */}
+          {masterSubTab === 'vault' && (
+            <div className="space-y-4">
+              <div className="bg-linear-to-r from-slate-900 via-rose-950 to-slate-900 rounded-2xl p-5 text-white shadow-xl border border-rose-900/40">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-base font-black m-0 flex items-center gap-2">
+                      🗑️ Deletion Vault & Recycle Bin (डेटा रिकवरी वॉल्ट)
+                    </h3>
+                    <p className="text-xs text-rose-200 mt-1 m-0">
+                      All deleted jobs, plans, shift handovers, and orders are securely archived here. Inspect who deleted them under which login, and restore them instantly.
+                    </p>
+                  </div>
+                  <div className="bg-rose-950/80 border border-rose-700/50 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-200">
+                    Archived Items: {(state.deletedVaultItems || []).length}
+                  </div>
+                </div>
+              </div>
+
+              {(state.deletedVaultItems || []).length === 0 ? (
+                <div className="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
+                  <span className="text-3xl block mb-2">✨</span>
+                  <p className="text-sm font-bold text-slate-700">Deletion Vault is Clean</p>
+                  <p className="text-xs text-slate-400">No records have been deleted in this session, or the vault is empty.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(state.deletedVaultItems || []).map((vaultItem) => (
+                    <div key={vaultItem.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex items-center justify-between flex-wrap gap-4 hover:border-rose-300 transition">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-rose-100 text-rose-800">
+                            {vaultItem.type}
+                          </span>
+                          <span className="font-mono text-xs font-black text-slate-800">{vaultItem.title}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">({vaultItem.originalId})</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                          <span>👤 Deleted By Login: <strong className="text-slate-800">{vaultItem.deletedBy}</strong></span>
+                          <span>🕒 Timestamp: <strong className="text-slate-800">{vaultItem.deletedAt}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!confirm(`Restore [${vaultItem.title}] back to active factory database?`)) return;
+                            let nextState = { ...state };
+                            if (vaultItem.type === 'JOB') {
+                              const restoredJob = vaultItem.data?.job;
+                              const restoredPlan = vaultItem.data?.productionPlan;
+                              if (restoredJob) {
+                                nextState.jobs = [restoredJob, ...(nextState.jobs || [])];
+                                nextState.deletedJobIds = (nextState.deletedJobIds || []).filter(id => id !== restoredJob.id);
+                              }
+                              if (restoredPlan) {
+                                nextState.productionPlans = [restoredPlan, ...(nextState.productionPlans || [])];
+                                nextState.deletedPlanIds = (nextState.deletedPlanIds || []).filter(id => id !== restoredPlan.id);
+                              }
+                            } else if (vaultItem.type === 'SHIFT_HANDOVER') {
+                              const restoredHo = vaultItem.data;
+                              if (restoredHo) {
+                                nextState.shiftHandovers = [restoredHo, ...(nextState.shiftHandovers || [])];
+                              }
+                            }
+                            nextState.deletedVaultItems = (nextState.deletedVaultItems || []).filter(v => v.id !== vaultItem.id);
+                            onSaveState(nextState);
+                            alert(`✅ Successfully restored [${vaultItem.title}] to active production database!`);
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-extrabold transition shadow-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          🔄 Restore / Recover
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!confirm(`Permanently delete [${vaultItem.title}] from vault? This cannot be undone.`)) return;
+                            const nextVault = (state.deletedVaultItems || []).filter(v => v.id !== vaultItem.id);
+                            onSaveState({
+                              ...state,
+                              deletedVaultItems: nextVault
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                        >
+                          🗑️ Permanent Purge
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -6830,6 +6993,138 @@ ${formLines.join('\n')}
             </div>
           </div>
 
+          {/* Cascade Deletions Backup Repository */}
+          <div className="bg-indigo-50/40 border border-indigo-200 rounded-2xl p-5 mt-6 shadow-[inset_0_2px_10px_rgba(99,102,241,0.02)]">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-indigo-100 pb-3 mb-4 gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h5 className="text-sm font-black text-indigo-950 uppercase m-0">Cascade Deletions Backup Repository</h5>
+                  <p className="text-[11px] text-indigo-700 mt-0.5 m-0 font-medium">
+                    All cascade deletions of production jobs and plans are securely archived here. You can view, download, or restore them instantly.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirm('Are you sure you want to permanently clear the deleted backups history? This cannot be undone.')) return;
+                  localStorage.removeItem('paperware_deleted_backups');
+                  showToast('🧹 Deleted backups repository cleared successfully.');
+                  // force re-render
+                  onSaveState({ ...state });
+                }}
+                className="px-3 py-1.5 text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold border border-rose-200 hover:border-rose-300 rounded-lg transition self-start sm:self-auto cursor-pointer"
+              >
+                Clear Repository
+              </button>
+            </div>
+
+            {(() => {
+              const backupsRaw = localStorage.getItem('paperware_deleted_backups');
+              const backups = backupsRaw ? JSON.parse(backupsRaw) : [];
+
+              if (backups.length === 0) {
+                return (
+                  <div className="text-center py-6 text-xs text-slate-500 italic bg-white rounded-xl border border-dashed border-indigo-100">
+                    No deleted records in the archive. Every job or plan deletion automatically triggers a secure snapshot backup.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                  {backups.map((b: any) => (
+                    <div key={b.backupId} className="bg-white border border-indigo-100 rounded-xl p-3.5 shadow-xs flex items-center justify-between text-xs hover:border-indigo-200 transition">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md text-[10px]">{b.backupId}</span>
+                          <span className="font-black text-slate-800">Job: {b.jobId}</span>
+                          {b.planId && <span className="text-slate-500 font-semibold">• Plan: {b.planId}</span>}
+                          <span className="text-slate-400">• {b.date || 'N/A'}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-2 flex-wrap">
+                          <span>Deleted: <strong>{b.deletedAt}</strong></span>
+                          <span>• By: <strong>{b.deletedBy}</strong></span>
+                          <span>• Active Runs Purged: <strong className="text-indigo-700">{b.job?.runningBatches?.length || 0} batches</strong></span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const blob = new Blob([JSON.stringify(b, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `Backup_Deleted_${b.jobId}_${b.backupId}.json`;
+                            a.click();
+                          }}
+                          className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 transition cursor-pointer"
+                          title="Download JSON Snapshot"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!confirm(`Are you sure you want to RESTORE Job [${b.jobId}] and Plan [${b.planId}] from backup #${b.backupId}?\nThis will recreate the plan and job records back to the factory database.`)) return;
+                            
+                            const nextJobs = [...state.jobs];
+                            if (b.job && !nextJobs.some(j => j.id === b.jobId)) {
+                              nextJobs.push(b.job);
+                            }
+
+                            const nextPlans = [...(state.productionPlans || [])];
+                            if (b.productionPlan && !nextPlans.some(p => p.id === b.planId)) {
+                              nextPlans.push(b.productionPlan);
+                            }
+
+                            // Remove from deleted list
+                            const nextDeletedJobs = (state.deletedJobIds || []).filter(id => id !== b.jobId);
+                            const nextDeletedPlans = (state.deletedPlanIds || []).filter(id => id !== b.planId);
+
+                            const newLog: LogEntry = {
+                              jobId: b.jobId,
+                              stage: 'Admin Master',
+                              machine: 'BACKUP-RESTORE',
+                              shift: 'DAY',
+                              action: `🔄 Restored Job [${b.jobId}] & Plan [${b.planId}] from Cascade Backup Archive #${b.backupId}`,
+                              worker: 'ADMIN',
+                              user: currentUser?.username || 'admin',
+                              rawDate: new Date().toISOString().split('T')[0],
+                              timestamp: new Date().toLocaleString()
+                            };
+
+                            onSaveState({
+                              ...state,
+                              jobs: nextJobs,
+                              productionPlans: nextPlans,
+                              deletedJobIds: nextDeletedJobs,
+                              deletedPlanIds: nextDeletedPlans,
+                              logs: [...state.logs, newLog]
+                            });
+
+                            // remove this backup from localStorage list
+                            const updatedBackups = backups.filter((bk: any) => bk.backupId !== b.backupId);
+                            localStorage.setItem('paperware_deleted_backups', JSON.stringify(updatedBackups));
+
+                            showToast(`✅ Successfully Restored Job [${b.jobId}] and production plan!`);
+                          }}
+                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] transition cursor-pointer shadow-xs"
+                        >
+                          Restore Data
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
           <div className="mt-6 border border-rose-200 bg-rose-50/30 rounded-2xl overflow-hidden">
             <div className="bg-rose-100/50 border-b border-rose-200 p-4">
               <h5 className="text-sm font-black text-rose-950 flex items-center gap-2 uppercase">
@@ -7508,6 +7803,16 @@ ${formLines.join('\n')}
             state={state}
             onSaveState={onSaveState}
             isEmbedded={true}
+          />
+        </div>
+      )}
+
+      {activeTab === 'employee_master' && (
+        <div className="space-y-6" id="employee-master-tab">
+          <EmployeeMasterView
+            state={state}
+            onBackToHub={onBackToHub}
+            onSaveState={onSaveState}
           />
         </div>
       )}

@@ -25,9 +25,11 @@ import {
   CheckCircle2,
   Calendar,
   Users,
-  Database
+  Database,
+  Trash2
 } from 'lucide-react';
 import { CurrentView, FactoryState } from '../types';
+import { calculateAvailableScrapKg } from '../lib/utils';
 
 interface NavigationHubProps {
   state?: FactoryState;
@@ -86,9 +88,9 @@ export const NavigationHub: React.FC<NavigationHubProps> = ({
 
   // Daily Factory Inspiration Poem State
   const DEFAULT_POEM = `With hard work and dedication, we give a new shape to every roll,
-We increase the factory\'s pride with exact measurements and pure quality.
-In every spoon, every fork, every pack lies our trust,
-Every worker\'s dear sweat is the pride of Wondercraft.`;
+    We increase the factory\'s pride with exact measurements and pure quality.
+    In every spoon, every fork, every pack lies our trust,
+    Every employee\'s dear sweat is the pride of Wondercraft.`;
 
   const [poem, setPoem] = useState(() => {
     return localStorage.getItem('wunderkraf_daily_poem') || DEFAULT_POEM;
@@ -212,6 +214,15 @@ Every worker\'s dear sweat is the pride of Wondercraft.`;
       perm: 'Analytics',
       borderColor: 'border-violet-600',
       badge: '8-Day & Operator Audit'
+    },
+    {
+      id: 'SCRAP',
+      title: 'Scrap & Wastage Module',
+      subtitle: 'Cutting, Forming, Slitting Scrap, Wastage Reports & Buyer Sales Audit',
+      icon: <Trash2 className="w-8 h-8 text-rose-600" />,
+      perm: 'Scrap',
+      borderColor: 'border-rose-600',
+      badge: `${Math.round(calculateAvailableScrapKg(state?.logs || [], state?.scrapSales || []))} KG Avail`
     },
     {
       id: 'SEARCH',

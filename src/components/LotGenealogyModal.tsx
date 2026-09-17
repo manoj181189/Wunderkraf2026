@@ -15,10 +15,13 @@ import {
   AlertTriangle,
   ArrowRight,
   ShieldCheck,
-  Share2
+  Share2,
+  Droplets
 } from 'lucide-react';
 import { FactoryState, Job } from '../types';
 import { getJobAllReels, getJobAllGsms, getJobReelItemsBreakdown } from '../lib/utils';
+import { getJobStageShiftLedger } from '../lib/shiftSlices';
+import { StageShiftLedgerTable } from './StageShiftLedgerTable';
 
 interface LotGenealogyModalProps {
   isOpen: boolean;
@@ -81,9 +84,35 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
   const qcDate = getStageDate('qc');
   const packingDate = getStageDate('packing');
 
+  const slitLedger = getJobStageShiftLedger(job, 'Slitting', state);
+  const cutLedger = getJobStageShiftLedger(job, 'Cutting', state);
+  const formLedger = getJobStageShiftLedger(job, 'Forming', state);
+  const qcLedger = getJobStageShiftLedger(job, 'QC', state);
+
+  // Glue details for Cutting stage
+  const cuttingBatches = job.runningBatches?.filter(b => b.stage === 'Cutting' || b.batchId.includes('CUT')) || [];
+  const totalCuttingGlueKg = Number(
+    (
+      job.glueUsageKg ||
+      cuttingBatches.reduce((sum, b) => sum + (b.glueUsageKg || 0), 0) ||
+      cutLedger.totalGlueKg ||
+      0
+    ).toFixed(2)
+  );
+  const cuttingGlueBrand =
+    job.glueBrand ||
+    cuttingBatches.find(b => b.glueBrand)?.glueBrand ||
+    cutLedger.glueBrand ||
+    'Pidilite W-10 (Food Grade Adhesive)';
+
+  // Glue entries logs for this job/stage
+  const relevantGlueLogs = (state.glueUsageLogs || []).filter(
+    g => g.jobId === job.id || (job.runningBatches || []).some(b => b.batchId === g.batchId)
+  );
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 flex flex-col">
+      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 flex flex-col">
         {/* Header */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10">
           <div className="flex items-center gap-3">
@@ -116,7 +145,7 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
         {/* Content Body */}
         <div className="p-6 space-y-6">
           {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-2xl">
               <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wide">Parent Reels</span>
               <div className="text-base font-extrabold text-blue-950 truncate">
@@ -132,6 +161,19 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
               </div>
               <span className="text-[10px] text-indigo-700 font-medium">
                 ~{((job.availableCuttingCrates || 0) * cutPcsStd).toLocaleString()} Blanks
+              </span>
+            </div>
+
+            <div className="p-3 bg-teal-50/80 border border-teal-200 rounded-2xl">
+              <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wide flex items-center gap-1">
+                <Droplets className="w-3 h-3 text-teal-600" />
+                Glue Consumed
+              </span>
+              <div className="text-base font-extrabold text-teal-950">
+                {totalCuttingGlueKg > 0 ? `${totalCuttingGlueKg} KG` : '0 KG Logged'}
+              </div>
+              <span className="text-[10px] text-teal-700 font-medium truncate block" title={cuttingGlueBrand}>
+                {cuttingGlueBrand.split(' ')[0]} ({cuttingGlueBrand})
               </span>
             </div>
 
@@ -212,6 +254,15 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Shift & Changeover Production History Ledger */}
+                <div className="mt-3 pt-3 border-t border-slate-200/80">
+                  <StageShiftLedgerTable
+                    ledger={slitLedger}
+                    stageTitle="Slitting Machine"
+                    themeColor="blue"
+                  />
+                </div>
               </div>
             </div>
 
@@ -238,7 +289,7 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs pt-1">
                   <div>
                     <span className="text-slate-500 font-medium">Cutting Batches:</span>
                     <div className="font-mono font-bold text-slate-900 mt-0.5">
@@ -253,7 +304,7 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                     <div className="font-bold text-slate-900 mt-0.5">
                       {cutBatches.length > 0
                         ? Array.from(new Set(cutBatches.map(b => b.worker))).join(', ')
-                        : 'CUT_OP1'}
+                        : 'Operator'}
                     </div>
                   </div>
 
@@ -263,6 +314,56 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                       {job.availableCuttingCrates || 0} Crates (@ {cutPcsStd.toLocaleString()} Blanks/Crate)
                     </div>
                   </div>
+
+                  <div className="bg-teal-50/90 border border-teal-300 rounded-xl p-2.5">
+                    <span className="text-teal-900 font-bold text-[11px] flex items-center gap-1">
+                      <Droplets className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                      Adhesive Glue (ग्लू खपत):
+                    </span>
+                    <div className="font-black text-teal-950 text-sm mt-0.5">
+                      {totalCuttingGlueKg > 0 ? `${totalCuttingGlueKg} KG` : '0.00 KG'}
+                    </div>
+                    <div className="text-[10px] text-teal-700 font-medium truncate" title={cuttingGlueBrand}>
+                      {cuttingGlueBrand}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Glue Issue Transactions log for this job if any */}
+                {relevantGlueLogs.length > 0 && (
+                  <div className="mt-2.5 bg-white border border-teal-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-teal-950 uppercase flex items-center gap-1.5">
+                        <Droplets className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Adhesive Issue Transactions (ग्लू यूज़ एंट्री हिस्ट्री):</span>
+                      </span>
+                      <span className="text-[10px] font-extrabold bg-teal-100 text-teal-900 px-2 py-0.5 rounded-full border border-teal-300">
+                        Total: {totalCuttingGlueKg} KG
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {relevantGlueLogs.map((log, lIdx) => (
+                        <div
+                          key={log.id || lIdx}
+                          className="flex items-center gap-1.5 bg-teal-50/90 border border-teal-300 px-2.5 py-1 rounded-lg text-xs"
+                        >
+                          <span className="font-black text-teal-950">+{log.quantityKg} KG</span>
+                          <span className="text-[10px] text-slate-500">
+                            ({log.date} {log.time} | Shift: {log.shift} | Op: {log.operator})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shift & Changeover Production History Ledger */}
+                <div className="mt-3 pt-3 border-t border-slate-200/80">
+                  <StageShiftLedgerTable
+                    ledger={cutLedger}
+                    stageTitle="Cutting Machine"
+                    themeColor="indigo"
+                  />
                 </div>
               </div>
             </div>
@@ -315,6 +416,15 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                       {job.availableFormingCrates || 0} Formed Crates (@ {formPcsStd.toLocaleString()} Pcs/Crate)
                     </div>
                   </div>
+                </div>
+
+                {/* Shift & Changeover Production History Ledger */}
+                <div className="mt-3 pt-3 border-t border-slate-200/80">
+                  <StageShiftLedgerTable
+                    ledger={formLedger}
+                    stageTitle="Forming Machines"
+                    themeColor="purple"
+                  />
                 </div>
               </div>
             </div>
@@ -370,6 +480,17 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Shift Ledger for QC if records exist */}
+                {qcLedger.items.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-200/80">
+                    <StageShiftLedgerTable
+                      ledger={qcLedger}
+                      stageTitle="QC Inspection Desk"
+                      themeColor="emerald"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

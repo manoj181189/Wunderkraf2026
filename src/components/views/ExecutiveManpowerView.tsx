@@ -25,7 +25,7 @@ import {
   ArrowRight,
   Percent
 } from 'lucide-react';
-import { FactoryState, FloorWorker, Job, RunningBatch, ShiftHandoverRecord, GlueUsageEntry } from '../../types';
+import { FactoryState, FloorWorker, Job, RunningBatch, ShiftHandoverRecord, GlueUsageEntry, CurrentView } from '../../types';
 import { DEFAULT_FLOOR_WORKERS } from '../../lib/constants';
 import { LiveFloorManpowerTracker } from '../LiveFloorManpowerTracker';
 
@@ -33,15 +33,17 @@ interface ExecutiveManpowerViewProps {
   state: FactoryState;
   onBackToHub: () => void;
   onSaveState: (nextState: FactoryState) => void;
+  onNavigateToView?: (view: CurrentView) => void;
 }
 
 export const ExecutiveManpowerView: React.FC<ExecutiveManpowerViewProps> = ({
   state,
   onBackToHub,
-  onSaveState
+  onSaveState,
+  onNavigateToView
 }) => {
   const workers: FloorWorker[] =
-    state.floorWorkers && state.floorWorkers.length > 0
+    state.floorWorkers !== undefined
       ? state.floorWorkers
       : DEFAULT_FLOOR_WORKERS;
 
@@ -84,7 +86,7 @@ export const ExecutiveManpowerView: React.FC<ExecutiveManpowerViewProps> = ({
   });
 
   // --- BOTTOM SECTION DYNAMIC METRICS CALCULATION ---
-  const operatorStats = (state.floorWorkers || DEFAULT_FLOOR_WORKERS)
+  const operatorStats = (state.floorWorkers !== undefined ? state.floorWorkers : DEFAULT_FLOOR_WORKERS)
     .filter((w) => w.role === 'OPERATOR')
     .map((op) => {
       // Find logs for this operator
@@ -389,136 +391,97 @@ export const ExecutiveManpowerView: React.FC<ExecutiveManpowerViewProps> = ({
             </div>
           </div>
 
-          {/* Shift Handover Summaries */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-                <Clock className="w-4 h-4" />
+          {/* Shift Handover Summaries -> Redirect to Audit Module */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wide text-slate-900 m-0">
+                    Shift Handover summaries
+                  </h4>
+                  <p className="text-[11px] text-slate-500 m-0">Shift Custody & Custodian Handover Logbook</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wide text-slate-900 m-0">
-                  Shift Handover summaries
-                </h4>
-                <p className="text-[11px] text-slate-500 m-0">Real-time custody transfers & checklist logs</p>
+
+              <div className="space-y-4">
+                <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1 text-xs text-slate-600">
+                  <div className="flex justify-between text-[11px] font-bold text-slate-400 uppercase">
+                    <span>Total Handovers</span>
+                    <span className="text-slate-800 font-extrabold font-mono text-xs">{(state.shiftHandovers || []).length} Entries</span>
+                  </div>
+                  <p className="m-0 pt-2 text-[11px] leading-relaxed">
+                    Shift handover logs and custodian custody transfers have been relocated to the <b>Audit & Traceability Module</b> under a dedicated <b>Handovers Tab</b> for clear separation of concerns.
+                  </p>
+                </div>
+                
+                <div className="text-xs text-amber-800 bg-amber-50 border border-amber-100 p-3 rounded-lg flex items-start gap-1.5 font-medium leading-relaxed">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>The live shift data is kept in direct synchronization via the central factory state engine.</span>
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto max-h-[350px]">
-              {(state.shiftHandovers || []).length === 0 ? (
-                <div className="text-center py-8 text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200 flex-1 flex flex-col items-center justify-center">
-                  <AlertCircle className="w-8 h-8 text-slate-300 mb-1.5" />
-                  <span>No shift handovers logged yet. Handovers are recorded during active workstation operator transitions.</span>
-                </div>
-              ) : (
-                (state.shiftHandovers || []).slice(0, 5).map((ho) => (
-                  <div key={ho.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-indigo-950 font-mono text-[11px]">{ho.id}</span>
-                      <span className="text-[10px] text-slate-400 font-bold">{ho.date}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="bg-blue-100 text-blue-800 text-[9px] font-black px-1.5 py-0.5 rounded uppercase">
-                        {ho.department} • {ho.machine}
-                      </span>
-                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
-                        ho.checklistPassed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-                      }`}>
-                        {ho.checklistPassed ? '✓ Checklist Pass' : '✗ Audit Review'}
-                      </span>
-                    </div>
-                    <div className="pt-1.5 border-t border-slate-200/60 flex items-center justify-between gap-1">
-                      <div className="text-slate-600 font-semibold">
-                        Outgoing: <b className="text-slate-900">{ho.outgoingOperator}</b>
-                      </div>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <div className="text-slate-600 font-semibold">
-                        Relieving: <b className="text-blue-700">{ho.relievedByOperator}</b>
-                      </div>
-                    </div>
-                    <div className="text-[10.5px] bg-white p-1.5 rounded border border-slate-100 flex justify-between text-slate-500 font-medium">
-                      <span>Produced: <b>{ho.producedQty} {ho.department === 'Slitting' ? 'Rolls' : 'Crates'}</b></span>
-                      <span>Scrap: <b className="text-rose-600">{ho.scrapQty} KG</b></span>
-                    </div>
-                  </div>
-                ))
-              )}
+            <div className="pt-4 mt-auto">
+              <button
+                onClick={() => onNavigateToView?.('AUDIT')}
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+              >
+                <span>Go to Audit & Traceability Desk</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 
-          {/* Cumulative Raw Material (Glue/Scrap) Analytics */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
-                <Droplets className="w-4 h-4" />
+          {/* Cumulative Raw Material (Glue/Scrap) Analytics -> Redirect to Scrap Module */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
+                  <Droplets className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wide text-slate-900 m-0">
+                    Raw Material & Wastage analytics
+                  </h4>
+                  <p className="text-[11px] text-slate-500 m-0">Glue consumption & cumulative process scrap</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wide text-slate-900 m-0">
-                  Raw Material & Wastage analytics
-                </h4>
-                <p className="text-[11px] text-slate-500 m-0">Adhesive glue consumption & cumulative process scrap</p>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Glue Consumed</span>
+                    <b className="text-blue-900 text-sm font-black">{totalGlueConsumed.toFixed(1)} KG</b>
+                  </div>
+                  <div className="bg-rose-50/40 border border-rose-100 p-2 rounded-xl">
+                    <span className="text-[9px] text-rose-600 font-bold uppercase block">Process Scrap</span>
+                    <b className="text-rose-700 text-sm font-black">{cumulativeScrap.toFixed(1)} KG</b>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-[11px] text-slate-600 leading-relaxed space-y-1">
+                  <div className="flex justify-between font-bold text-slate-400 uppercase text-[9px] mb-1">
+                    <span>Overall Plant Wastage Rate</span>
+                    <span className="text-rose-700 font-extrabold">{overallWastagePct}%</span>
+                  </div>
+                  <p className="m-0">
+                    Wastage source logs, scrap dispatches, and material consumption analytics have been integrated into the <b>Scrap & Wastage Module</b> for unified raw material control.
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 space-y-4">
-              {/* Glue Metric block */}
-              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-600 uppercase">Cumulative Glue Consumed</span>
-                  <span className="bg-blue-100 text-blue-800 text-[9px] font-black px-1.5 py-0.5 rounded">
-                    Traceable Logs
-                  </span>
-                </div>
-                <div className="text-2xl font-black text-blue-950 flex items-baseline gap-1">
-                  <span>{totalGlueConsumed.toFixed(1)}</span>
-                  <span className="text-xs text-slate-500 font-bold">KG</span>
-                </div>
-                {/* Brand breakdown */}
-                {Object.keys(glueByBrand).length > 0 && (
-                  <div className="pt-2 border-t border-slate-200/60 grid grid-cols-2 gap-2 text-[10px]">
-                    {Object.entries(glueByBrand).map(([brand, qty]) => (
-                      <div key={brand} className="bg-white px-2 py-1 rounded border border-slate-100 flex items-center justify-between animate-fade-in">
-                        <span className="text-slate-500 font-semibold truncate max-w-[65px]">{brand}</span>
-                        <b className="text-slate-800">{qty.toFixed(1)} KG</b>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Scrap Metric block */}
-              <div className="bg-rose-50/40 border border-rose-100 p-3 rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-rose-800 uppercase">Cumulative Scrap/Wastage</span>
-                  <span className="bg-rose-100 text-rose-800 text-[9px] font-black px-1.5 py-0.5 rounded">
-                    Yield Impact
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl font-black text-rose-950 flex items-baseline gap-1">
-                    <span>{cumulativeScrap.toFixed(1)}</span>
-                    <span className="text-xs text-slate-500 font-bold">KG</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Overall Wastage Rate</span>
-                    <b className="text-rose-700 text-sm font-extrabold">{overallWastagePct}%</b>
-                  </div>
-                </div>
-                {/* Department breakdown */}
-                <div className="pt-2 border-t border-rose-200/40 grid grid-cols-3 gap-1.5 text-[9px] text-center">
-                  <div className="bg-white p-1 rounded border border-rose-100">
-                    <span className="text-slate-400 block font-semibold">Slitting</span>
-                    <b className="text-slate-800 font-extrabold">{slittingScrap.toFixed(1)} KG</b>
-                  </div>
-                  <div className="bg-white p-1 rounded border border-rose-100">
-                    <span className="text-slate-400 block font-semibold">Cutting</span>
-                    <b className="text-slate-800 font-extrabold">{cuttingScrap.toFixed(1)} KG</b>
-                  </div>
-                  <div className="bg-white p-1 rounded border border-rose-100">
-                    <span className="text-slate-400 block font-semibold">Forming</span>
-                    <b className="text-slate-800 font-extrabold">{formingScrap.toFixed(1)} KG</b>
-                  </div>
-                </div>
-              </div>
+            <div className="pt-4 mt-auto">
+              <button
+                onClick={() => onNavigateToView?.('SCRAP')}
+                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+              >
+                <span>Go to Scrap & Wastage Module</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 

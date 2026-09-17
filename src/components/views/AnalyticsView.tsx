@@ -106,10 +106,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
     allEvents.forEach((e) => {
       if (e.operator && e.operator !== 'Unknown') set.add(e.operator);
     });
-    // Add known operators from state/defaults
-    ['CUT_OP1', 'CUT_OP2', 'VIKRAM_CUT', 'FORM_OP1', 'FORM_OP2', 'FORM_OP3', 'RAMESH_SLIT', 'SURESH_SLIT', 'QC_RAMESH', 'PACK_SURESH', 'PACK_MAHESH'].forEach(
-      (op) => set.add(op)
-    );
+    // Add known operators from state
+    if (state.floorWorkers) {
+      state.floorWorkers.filter(w => w.role === 'OPERATOR').forEach(w => set.add(w.name));
+    }
     return Array.from(set).sort();
   }, [allEvents]);
 
