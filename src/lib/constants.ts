@@ -358,7 +358,7 @@ export const TARGET_GSM_DEFAULT = [
 ];
 
 export const GLUE_BRANDS = [
-  'Pidilite FS-35'
+  'Pidilite FS35'
 ];
 
 export const DEFAULT_GLUE_USAGE_LOGS: GlueUsageEntry[] = [

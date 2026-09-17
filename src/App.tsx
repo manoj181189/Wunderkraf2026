@@ -99,6 +99,7 @@ export const App: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         parsed.users = sanitizeUsersState(parsed.users);
+        parsed.glueBrands = ['Pidilite FS35'];
         return parsed;
       }
     } catch (e) {
@@ -106,6 +107,7 @@ export const App: React.FC = () => {
     }
     return {
       ...INITIAL_STATE,
+      glueBrands: ['Pidilite FS35'],
       users: sanitizeUsersState(INITIAL_STATE.users)
     };
   });

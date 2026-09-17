@@ -413,6 +413,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
       if (cloudState && Array.isArray(cloudState.jobs)) {
         console.info('[FirebaseSync] Authoritative cloud state received. Converging with local state...');
         const merged = mergeFactoryStates(cloudState, localState || INITIAL_STATE);
+        merged.glueBrands = ['Pidilite FS35'];
         await saveToIndexedDB(merged);
         try {
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
@@ -432,6 +433,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
     if (centralState) {
       console.info('[Sync Bridge] Central state fetched successfully. Merging with local data...');
       const merged = mergeFactoryStates(centralState, localState || INITIAL_STATE);
+      merged.glueBrands = ['Pidilite FS35'];
 
       // Save converged authoritative state to local storage
       await saveToIndexedDB(merged);
@@ -451,12 +453,14 @@ export async function initializeFactoryState(): Promise<FactoryState> {
   // Step 3: Fallback to local state or INITIAL_STATE if offline
   if (localState && localState.jobs && Array.isArray(localState.jobs)) {
     console.info('[Storage] Initialized with local offline state.');
+    localState.glueBrands = ['Pidilite FS35'];
     return localState;
   }
 
   console.info('[Storage] Initializing fresh default state.');
-  saveToIndexedDB(INITIAL_STATE).catch(() => {});
-  return INITIAL_STATE;
+  const defaultSt = { ...INITIAL_STATE, glueBrands: ['Pidilite FS35'] };
+  saveToIndexedDB(defaultSt).catch(() => {});
+  return defaultSt;
 }
 
 /**
