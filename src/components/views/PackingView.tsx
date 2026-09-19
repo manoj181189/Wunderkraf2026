@@ -29,6 +29,7 @@ import {
 import { FactoryState, Job, PackJob, ProductType, OperatorRunSlice, LogEntry } from '../../types';
 import { DEPT_WORKERS, MACHINES } from '../../lib/constants';
 import { getCurrentExpectedShift } from '../../lib/utils';
+import { autoRegisterWorker } from '../../lib/workerUtils';
 import { MachineBreakdownBanner } from '../MachineBreakdownBanner';
 import { ShiftHandoverModal } from '../ShiftHandoverModal';
 
@@ -235,10 +236,14 @@ export const PackingView: React.FC<PackingViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, packerName, 'Packing', selectedMachine, shift);
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
       packJobs: updatedPackJobs,
+      floorWorkers,
+      deptWorkers,
       logs: [...state.logs, newLog]
     });
 
@@ -709,9 +714,13 @@ export const PackingView: React.FC<PackingViewProps> = ({
       timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
     };
 
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, handoverData.relievedByOperator, 'Packing', selectedMachine, handoverData.nextShift as any);
+
     onSaveState({
       ...state,
       packJobs: updatedPackJobs,
+      floorWorkers,
+      deptWorkers,
       logs: [handoverLog, ...(state.logs || [])]
     });
 

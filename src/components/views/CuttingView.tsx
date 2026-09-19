@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Scissors, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, Box, Wrench, Search, Shield, ShieldCheck, CheckCircle2, AlertTriangle, RotateCcw, Calendar, Clock, Droplets, Users, UserCheck, Recycle, ChevronDown, ChevronUp, Lock, Pencil, Plus, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
-import { FactoryState, Job, ProductType, RunningBatch, OperatorRunSlice, LogEntry, GlueUsageEntry, AuditLog, ShiftHandoverRecord } from '../../types';
+import { FactoryState, WipLot, Job, ProductType, RunningBatch, OperatorRunSlice, LogEntry, GlueUsageEntry, AuditLog, ShiftHandoverRecord } from '../../types';
 import { logAuditTrail } from '../../lib/audit';
 import { PRODUCTS, DEPT_WORKERS, MACHINES } from '../../lib/constants';
 import { getCurrentExpectedShift, getJobAllReels, getJobReelsSummary, getJobReelItemsBreakdown, getJobAllGsms, getJobPlannedLayers } from '../../lib/utils';
@@ -11,6 +11,7 @@ import { LotGenealogyModal } from '../LotGenealogyModal';
 import { ShiftHandoverModal } from '../ShiftHandoverModal';
 import { StationCrewModal } from '../StationCrewModal';
 import { GlueUsageModal } from '../GlueUsageModal';
+import { autoRegisterWorker } from '../../lib/workerUtils';
 import { LiveFloorManpowerTracker } from '../LiveFloorManpowerTracker';
 
 interface CuttingViewProps {
@@ -654,9 +655,13 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, operatorName, 'Cutting', selectedMachine, shift);
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      floorWorkers,
+      deptWorkers,
       logs: [...state.logs, newLog]
     });
 
@@ -696,6 +701,22 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       return;
     }
 
+    const newLot: WipLot = {
+      id: `LOT-CUT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      jobId: job.id,
+      product: job.product,
+      stage: 'Cutting',
+      producedQty: qty,
+      consumedQty: 0,
+      remainingQty: qty,
+      piecesPerCrate: effectiveCutPcs,
+      totalPieces: forwardedPcs,
+      producedByOperator: batch.worker || operatorName,
+      machine: selectedMachine,
+      shift: batch.shift || shift || 'DAY',
+      timestamp: new Date().toISOString()
+    };
+
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
       return {
@@ -721,7 +742,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       stage: 'Cutting Forward',
       machine: selectedMachine,
       shift: batch.shift,
-      action: `⚡ Partial Forward: ${qty} Cut Crates (= ${forwardedPcs.toLocaleString()} Flat Blanks) forwarded to Forming Desk (Batch #${batch.batchId})`,
+      action: `⚡ Partial Forward: ${qty} Cut Crates (= ${forwardedPcs.toLocaleString()} Flat Blanks) forwarded. Created Lot: ${newLot.id}`,
       worker: batch.worker,
       user: 'cut_user',
       rawDate: new Date().toISOString().split('T')[0],
@@ -731,6 +752,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      wipLots: [newLot, ...(state.wipLots || [])],
       logs: [...state.logs, newLog]
     });
 
@@ -2198,13 +2220,6 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                     <span className="text-[10px] text-rose-500 text-center">Please fill Actual Sheets Cut</span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCancelConfirmOpen(true)}
-                  className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
-                >
-                  <XCircle className="w-3.5 h-3.5" /> Cancel & Return
-                </button>
               </div>
             </div>
           </div>

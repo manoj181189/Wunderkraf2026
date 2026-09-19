@@ -11,6 +11,7 @@ import { ShiftHandoverModal } from '../ShiftHandoverModal';
 import { StationCrewModal } from '../StationCrewModal';
 import { Users } from 'lucide-react';
 
+import { autoRegisterWorker } from '../../lib/workerUtils';
 interface FormingViewProps {
   state: FactoryState;
   onBackToHub: () => void;
@@ -287,9 +288,50 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return b;
     });
 
-    if (remDeduct > 0) {
-      alert(`⚠️ Insufficient crates in selected Cutting Operator Lot! Available remaining: ${cratesCount - remDeduct}, Requested: ${cratesCount}`);
+    // Also deduct from new WipLots
+    let remWipDeduct = cratesCount;
+    const updatedWipLots = (state.wipLots || []).map(lot => {
+      if (lot.jobId === job.id && lot.stage === 'Cutting' && remWipDeduct > 0) {
+        if (!selectedCuttingBatchId || lot.id === selectedCuttingBatchId) {
+          const rem = lot.remainingQty;
+          if (rem > 0) {
+            const dec = Math.min(rem, remWipDeduct);
+            remWipDeduct -= dec;
+            return {
+              ...lot,
+              consumedQty: lot.consumedQty + dec,
+              remainingQty: lot.remainingQty - dec
+            };
+          }
+        }
+      }
+      return lot;
+    });
+
+    if (remDeduct > 0 && remWipDeduct > 0) {
+      alert(`⚠️ Insufficient crates in selected Cutting Operator Lot! Available remaining: ${cratesCount - Math.min(remDeduct, remWipDeduct)}, Requested: ${cratesCount}`);
       return;
+    }
+
+    // Find worker name and ID of selected lot for provenance
+    let selectedCuttingLotWorker = '';
+    const cuttingBatchesForJob = (job.runningBatches || []).filter((b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
+    for (const cb of cuttingBatchesForJob) {
+      if (cb.slices && cb.slices.length > 0) {
+        const matchingSlice = cb.slices.find(s => s.sliceId === selectedCuttingBatchId);
+        if (matchingSlice) {
+          selectedCuttingLotWorker = matchingSlice.operator;
+          break;
+        }
+      }
+      if (cb.batchId === selectedCuttingBatchId) {
+        selectedCuttingLotWorker = cb.worker;
+        break;
+      }
+    }
+    if (!selectedCuttingLotWorker) {
+      const matchWip = (state.wipLots || []).find(l => l.id === selectedCuttingBatchId);
+      if (matchWip) selectedCuttingLotWorker = matchWip.producedByOperator;
     }
 
     let updatedJobs: Job[] = [];
@@ -305,6 +347,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
             if (b.batchId !== activeRunning.batch.batchId) return b;
             return {
               ...b,
+              sourceLotId: b.sourceLotId || selectedCuttingBatchId || undefined,
+              sourceOperator: b.sourceOperator || selectedCuttingLotWorker || undefined,
               issuedQty: (b.issuedQty || 0) + cratesCount,
               inputPieces: (b.inputPieces || 0) + issuedInputPieces,
               pcsPerCrate: netCutPcsPerCrate
@@ -312,13 +356,13 @@ export const FormingView: React.FC<FormingViewProps> = ({
           })
         };
       });
-      logMessage = `Forming Top-up on ${selectedMachine} (+${cratesCount} Crates = +${issuedInputPieces.toLocaleString()} Net Blanks Added to Running Batch)`;
+      logMessage = `Forming Top-up on ${selectedMachine} (+${cratesCount} Crates = +${issuedInputPieces.toLocaleString()} Net Blanks Added from Lot ${selectedCuttingBatchId || 'Cut'} by ${selectedCuttingLotWorker || 'Operator'})`;
       alert(`✅ Top-up Successful! Added ${cratesCount} more crates (+${issuedInputPieces.toLocaleString()} Net Blanks @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate) to running Job ${job.id} on ${selectedMachine}.`);
     } else {
       // Fresh batch
       const master = getNumberingMaster(state.seriesConfig);
       const batchId = generateFormingBatchId(job.id, job.runningBatches || [], master);
-      const upstreamBatchId = job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
+      const upstreamBatchId = selectedCuttingBatchId || job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
       const newBatch: RunningBatch = {
         batchId,
         stage: 'Forming',
@@ -327,6 +371,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
         startTime: nowTime,
         status: 'Running',
         parentBatchId: upstreamBatchId,
+        sourceLotId: selectedCuttingBatchId || undefined,
+        sourceOperator: selectedCuttingLotWorker || undefined,
         issuedQty: cratesCount,
         inputCrates: cratesCount,
         inputPieces: issuedInputPieces,
@@ -339,14 +385,13 @@ export const FormingView: React.FC<FormingViewProps> = ({
         if (j.id !== job.id) return j;
         return {
           ...j,
-          tracedLots: { ...(j.tracedLots || {}), Forming: batchId },
+          tracedLots: { ...(j.tracedLots || {}), Forming: batchId, Cutting: selectedCuttingBatchId || j.tracedLots?.Cutting },
           availableCuttingCrates: Math.max(0, (j.availableCuttingCrates || 0) - cratesCount),
           runningBatches: [...modifiedCuttingBatches, newBatch]
         };
       });
-      logMessage = `Started Forming on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks Issued @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate) | Worker: ${operatorName.toUpperCase()}`;
+      logMessage = `Started Forming on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks Issued from ${selectedCuttingLotWorker ? `${selectedCuttingLotWorker}'s Cut Lot` : 'Cut Queue'} @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate) | Worker: ${operatorName.toUpperCase()}`;
       setSelectedActiveBatchId(batchId);
-      alert(`✅ Forming Job ${job.id} Loaded on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate)!`);
       alert(`✅ Forming Job ${job.id} Loaded on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate)!`);
     }
 
@@ -364,9 +409,14 @@ export const FormingView: React.FC<FormingViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, operatorName, 'Forming', selectedMachine, shift);
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      wipLots: updatedWipLots,
+      floorWorkers,
+      deptWorkers,
       logs: [...state.logs, newLog]
     });
 
@@ -400,7 +450,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return {
         ...j,
         pcsPerCrateForming: effectiveFormPcs,
-        availableFormingCrates: (j.availableFormingCrates || 0) + qty,
+        availableFormingCrates: Math.max(0, (j.availableFormingCrates || 0) - qty),
+        availableForQcCrates: (j.availableForQcCrates || 0) + qty,
+        isReadyForQcInspection: true,
         totalFormedPieces: (j.totalFormedPieces || 0) + forwardedFormedPcs,
         runningBatches: (j.runningBatches || []).map((b) => {
           if (b.batchId !== batch.batchId) return b;
@@ -452,6 +504,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return;
     }
     const remaining = curIssued - qty;
+    const targetSourceLotId = batch.sourceLotId || batch.parentBatchId;
     let remAddUnissue = qty;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
@@ -461,11 +514,48 @@ export const FormingView: React.FC<FormingViewProps> = ({
             return { ...b, issuedQty: remaining };
           }
           if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remAddUnissue > 0) {
-            const consumedP = b.consumedQty || 0;
-            const restore = Math.min(consumedP, remAddUnissue);
-            if (restore > 0) {
-              remAddUnissue -= restore;
-              return { ...b, consumedQty: consumedP - restore };
+            if (b.slices && b.slices.length > 0) {
+              let restoredFromBatch = 0;
+              // Pass 1: Restore to specific matching source slice first (e.g. Tushar's slice)
+              let updatedSlices = b.slices.map(slice => {
+                if (remAddUnissue > 0 && targetSourceLotId && slice.sliceId === targetSourceLotId) {
+                  const sliceConsumed = slice.consumedQty || 0;
+                  const restore = Math.min(sliceConsumed, remAddUnissue);
+                  if (restore > 0) {
+                    remAddUnissue -= restore;
+                    restoredFromBatch += restore;
+                    return { ...slice, consumedQty: sliceConsumed - restore };
+                  }
+                }
+                return slice;
+              });
+              // Pass 2: If still remaining, restore across slices in reverse order
+              if (remAddUnissue > 0) {
+                updatedSlices = [...updatedSlices].reverse().map(slice => {
+                  if (remAddUnissue > 0) {
+                    const sliceConsumed = slice.consumedQty || 0;
+                    const restore = Math.min(sliceConsumed, remAddUnissue);
+                    if (restore > 0) {
+                      remAddUnissue -= restore;
+                      restoredFromBatch += restore;
+                      return { ...slice, consumedQty: sliceConsumed - restore };
+                    }
+                  }
+                  return slice;
+                }).reverse();
+              }
+              if (restoredFromBatch > 0) {
+                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
+              }
+            } else {
+              if (!targetSourceLotId || b.batchId === targetSourceLotId || remAddUnissue > 0) {
+                const consumedP = b.consumedQty || 0;
+                const restore = Math.min(consumedP, remAddUnissue);
+                if (restore > 0) {
+                  remAddUnissue -= restore;
+                  return { ...b, consumedQty: consumedP - restore };
+                }
+              }
             }
           }
           return b;
@@ -478,13 +568,33 @@ export const FormingView: React.FC<FormingViewProps> = ({
       };
     });
 
+    // Also restore wipLots if applicable
+    let remWipUnissue = qty;
+    const updatedWipLots = (state.wipLots || []).map(lot => {
+      if (lot.jobId === job.id && lot.stage === 'Cutting' && remWipUnissue > 0) {
+        if (!targetSourceLotId || lot.id === targetSourceLotId) {
+          const consumed = lot.consumedQty || 0;
+          const restore = Math.min(consumed, remWipUnissue);
+          if (restore > 0) {
+            remWipUnissue -= restore;
+            return {
+              ...lot,
+              consumedQty: lot.consumedQty - restore,
+              remainingQty: lot.remainingQty + restore
+            };
+          }
+        }
+      }
+      return lot;
+    });
+
     const newLog = {
       jobId: job.id,
       product: job.product,
       stage: 'Forming Un-issue',
       machine: selectedMachine,
       shift: batch.shift,
-      action: `↩️ Quick Un-issue: ${qty} Cut Crates returned to Cutting Stock (Remaining: ${remaining})`,
+      action: `↩️ Quick Un-issue: ${qty} Cut Crates returned to ${batch.sourceOperator ? `${batch.sourceOperator}'s Cutting Lot` : 'Cutting Stock'} (Remaining in Forming: ${remaining})`,
       worker: batch.worker,
       user: 'form_user',
       rawDate: new Date().toISOString().split('T')[0],
@@ -494,6 +604,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      wipLots: updatedWipLots,
       logs: [...state.logs, newLog]
     });
 
@@ -790,6 +901,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
         ...j,
         pcsPerCrateForming: effectiveFormPcs,
         availableFormingCrates: (j.availableFormingCrates || 0) + cratesDone,
+        isReadyForQcInspection: true,
+        stage: (j.availableCuttingCrates || 0) <= 0 ? 'QC' : j.stage,
         totalFormedPieces: (j.totalFormedPieces || 0) + totalFormedPcs,
         formingLoosePcs: (j.formingLoosePcs || 0) + looseDone,
         formingScrapPcs: (j.formingScrapPcs || 0) + finalScrapPcs,
@@ -860,17 +973,55 @@ export const FormingView: React.FC<FormingViewProps> = ({
     if (!activeBatchObj) return;
     const { job, batch } = activeBatchObj;
     const cratesToReturn = batch.issuedQty || 0;
+    const targetSourceLotId = batch.sourceLotId || batch.parentBatchId;
     let remCancelReturn = cratesToReturn;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
       const updatedBatches = (j.runningBatches || [])
         .map((b) => {
           if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remCancelReturn > 0) {
-            const consumedP = b.consumedQty || 0;
-            const restore = Math.min(consumedP, remCancelReturn);
-            if (restore > 0) {
-              remCancelReturn -= restore;
-              return { ...b, consumedQty: consumedP - restore };
+            if (b.slices && b.slices.length > 0) {
+              let restoredFromBatch = 0;
+              // Pass 1: Target matching slice first
+              let updatedSlices = b.slices.map(slice => {
+                if (remCancelReturn > 0 && targetSourceLotId && slice.sliceId === targetSourceLotId) {
+                  const sliceConsumed = slice.consumedQty || 0;
+                  const restore = Math.min(sliceConsumed, remCancelReturn);
+                  if (restore > 0) {
+                    remCancelReturn -= restore;
+                    restoredFromBatch += restore;
+                    return { ...slice, consumedQty: sliceConsumed - restore };
+                  }
+                }
+                return slice;
+              });
+              // Pass 2: Remaining fallback in reverse order
+              if (remCancelReturn > 0) {
+                updatedSlices = [...updatedSlices].reverse().map(slice => {
+                  if (remCancelReturn > 0) {
+                    const sliceConsumed = slice.consumedQty || 0;
+                    const restore = Math.min(sliceConsumed, remCancelReturn);
+                    if (restore > 0) {
+                      remCancelReturn -= restore;
+                      restoredFromBatch += restore;
+                      return { ...slice, consumedQty: sliceConsumed - restore };
+                    }
+                  }
+                  return slice;
+                }).reverse();
+              }
+              if (restoredFromBatch > 0) {
+                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
+              }
+            } else {
+              if (!targetSourceLotId || b.batchId === targetSourceLotId || remCancelReturn > 0) {
+                const consumedP = b.consumedQty || 0;
+                const restore = Math.min(consumedP, remCancelReturn);
+                if (restore > 0) {
+                  remCancelReturn -= restore;
+                  return { ...b, consumedQty: consumedP - restore };
+                }
+              }
             }
           }
           return b;
@@ -883,13 +1034,33 @@ export const FormingView: React.FC<FormingViewProps> = ({
       };
     });
 
+    // Also restore wipLots
+    let remWipCancel = cratesToReturn;
+    const updatedWipLots = (state.wipLots || []).map(lot => {
+      if (lot.jobId === job.id && lot.stage === 'Cutting' && remWipCancel > 0) {
+        if (!targetSourceLotId || lot.id === targetSourceLotId) {
+          const consumed = lot.consumedQty || 0;
+          const restore = Math.min(consumed, remWipCancel);
+          if (restore > 0) {
+            remWipCancel -= restore;
+            return {
+              ...lot,
+              consumedQty: lot.consumedQty - restore,
+              remainingQty: lot.remainingQty + restore
+            };
+          }
+        }
+      }
+      return lot;
+    });
+
     const newLog = {
       jobId: job.id,
       product: job.product,
       stage: 'Forming Cancelled',
       machine: selectedMachine,
       shift: batch.shift,
-      action: `❌ Forming Run Cancelled: Batch ${batch.batchId} deleted, ${cratesToReturn} cut crates returned to stock.`,
+      action: `❌ Forming Run Cancelled: Batch ${batch.batchId} deleted, ${cratesToReturn} cut crates returned to ${batch.sourceOperator ? `${batch.sourceOperator}'s Cutting Lot` : 'stock'}.`,
       worker: batch.worker,
       user: 'form_user',
       rawDate: new Date().toISOString().split('T')[0],
@@ -899,6 +1070,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      wipLots: updatedWipLots,
       logs: [...state.logs, newLog]
     });
 
@@ -1430,13 +1602,6 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 >
                   <Square className="w-3.5 h-3.5" /> Finish Run
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsCancelConfirmOpen(true)}
-                  className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
-                >
-                  <XCircle className="w-3.5 h-3.5" /> Cancel & Return
-                </button>
               </div>
             </div>
           </div>
@@ -1625,12 +1790,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   </span>
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {(() => {
-                      const cuttingBatches = (selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
-                      
                       const selectableLots: {
                         id: string;
                         batchId: string;
-                        sliceId?: string;
                         worker: string;
                         shift: string;
                         machine: string;
@@ -1640,6 +1802,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
                         date?: string;
                       }[] = [];
 
+                      const cuttingBatches = (selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
+                      
                       cuttingBatches.forEach(cb => {
                         const totalP = cb.producedQty || 0;
                         const consumedP = cb.consumedQty || 0;
@@ -1652,7 +1816,6 @@ export const FormingView: React.FC<FormingViewProps> = ({
                             selectableLots.push({
                               id: slice.sliceId,
                               batchId: cb.batchId,
-                              sliceId: slice.sliceId,
                               worker: slice.operator,
                               shift: slice.shift,
                               machine: cb.machine || slice.machine || 'Cutting',
@@ -1676,21 +1839,46 @@ export const FormingView: React.FC<FormingViewProps> = ({
                         }
                       });
 
+                      // Add WIP Lots (New ERP Approach) without duplication
+                      const wipLots = state.wipLots?.filter(lot => lot.jobId === selectedPendingJob.id && lot.stage === 'Cutting') || [];
+                      wipLots.forEach(lot => {
+                        if (!selectableLots.some(sl => sl.id === lot.id)) {
+                          selectableLots.push({
+                            id: lot.id,
+                            batchId: lot.id,
+                            worker: lot.producedByOperator,
+                            shift: lot.shift,
+                            machine: lot.machine,
+                            totalQty: lot.producedQty,
+                            consumedQty: lot.consumedQty,
+                            remainingQty: lot.remainingQty,
+                            date: lot.timestamp.split('T')[0]
+                          });
+                        }
+                      });
+
                       if (selectableLots.length === 0) {
                         return <div className="text-slate-400 italic text-[11px]">No specific cutting lot metadata found (Legacy or Direct entry).</div>;
                       }
 
+                      // If no lot is currently selected, pick the first one with remaining quantity
+                      const activeSelectionId = selectedCuttingBatchId || selectableLots.find(l => l.remainingQty > 0)?.id || selectableLots[0].id;
+
                       return selectableLots.map(lot => {
-                        const isSelected = selectedCuttingBatchId === lot.id || 
-                          (!selectedCuttingBatchId && lot.remainingQty > 0);
+                        const isSelected = activeSelectionId === lot.id;
                         
                         return (
                           <div 
                             key={lot.id} 
-                            onClick={() => setSelectedCuttingBatchId(lot.id)}
+                            onClick={() => {
+                              if (lot.remainingQty > 0) {
+                                setSelectedCuttingBatchId(lot.id);
+                                setIssueCratesQty(String(Math.min(lot.remainingQty, 2)));
+                              }
+                            }}
                             className={`p-2.5 rounded-lg border cursor-pointer transition flex items-center justify-between text-[11px] ${
                               isSelected 
-                                ? 'bg-indigo-100 border-indigo-500 text-indigo-950 font-bold shadow-xs' 
+                                ? 'bg-indigo-100 border-indigo-500 text-indigo-950 font-bold shadow-xs ring-1 ring-indigo-400' 
                                 : lot.remainingQty === 0
                                   ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -1698,7 +1886,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
                           >
                             <div className="flex items-center gap-2">
                               <span className="font-mono bg-indigo-50 text-indigo-900 border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold">
-                                {lot.sliceId ? 'Slice' : 'Batch'}: {lot.id.substring(0, 12)}
+                                Lot: {lot.id.substring(0, 16)}
                               </span>
                               <span className="font-extrabold text-slate-900">👨‍🏭 {lot.worker}</span>
                               <span className="text-slate-500 font-normal">({lot.machine} | ☀️ {lot.shift})</span>
@@ -2312,6 +2500,14 @@ export const FormingView: React.FC<FormingViewProps> = ({
             <div className="bg-amber-50 p-3 rounded-xl text-xs space-y-1 text-amber-900">
               <div>Job: <b>{activeBatchObj.job.id}</b> ({activeBatchObj.job.product})</div>
               <div>Currently Issued to Machine: <b>{activeBatchObj.batch.issuedQty} Crates</b></div>
+              {activeBatchObj.batch.sourceOperator && (
+                <div className="text-amber-800 font-semibold flex items-center gap-1">
+                  <span>↩️ Returning directly to Cutting Operator Lot:</span>
+                  <span className="font-extrabold bg-amber-200/80 text-amber-950 px-1.5 py-0.5 rounded text-[11px]">
+                    👨‍🏭 {activeBatchObj.batch.sourceOperator}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div>

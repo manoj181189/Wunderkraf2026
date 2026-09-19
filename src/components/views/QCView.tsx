@@ -1,3 +1,4 @@
+import { autoRegisterWorker } from '../../lib/workerUtils';
 import React, { useState } from 'react';
 import { ArrowLeft, SearchCheck, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, PlusCircle, Users, Box, Search, ShieldCheck, Calendar, Clock, CheckCircle2, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { FactoryState, Job, ProductType, RunningBatch } from '../../types';
@@ -11,6 +12,7 @@ interface QCViewProps {
   onBackToHub: () => void;
   onSaveState: (state: FactoryState) => void;
   onOpenHoldModal: (machineName: string) => void;
+
   onNavigateToTraceability?: (query: string) => void;
 }
 
@@ -88,8 +90,8 @@ export const QCView: React.FC<QCViewProps> = ({
   // Genealogy Modal state
   const [genealogyModalJob, setGenealogyModalJob] = useState<Job | null>(null);
 
-  // Formed crates queue
-  let pendingFormedJobs = jobs.filter((j) => (j.availableFormingCrates || 0) > 0);
+  // Formed crates queue: Any job with available crates waiting for QC inspection
+  let pendingFormedJobs = jobs.filter((j) => ((j.availableForQcCrates || 0) + (j.availableFormingCrates || 0)) > 0);
   if (filterProduct) {
     pendingFormedJobs = pendingFormedJobs.filter((j) => j.product === filterProduct);
   }
@@ -131,8 +133,9 @@ export const QCView: React.FC<QCViewProps> = ({
     }
 
     const job = jobs.find((j) => j.id === selectedPendingJobId);
-    if (!job || (job.availableFormingCrates || 0) < cratesCount) {
-      alert(`Insufficient formed crates! Available: ${job?.availableFormingCrates || 0}`);
+    const totalAvailFormed = (job?.availableForQcCrates || 0) + (job?.availableFormingCrates || 0);
+    if (!job || totalAvailFormed < cratesCount) {
+      alert(`Insufficient formed crates! Available: ${totalAvailFormed}`);
       return;
     }
 
@@ -150,17 +153,24 @@ export const QCView: React.FC<QCViewProps> = ({
       let remDeductTopup = cratesCount;
       const updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
+        const deductForQc = Math.min(j.availableForQcCrates || 0, remDeductTopup);
+        const remAfterForQc = remDeductTopup - deductForQc;
+        const deductForming = Math.min(j.availableFormingCrates || 0, remAfterForQc);
+        const newAvailForQc = Math.max(0, (j.availableForQcCrates || 0) - deductForQc);
+        const newAvailForming = Math.max(0, (j.availableFormingCrates || 0) - deductForming);
+
+        let remBatchDeduct = cratesCount;
         const newRunBatches = (j.runningBatches || []).map((b) => {
           if (b.batchId === existingBatch.batchId) {
             return { ...b, issuedQty: newTotalQty };
           }
-          if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remDeductTopup > 0) {
+          if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remBatchDeduct > 0) {
             const totalP = b.producedQty || 0;
             const consumedP = b.consumedQty || 0;
             const remP = Math.max(0, totalP - consumedP);
             if (remP > 0 && (!selectedFormingBatchId || b.batchId === selectedFormingBatchId)) {
-              const dec = Math.min(remP, remDeductTopup);
-              remDeductTopup -= dec;
+              const dec = Math.min(remP, remBatchDeduct);
+              remBatchDeduct -= dec;
               return { ...b, consumedQty: consumedP + dec };
             }
           }
@@ -168,7 +178,9 @@ export const QCView: React.FC<QCViewProps> = ({
         });
         return {
           ...j,
-          availableFormingCrates: Math.max(0, (j.availableFormingCrates || 0) - cratesCount),
+          availableForQcCrates: newAvailForQc,
+          availableFormingCrates: newAvailForming,
+          isReadyForQcInspection: (newAvailForQc + newAvailForming) > 0,
           runningBatches: newRunBatches
         };
       });
@@ -187,9 +199,13 @@ export const QCView: React.FC<QCViewProps> = ({
         timestamp: new Date().toLocaleString()
       };
 
+      const { floorWorkers, deptWorkers } = autoRegisterWorker(state, cleanInspector, 'QC', 'QC-Desk', shift);
+
       onSaveState({
         ...state,
         jobs: updatedJobs,
+        floorWorkers,
+        deptWorkers,
         logs: [...state.logs, newLog]
       });
 
@@ -215,7 +231,24 @@ export const QCView: React.FC<QCViewProps> = ({
     // Fresh batch when new job or different inspector
     const master = getNumberingMaster(state.seriesConfig);
     const batchId = generateQCInspectionBatchId(job.id, job.runningBatches || [], master);
-    const upstreamBatchId = job.tracedLots?.Forming || job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
+    const upstreamBatchId = selectedFormingBatchId || job.tracedLots?.Forming || job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
+
+    // Find worker name of selected forming lot for provenance
+    let selectedFormingWorker = '';
+    const formingBatchesForJob = (job.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'));
+    for (const fb of formingBatchesForJob) {
+      if (fb.slices && fb.slices.length > 0) {
+        const matchingSlice = fb.slices.find(s => s.sliceId === selectedFormingBatchId);
+        if (matchingSlice) {
+          selectedFormingWorker = matchingSlice.operator;
+          break;
+        }
+      }
+      if (fb.batchId === selectedFormingBatchId) {
+        selectedFormingWorker = fb.worker;
+        break;
+      }
+    }
 
     const newBatch: RunningBatch = {
       batchId,
@@ -225,6 +258,8 @@ export const QCView: React.FC<QCViewProps> = ({
       startTime: nowTime,
       status: 'Running',
       parentBatchId: upstreamBatchId,
+      sourceLotId: selectedFormingBatchId || undefined,
+      sourceOperator: selectedFormingWorker || undefined,
       issuedQty: cratesCount,
       producedQty: 0,
       worker: cleanInspector,
@@ -234,23 +269,50 @@ export const QCView: React.FC<QCViewProps> = ({
     let remDeductFresh = cratesCount;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
+      const deductForQc = Math.min(j.availableForQcCrates || 0, remDeductFresh);
+      const remAfterForQc = remDeductFresh - deductForQc;
+      const deductForming = Math.min(j.availableFormingCrates || 0, remAfterForQc);
+      const newAvailForQc = Math.max(0, (j.availableForQcCrates || 0) - deductForQc);
+      const newAvailForming = Math.max(0, (j.availableFormingCrates || 0) - deductForming);
+
+      let remBatchDeduct = cratesCount;
       const modifiedFormBatches = (j.runningBatches || []).map((b) => {
-        if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remDeductFresh > 0) {
-          const totalP = b.producedQty || 0;
-          const consumedP = b.consumedQty || 0;
-          const remP = Math.max(0, totalP - consumedP);
-          if (remP > 0 && (!selectedFormingBatchId || b.batchId === selectedFormingBatchId)) {
-            const dec = Math.min(remP, remDeductFresh);
-            remDeductFresh -= dec;
-            return { ...b, consumedQty: consumedP + dec };
+        if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remBatchDeduct > 0) {
+          if (b.slices && b.slices.length > 0) {
+            const updatedSlices = b.slices.map(slice => {
+              if (remBatchDeduct > 0 && (!selectedFormingBatchId || slice.sliceId === selectedFormingBatchId)) {
+                const sliceTotal = slice.producedQty || 0;
+                const sliceConsumed = slice.consumedQty || 0;
+                const sliceRem = Math.max(0, sliceTotal - sliceConsumed);
+                if (sliceRem > 0) {
+                  const dec = Math.min(sliceRem, remBatchDeduct);
+                  remBatchDeduct -= dec;
+                  return { ...slice, consumedQty: sliceConsumed + dec };
+                }
+              }
+              return slice;
+            });
+            const totalConsumed = updatedSlices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+            return { ...b, consumedQty: totalConsumed, slices: updatedSlices };
+          } else {
+            const totalP = b.producedQty || 0;
+            const consumedP = b.consumedQty || 0;
+            const remP = Math.max(0, totalP - consumedP);
+            if (remP > 0 && (!selectedFormingBatchId || b.batchId === selectedFormingBatchId)) {
+              const dec = Math.min(remP, remBatchDeduct);
+              remBatchDeduct -= dec;
+              return { ...b, consumedQty: consumedP + dec };
+            }
           }
         }
         return b;
       });
       return {
         ...j,
-        tracedLots: { ...(j.tracedLots || {}), QC: batchId },
-        availableFormingCrates: Math.max(0, (j.availableFormingCrates || 0) - cratesCount),
+        tracedLots: { ...(j.tracedLots || {}), QC: batchId, Forming: selectedFormingBatchId || j.tracedLots?.Forming },
+        availableForQcCrates: newAvailForQc,
+        availableFormingCrates: newAvailForming,
+        isReadyForQcInspection: (newAvailForQc + newAvailForming) > 0,
         runningBatches: [...modifiedFormBatches, newBatch]
       };
     });
@@ -269,9 +331,13 @@ export const QCView: React.FC<QCViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, cleanInspector, 'QC', 'QC-Desk', shift);
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      floorWorkers,
+      deptWorkers,
       logs: [...state.logs, newLog]
     });
 
@@ -350,7 +416,7 @@ export const QCView: React.FC<QCViewProps> = ({
       return;
     }
 
-    const availableStock = job.availableFormingCrates || 0;
+    const availableStock = (job.availableForQcCrates || 0) + (job.availableFormingCrates || 0);
     if (availableStock < addCount) {
       alert(`⚠️ Insufficient formed stock! Available: ${availableStock} Crates`);
       return;
@@ -362,9 +428,17 @@ export const QCView: React.FC<QCViewProps> = ({
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
+      const deductForQc = Math.min(j.availableForQcCrates || 0, addCount);
+      const remAfterForQc = addCount - deductForQc;
+      const deductForming = Math.min(j.availableFormingCrates || 0, remAfterForQc);
+      const newAvailForQc = Math.max(0, (j.availableForQcCrates || 0) - deductForQc);
+      const newAvailForming = Math.max(0, (j.availableFormingCrates || 0) - deductForming);
+
       return {
         ...j,
-        availableFormingCrates: (j.availableFormingCrates || 0) - addCount,
+        availableForQcCrates: newAvailForQc,
+        availableFormingCrates: newAvailForming,
+        isReadyForQcInspection: (newAvailForQc + newAvailForming) > 0,
         runningBatches: (j.runningBatches || []).map((b) => {
           if (b.batchId !== batch.batchId) return b;
           return {
@@ -427,19 +501,69 @@ export const QCView: React.FC<QCViewProps> = ({
     }
 
     const remaining = curIssued - qty;
+    const targetSourceLotId = batch.sourceLotId || batch.parentBatchId;
 
+    let remAddUnissue = qty;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
       const updatedBatches = (j.runningBatches || [])
         .map((b) => {
-          if (b.batchId !== batch.batchId) return b;
-          return { ...b, issuedQty: remaining };
+          if (b.batchId === batch.batchId) {
+            return { ...b, issuedQty: remaining };
+          }
+          if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remAddUnissue > 0) {
+            if (b.slices && b.slices.length > 0) {
+              let restoredFromBatch = 0;
+              // Pass 1: Target matching slice
+              let updatedSlices = b.slices.map(slice => {
+                if (remAddUnissue > 0 && targetSourceLotId && slice.sliceId === targetSourceLotId) {
+                  const sliceConsumed = slice.consumedQty || 0;
+                  const restore = Math.min(sliceConsumed, remAddUnissue);
+                  if (restore > 0) {
+                    remAddUnissue -= restore;
+                    restoredFromBatch += restore;
+                    return { ...slice, consumedQty: sliceConsumed - restore };
+                  }
+                }
+                return slice;
+              });
+              // Pass 2: Fallback in reverse order
+              if (remAddUnissue > 0) {
+                updatedSlices = [...updatedSlices].reverse().map(slice => {
+                  if (remAddUnissue > 0) {
+                    const sliceConsumed = slice.consumedQty || 0;
+                    const restore = Math.min(sliceConsumed, remAddUnissue);
+                    if (restore > 0) {
+                      remAddUnissue -= restore;
+                      restoredFromBatch += restore;
+                      return { ...slice, consumedQty: sliceConsumed - restore };
+                    }
+                  }
+                  return slice;
+                }).reverse();
+              }
+              if (restoredFromBatch > 0) {
+                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
+              }
+            } else {
+              if (!targetSourceLotId || b.batchId === targetSourceLotId || remAddUnissue > 0) {
+                const consumedP = b.consumedQty || 0;
+                const restore = Math.min(consumedP, remAddUnissue);
+                if (restore > 0) {
+                  remAddUnissue -= restore;
+                  return { ...b, consumedQty: consumedP - restore };
+                }
+              }
+            }
+          }
+          return b;
         })
-        .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0);
+        .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0 || (b.consumedQty || 0) > 0);
 
       return {
         ...j,
-        availableFormingCrates: (j.availableFormingCrates || 0) + qty,
+        availableForQcCrates: (j.availableForQcCrates || 0) + qty,
+        isReadyForQcInspection: true,
         runningBatches: updatedBatches
       };
     });
@@ -450,7 +574,7 @@ export const QCView: React.FC<QCViewProps> = ({
       stage: 'QC Un-issue',
       machine: 'QC-Desk',
       shift: batch.shift,
-      action: `↩️ Issue Return: ${qty} Formed Crates returned back to Forming Stock (Remaining in QC: ${remaining})`,
+      action: `↩️ Issue Return: ${qty} Formed Crates returned back to ${batch.sourceOperator ? `${batch.sourceOperator}'s Forming Lot` : 'Forming Stock'} (Remaining in QC: ${remaining})`,
       worker: batch.worker,
       user: 'qc_user',
       rawDate: new Date().toISOString().split('T')[0],
@@ -575,11 +699,14 @@ export const QCView: React.FC<QCViewProps> = ({
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
+      const remainingFormed = (j.availableForQcCrates || 0) + (j.availableFormingCrates || 0);
       return {
         ...j,
+        stage: remainingFormed === 0 ? 'Packing' : j.stage,
         availableQcCrates: (j.availableQcCrates || 0) + cratesDone,
         totalQcPieces: (j.totalQcPieces || 0) + approvedPcs,
         qcLoosePcs: (j.qcLoosePcs || 0) + looseDone,
+        isReadyForQcInspection: remainingFormed > 0,
         runningBatches: (j.runningBatches || []).map((b) => {
           if (b.batchId !== batch.batchId) return b;
           return {
@@ -710,9 +837,13 @@ export const QCView: React.FC<QCViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, inspectorName, 'QC', 'QC-Desk', shift);
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      floorWorkers,
+      deptWorkers,
       logs: [...state.logs, newLog]
     });
 
@@ -736,12 +867,66 @@ export const QCView: React.FC<QCViewProps> = ({
       return;
     }
 
+    const targetSourceLotId = batch.sourceLotId || batch.parentBatchId;
+    let remCancelReturn = cratesToReturn;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
+      const updatedBatches = (j.runningBatches || [])
+        .map((b) => {
+          if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remCancelReturn > 0) {
+            if (b.slices && b.slices.length > 0) {
+              let restoredFromBatch = 0;
+              // Pass 1: Target matching slice
+              let updatedSlices = b.slices.map(slice => {
+                if (remCancelReturn > 0 && targetSourceLotId && slice.sliceId === targetSourceLotId) {
+                  const sliceConsumed = slice.consumedQty || 0;
+                  const restore = Math.min(sliceConsumed, remCancelReturn);
+                  if (restore > 0) {
+                    remCancelReturn -= restore;
+                    restoredFromBatch += restore;
+                    return { ...slice, consumedQty: sliceConsumed - restore };
+                  }
+                }
+                return slice;
+              });
+              // Pass 2: Remaining fallback in reverse order
+              if (remCancelReturn > 0) {
+                updatedSlices = [...updatedSlices].reverse().map(slice => {
+                  if (remCancelReturn > 0) {
+                    const sliceConsumed = slice.consumedQty || 0;
+                    const restore = Math.min(sliceConsumed, remCancelReturn);
+                    if (restore > 0) {
+                      remCancelReturn -= restore;
+                      restoredFromBatch += restore;
+                      return { ...slice, consumedQty: sliceConsumed - restore };
+                    }
+                  }
+                  return slice;
+                }).reverse();
+              }
+              if (restoredFromBatch > 0) {
+                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
+              }
+            } else {
+              if (!targetSourceLotId || b.batchId === targetSourceLotId || remCancelReturn > 0) {
+                const consumedP = b.consumedQty || 0;
+                const restore = Math.min(consumedP, remCancelReturn);
+                if (restore > 0) {
+                  remCancelReturn -= restore;
+                  return { ...b, consumedQty: consumedP - restore };
+                }
+              }
+            }
+          }
+          return b;
+        })
+        .filter((b) => b.batchId !== batch.batchId);
+
       return {
         ...j,
         availableFormingCrates: (j.availableFormingCrates || 0) + cratesToReturn,
-        runningBatches: (j.runningBatches || []).filter((b) => b.batchId !== batch.batchId)
+        isReadyForQcInspection: true,
+        runningBatches: updatedBatches
       };
     });
 
@@ -751,7 +936,7 @@ export const QCView: React.FC<QCViewProps> = ({
       stage: 'QC Cancelled',
       machine: 'QC-Desk',
       shift: batch.shift,
-      action: `❌ QC Run Cancelled & Reverted: Batch ${batch.batchId} deleted, ${cratesToReturn} crates returned to forming stock.`,
+      action: `❌ QC Run Cancelled & Reverted: Batch ${batch.batchId} deleted, ${cratesToReturn} crates returned to ${batch.sourceOperator ? `${batch.sourceOperator}'s Forming Lot` : 'forming stock'}.`,
       worker: batch.worker,
       user: 'qc_user',
       rawDate: new Date().toISOString().split('T')[0],
@@ -1248,14 +1433,14 @@ export const QCView: React.FC<QCViewProps> = ({
                   onChange={(e) => {
                     setSelectedPendingJobId(e.target.value);
                     const j = jobs.find((x) => x.id === e.target.value);
-                    if (j) setIssueCratesQty(String(j.availableFormingCrates || 1));
+                    if (j) setIssueCratesQty(String(((j.availableForQcCrates || 0) + (j.availableFormingCrates || 0)) || 1));
                   }}
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
                 >
                   <option value="">-- SELECT FORMED CRATES QUEUE --</option>
                   {pendingFormedJobs.map((j) => (
                     <option key={j.id} value={j.id}>
-                      {j.id} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {j.availableFormingCrates} Crates)
+                      {j.id} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {(j.availableForQcCrates || 0) + (j.availableFormingCrates || 0)} Crates)
                     </option>
                   ))}
                 </select>
@@ -1264,7 +1449,7 @@ export const QCView: React.FC<QCViewProps> = ({
               {selectedPendingJob && (
                 <div className="space-y-2">
                   <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-lg text-xs font-bold text-cyan-900 flex items-center justify-between">
-                    <span>Available Formed Stock: {selectedPendingJob.availableFormingCrates} Crates [Brand: {selectedPendingJob.paperBrand || 'ITC'}]</span>
+                    <span>Available Formed Stock: {(selectedPendingJob.availableFormingCrates || 0) + (selectedPendingJob.availableForQcCrates || 0)} Crates [Brand: {selectedPendingJob.paperBrand || 'ITC'}]</span>
                   </div>
                   
                   {/* Forming Operator Lots / Batches Breakdown */}
@@ -1272,39 +1457,95 @@ export const QCView: React.FC<QCViewProps> = ({
                     <span className="font-extrabold text-slate-700 uppercase tracking-wide block text-[11px]">
                       🔍 Forming Operator Lots Source Breakdown (Traceability):
                     </span>
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {((selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'))).length === 0 ? (
-                        <div className="text-slate-400 italic text-[11px]">No specific forming lot metadata found (Legacy or Direct entry).</div>
-                      ) : (
-                        ((selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'))).map(fb => (
-                          <div 
-                            key={fb.batchId} 
-                            onClick={() => setSelectedFormingBatchId(fb.batchId)}
-                            className={`p-2 rounded border cursor-pointer transition flex items-center justify-between text-[11px] ${
-                              selectedFormingBatchId === fb.batchId 
-                                ? 'bg-indigo-50 border-indigo-400 text-indigo-950 font-bold shadow-2xs' 
-                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-bold">{fb.batchId}</span>
-                              <span className="font-extrabold">👨‍🏭 {fb.worker || 'OPERATOR'}</span>
-                              <span className="text-slate-400 font-normal">({fb.machine || 'Forming'} | ☀️ {fb.shift || 'DAY'})</span>
-                            </div>
-                            {(() => {
-                              const totalP = fb.producedQty || 0;
-                              const consumedP = fb.consumedQty || 0;
-                              const remainingP = Math.max(0, totalP - consumedP);
-                              return (
-                                <div className="font-mono text-right">
-                                  <div className="font-bold text-emerald-700">{remainingP} Crates Remaining</div>
-                                  <div className="text-slate-400 text-[10px]">({totalP} Produced)</div>
+                    <div className="space-y-1 max-h-36 overflow-y-auto">
+                      {(() => {
+                        const selectableFormingLots: {
+                          id: string;
+                          batchId: string;
+                          worker: string;
+                          shift: string;
+                          machine: string;
+                          totalQty: number;
+                          consumedQty: number;
+                          remainingQty: number;
+                        }[] = [];
+
+                        const formingBatches = (selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'));
+                        
+                        formingBatches.forEach(fb => {
+                          const totalP = fb.producedQty || 0;
+                          const consumedP = fb.consumedQty || 0;
+                          
+                          if (fb.slices && fb.slices.length > 0) {
+                            fb.slices.forEach(slice => {
+                              const sliceTotal = slice.producedQty || 0;
+                              const sliceConsumed = slice.consumedQty || 0;
+                              const sliceRemaining = Math.max(0, sliceTotal - sliceConsumed);
+                              selectableFormingLots.push({
+                                id: slice.sliceId,
+                                batchId: fb.batchId,
+                                worker: slice.operator,
+                                shift: slice.shift,
+                                machine: fb.machine || slice.machine || 'Forming',
+                                totalQty: sliceTotal,
+                                consumedQty: sliceConsumed,
+                                remainingQty: sliceRemaining
+                              });
+                            });
+                          } else {
+                            selectableFormingLots.push({
+                              id: fb.batchId,
+                              batchId: fb.batchId,
+                              worker: fb.worker,
+                              shift: fb.shift,
+                              machine: fb.machine || 'Forming',
+                              totalQty: totalP,
+                              consumedQty: consumedP,
+                              remainingQty: Math.max(0, totalP - consumedP)
+                            });
+                          }
+                        });
+
+                        if (selectableFormingLots.length === 0) {
+                          return <div className="text-slate-400 italic text-[11px]">No specific forming lot metadata found (Legacy or Direct entry).</div>;
+                        }
+
+                        const activeSelectionId = selectedFormingBatchId || selectableFormingLots.find(l => l.remainingQty > 0)?.id || selectableFormingLots[0].id;
+
+                        return selectableFormingLots.map(lot => {
+                          const isSelected = activeSelectionId === lot.id;
+                          return (
+                            <div 
+                              key={lot.id} 
+                              onClick={() => {
+                                if (lot.remainingQty > 0) {
+                                  setSelectedFormingBatchId(lot.id);
+                                  setIssueCratesQty(String(Math.min(lot.remainingQty, 2)));
+                                }
+                              }}
+                              className={`p-2 rounded-lg border cursor-pointer transition flex items-center justify-between text-[11px] ${
+                                isSelected 
+                                  ? 'bg-indigo-50 border-indigo-500 text-indigo-950 font-bold shadow-2xs ring-1 ring-indigo-400' 
+                                  : lot.remainingQty === 0
+                                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-bold text-[10px]">{lot.id.substring(0, 16)}</span>
+                                <span className="font-extrabold">👨‍🏭 {lot.worker || 'OPERATOR'}</span>
+                                <span className="text-slate-500 font-normal text-[10px]">({lot.machine} | ☀️ {lot.shift})</span>
+                              </div>
+                              <div className="font-mono text-right">
+                                <div className={`font-black ${lot.remainingQty > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                  {lot.remainingQty} Crates Remaining
                                 </div>
-                              );
-                            })()}
-                          </div>
-                        ))
-                      )}
+                                <div className="text-slate-400 text-[10px]">({lot.totalQty} Produced, {lot.consumedQty} Consumed)</div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -1978,9 +2219,9 @@ export const QCView: React.FC<QCViewProps> = ({
                             <span className="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1 animate-pulse">
                               ● In Inspection ({item.activeQcBatch.worker})
                             </span>
-                          ) : (j.availableFormingCrates || 0) > 0 ? (
+                          ) : ((j.availableFormingCrates || 0) + (j.availableForQcCrates || 0)) > 0 ? (
                             <span className="text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                              Pending QC ({j.availableFormingCrates} Crates)
+                              Pending QC ({(j.availableFormingCrates || 0) + (j.availableForQcCrates || 0)} Crates)
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
@@ -2082,6 +2323,14 @@ export const QCView: React.FC<QCViewProps> = ({
             <div className="bg-amber-50 p-3 rounded-xl text-xs space-y-1 text-amber-900">
               <div>Job: <b>{activeBatchObj.job.id}</b> ({activeBatchObj.job.product})</div>
               <div>Currently in QC Desk: <b>{activeBatchObj.batch.issuedQty} Crates</b></div>
+              {activeBatchObj.batch.sourceOperator && (
+                <div className="text-amber-800 font-semibold flex items-center gap-1">
+                  <span>↩️ Returning directly to Forming Operator Lot:</span>
+                  <span className="font-extrabold bg-amber-200/80 text-amber-950 px-1.5 py-0.5 rounded text-[11px]">
+                    👨‍🏭 {activeBatchObj.batch.sourceOperator}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div>
@@ -2175,7 +2424,7 @@ export const QCView: React.FC<QCViewProps> = ({
               <div>Job: <b>{activeBatchObj.job.id}</b> ({activeBatchObj.job.product})</div>
               <div>Currently in Hand: <b>{activeBatchObj.batch.issuedQty} Crates</b></div>
               <div className="text-emerald-800 font-bold">
-                Available in Forming Stock: <b>{activeBatchObj.job.availableFormingCrates || 0} Crates</b>
+                Available in Forming Stock: <b>{(activeBatchObj.job.availableFormingCrates || 0) + (activeBatchObj.job.availableForQcCrates || 0)} Crates</b>
               </div>
             </div>
 
@@ -2186,7 +2435,7 @@ export const QCView: React.FC<QCViewProps> = ({
               <input
                 type="number"
                 min="1"
-                max={activeBatchObj.job.availableFormingCrates || 999}
+                max={(activeBatchObj.job.availableFormingCrates || 0) + (activeBatchObj.job.availableForQcCrates || 0) || 999}
                 value={topupQtyInput}
                 onChange={(e) => setTopupQtyInput(e.target.value)}
                 className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm font-bold text-slate-800 outline-none"

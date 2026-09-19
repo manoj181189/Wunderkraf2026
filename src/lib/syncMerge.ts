@@ -110,7 +110,10 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         availableRolls: incJob.availableRolls !== undefined ? incJob.availableRolls : (existing.availableRolls || 0),
         availableCuttingCrates: incJob.availableCuttingCrates !== undefined ? incJob.availableCuttingCrates : (existing.availableCuttingCrates || 0),
         availableFormingCrates: incJob.availableFormingCrates !== undefined ? incJob.availableFormingCrates : (existing.availableFormingCrates || 0),
+        availableForQcCrates: incJob.availableForQcCrates !== undefined ? incJob.availableForQcCrates : (existing.availableForQcCrates || 0),
         availableQcCrates: incJob.availableQcCrates !== undefined ? incJob.availableQcCrates : (existing.availableQcCrates || 0),
+        isReadyForQcInspection: incJob.isReadyForQcInspection !== undefined ? incJob.isReadyForQcInspection : existing.isReadyForQcInspection,
+        tracedLots: { ...(existing.tracedLots || {}), ...(incJob.tracedLots || {}) },
         totalCutPieces: Math.max(existing.totalCutPieces || 0, incJob.totalCutPieces || 0),
         totalFormedPieces: Math.max(existing.totalFormedPieces || 0, incJob.totalFormedPieces || 0),
         totalQcPieces: Math.max(existing.totalQcPieces || 0, incJob.totalQcPieces || 0),
@@ -337,8 +340,23 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       combinedUsers.admin.perms = ['*'];
       return combinedUsers;
     })(),
-    floorWorkers: incoming.floorWorkers !== undefined ? incoming.floorWorkers : base.floorWorkers,
-    deptWorkers: incoming.deptWorkers !== undefined ? incoming.deptWorkers : base.deptWorkers,
+    floorWorkers: (() => {
+      const map = new Map();
+      (base.floorWorkers || []).forEach(w => map.set(w.id || w.name, w));
+      (incoming.floorWorkers || []).forEach(w => {
+        const key = w.id || w.name;
+        if (!map.has(key)) map.set(key, w);
+      });
+      return Array.from(map.values());
+    })(),
+    deptWorkers: (() => {
+      const mergedDepts = { ...(base.deptWorkers || {}) };
+      for (const [dept, workers] of Object.entries(incoming.deptWorkers || {})) {
+        const existing = mergedDepts[dept] || [];
+        mergedDepts[dept] = Array.from(new Set([...existing, ...(workers as string[])]));
+      }
+      return mergedDepts;
+    })(),
     maintenanceContacts: incoming.maintenanceContacts !== undefined ? incoming.maintenanceContacts : base.maintenanceContacts,
     coordinationMatrix: incoming.coordinationMatrix?.length ? incoming.coordinationMatrix : base.coordinationMatrix,
     departmentHeads: incoming.departmentHeads?.length ? incoming.departmentHeads : base.departmentHeads,

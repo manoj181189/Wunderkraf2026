@@ -56,11 +56,12 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
   // QC inspection details
   const activeQcBatch = qcBatches.find((b) => b.status === 'Running') || qcBatches[qcBatches.length - 1];
   const isQcActive = Boolean(activeQcBatch && activeQcBatch.status === 'Running');
-  const assignedInspector = activeQcBatch?.worker || (job.availableFormingCrates && job.availableFormingCrates > 0 ? 'Awaiting Allocation' : 'QC Desk');
+  const totalFormedWaitingQc = (job.availableForQcCrates || 0) + (job.availableFormingCrates || 0);
+  const assignedInspector = activeQcBatch?.worker || (totalFormedWaitingQc > 0 ? 'Awaiting Allocation' : 'QC Desk');
   const qcAllocatedCrates = activeQcBatch?.issuedQty || 0;
   const qcStageStatus = isQcActive
     ? 'In Inspection'
-    : (job.availableFormingCrates || 0) > 0
+    : totalFormedWaitingQc > 0
     ? 'Pending QC'
     : (job.availableQcCrates || 0) > 0
     ? 'QC Approved'
@@ -413,7 +414,7 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                   <div>
                     <span className="text-slate-500 font-medium">Formed 3D Output:</span>
                     <div className="font-bold text-purple-950 mt-0.5">
-                      {job.availableFormingCrates || 0} Formed Crates (@ {formPcsStd.toLocaleString()} Pcs/Crate)
+                      {((job.availableFormingCrates || 0) + (job.availableForQcCrates || 0))} Formed Crates (@ {formPcsStd.toLocaleString()} Pcs/Crate)
                     </div>
                   </div>
                 </div>
@@ -469,7 +470,7 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                   <div>
                     <span className="text-slate-500 font-medium">QC Allocated Crates:</span>
                     <div className="font-bold text-slate-900 mt-0.5">
-                      📦 {qcAllocatedCrates > 0 ? `${qcAllocatedCrates} Crates` : `${job.availableFormingCrates || 0} Crates Queued`}
+                      📦 {qcAllocatedCrates > 0 ? `${qcAllocatedCrates} Crates` : `${totalFormedWaitingQc} Crates Queued`}
                     </div>
                   </div>
 

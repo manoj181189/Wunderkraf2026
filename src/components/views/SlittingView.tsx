@@ -1,3 +1,4 @@
+import { autoRegisterWorker } from '../../lib/workerUtils';
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, RefreshCw, Play, Pause, Lock, Square, XCircle, Plus, AlertCircle, Check, Search, Tag, ShieldCheck, Layers, Eye, AlertTriangle, RotateCcw, Calendar, Clock, CheckCircle2, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { FactoryState, Job, JobReelItem, ProductType, RunningBatch, OperatorRunSlice, LogEntry, PlannedLayer, ShiftHandoverRecord } from '../../types';
@@ -11,6 +12,7 @@ import {
   getJobAllGsms,
   getJobGsmsSummary,
   calculateLayerFulfillmentMatrix,
+
   isJobLayersFullySlit,
   getJobPlannedLayers,
   parseNumericGsm,
@@ -506,9 +508,13 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       updatedJobs = [newJob, ...baseJobsList];
     }
 
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, operatorName, 'Slitting', 'Slitting-1', shift);
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      floorWorkers,
+      deptWorkers,
       logs: [...state.logs, newLog],
       seriesConfig: nextSeriesConfig,
       productionPlans: updatedPlans,
@@ -670,9 +676,13 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, addReelWorker, 'Slitting', 'Slitting-1', shift);
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      floorWorkers,
+      deptWorkers,
       logs: [...state.logs, newLog]
     });
 

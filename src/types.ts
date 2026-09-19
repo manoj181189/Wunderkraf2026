@@ -167,6 +167,8 @@ export interface RunningBatch {
   user: string;
   holdReason?: string;
   parentBatchId?: string;
+  sourceLotId?: string;
+  sourceOperator?: string;
   parentReelNo?: string;
   inputCrates?: number;
   inputPieces?: number;
@@ -242,7 +244,9 @@ export interface Job {
   availableRolls: number;
   availableCuttingCrates: number;
   availableFormingCrates: number;
-  availableQcCrates: number;
+  availableForQcCrates?: number;
+  availableQcCrates?: number;
+  isReadyForQcInspection?: boolean;
   pcsPerCrateCutting?: number;
   pcsPerCrateForming?: number;
   totalCutPieces?: number;
@@ -538,6 +542,24 @@ export interface DeletedVaultItem {
   data: any;
 }
 
+export interface WipLot {
+  id: string; // e.g. "LOT-CUT-001"
+  jobId: string;
+  product: string;
+  stage: 'Slitting' | 'Cutting' | 'Forming' | 'QC';
+  producedQty: number; // e.g. crates or rolls
+  consumedQty: number; // quantity taken by next stage
+  remainingQty: number; // producedQty - consumedQty
+  piecesPerCrate?: number;
+  totalPieces?: number;
+  producedByOperator: string;
+  machine: string;
+  shift: string;
+  timestamp: string;
+  parentLotId?: string; // Hard-link to the previous stage lot
+  isQcApproved?: boolean;
+}
+
 export interface FactoryState {
   lastResetTimestamp?: number;
   deletedJobIds?: string[];
@@ -546,6 +568,7 @@ export interface FactoryState {
   deletedPlanIds?: string[];
   deletedVaultItems?: DeletedVaultItem[];
   jobs: Job[];
+  wipLots?: WipLot[]; // New ERP Lot Ledger
   logs: LogEntry[];
   auditLogs?: AuditLog[]; // Immutable compliance ledger
   packJobs: PackJob[];
