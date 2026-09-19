@@ -826,6 +826,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     if (batch.status === 'Running') return alert('Batch is already running.');
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nowIso = new Date().toISOString();
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
@@ -837,6 +838,21 @@ export const FormingView: React.FC<FormingViewProps> = ({
         })
       };
     });
+
+    // Clear any active readyAlerts or incidents for this machine
+    const updatedIncidents = (state.maintenanceIncidents || []).map((inc) => {
+      if (inc.machine === selectedMachine && (inc.status === 'REPAIRED_READY' || inc.status === 'OPEN' || inc.status === 'IN_PROGRESS')) {
+        return {
+          ...inc,
+          status: 'ACKNOWLEDGED' as const,
+          acknowledgedAt: nowIso
+        };
+      }
+      return inc;
+    });
+    const updatedReadyAlerts = (state.machineReadyAlerts || []).filter(
+      (a) => a.machine !== selectedMachine
+    );
 
     const newLog = {
       jobId: job.id,
@@ -855,6 +871,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      maintenanceIncidents: updatedIncidents,
+      machineReadyAlerts: updatedReadyAlerts,
       logs: [...state.logs, newLog]
     });
 
@@ -1236,6 +1254,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
         state={state}
         onOpenAttendModal={onOpenAttendModal || onOpenHoldModal}
         onOpenHoldModal={onOpenHoldModal}
+        onResume={handleResume}
       />
 
       {/* ======================================================== */}

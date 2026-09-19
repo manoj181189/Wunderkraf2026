@@ -627,6 +627,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
     if (activeJob.status === 'Running') return alert('Order is already running.');
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nowIso = new Date().toISOString();
 
     const updatedPackJobs = packJobs.map((pj) => {
       if (pj.id !== activeJob.id) return pj;
@@ -636,6 +637,21 @@ export const PackingView: React.FC<PackingViewProps> = ({
         holdReason: undefined
       };
     });
+
+    // Clear any active readyAlerts or incidents for this machine
+    const updatedIncidents = (state.maintenanceIncidents || []).map((inc) => {
+      if (inc.machine === selectedMachine && (inc.status === 'REPAIRED_READY' || inc.status === 'OPEN' || inc.status === 'IN_PROGRESS')) {
+        return {
+          ...inc,
+          status: 'ACKNOWLEDGED' as const,
+          acknowledgedAt: nowIso
+        };
+      }
+      return inc;
+    });
+    const updatedReadyAlerts = (state.machineReadyAlerts || []).filter(
+      (a) => a.machine !== selectedMachine
+    );
 
     const newLog = {
       jobId: activeJob.id,
@@ -654,6 +670,8 @@ export const PackingView: React.FC<PackingViewProps> = ({
     onSaveState({
       ...state,
       packJobs: updatedPackJobs,
+      maintenanceIncidents: updatedIncidents,
+      machineReadyAlerts: updatedReadyAlerts,
       logs: [...state.logs, newLog]
     });
 
@@ -955,6 +973,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
         state={state}
         onOpenAttendModal={onOpenAttendModal || onOpenHoldModal}
         onOpenHoldModal={onOpenHoldModal}
+        onResume={handleResumePacking}
       />
 
       {/* ======================================================== */}

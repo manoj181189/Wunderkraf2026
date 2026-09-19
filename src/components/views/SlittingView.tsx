@@ -715,6 +715,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     }
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nowIso = new Date().toISOString();
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
@@ -726,6 +727,21 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
         })
       };
     });
+
+    // Clear any active readyAlerts or incidents for Slitting-1
+    const updatedIncidents = (state.maintenanceIncidents || []).map((inc) => {
+      if (inc.machine === 'Slitting-1' && (inc.status === 'REPAIRED_READY' || inc.status === 'OPEN' || inc.status === 'IN_PROGRESS')) {
+        return {
+          ...inc,
+          status: 'ACKNOWLEDGED' as const,
+          acknowledgedAt: nowIso
+        };
+      }
+      return inc;
+    });
+    const updatedReadyAlerts = (state.machineReadyAlerts || []).filter(
+      (a) => a.machine !== 'Slitting-1'
+    );
 
     const newLog = {
       jobId: job.id,
@@ -744,6 +760,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      maintenanceIncidents: updatedIncidents,
+      machineReadyAlerts: updatedReadyAlerts,
       logs: [...state.logs, newLog]
     });
 
@@ -1161,6 +1179,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
         state={state}
         onOpenAttendModal={onOpenAttendModal || onOpenHoldModal}
         onOpenHoldModal={onOpenHoldModal}
+        onResume={handleResumeSlitting}
       />
 
       {/* Active Batches Selector */}

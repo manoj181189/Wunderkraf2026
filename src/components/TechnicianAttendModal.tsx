@@ -259,7 +259,7 @@ export const TechnicianAttendModal: React.FC<TechnicianAttendModalProps> = ({
       return inc;
     });
 
-    // Automatically Un-hold machine batches in state.jobs and state.packJobs
+    // Keep machine batches Held with [REPAIRED_READY] so operator retains sole authority to Resume
     const updatedJobs = state.jobs.map((j) => {
       let hasChange = false;
       const batches = (j.runningBatches || []).map((b) => {
@@ -267,8 +267,8 @@ export const TechnicianAttendModal: React.FC<TechnicianAttendModalProps> = ({
           hasChange = true;
           return {
             ...b,
-            status: 'Running' as const,
-            holdReason: undefined
+            status: 'Held' as const,
+            holdReason: `[REPAIRED_READY] Repaired by ${activeIncident.technicianName || effectiveTechName} (${actionTaken.trim() || 'Ready for operator handover'})`
           };
         }
         return b;
@@ -280,8 +280,8 @@ export const TechnicianAttendModal: React.FC<TechnicianAttendModalProps> = ({
       if (pj.machine === targetMachine && pj.status === 'Held') {
         return {
           ...pj,
-          status: 'Running' as const,
-          holdReason: undefined
+          status: 'Held' as const,
+          holdReason: `[REPAIRED_READY] Repaired by ${activeIncident.technicianName || effectiveTechName} (${actionTaken.trim() || 'Ready for operator handover'})`
         };
       }
       return pj;
@@ -303,9 +303,9 @@ export const TechnicianAttendModal: React.FC<TechnicianAttendModalProps> = ({
     const newLog: LogEntry = {
       jobId: targetMachine,
       product: 'Workstation',
-      stage: 'Maintenance Clearance',
+      stage: 'Maintenance Handover',
       machine: targetMachine,
-      action: `✅ Machine ${targetMachine} Repaired & Handover OK by Tech ${activeIncident.technicianName || effectiveTechName}. Repair Duration: ${repairDuration}m | Total Downtime: ${totalDowntime}m | Spares: ${partsSummary} | Work Done: ${actionTaken || 'Calibrated & Tested'}`,
+      action: `✅ Machine ${targetMachine} Repaired & Handover OK by Tech ${activeIncident.technicianName || effectiveTechName}. Awaiting operator verification to resume. (Duration: ${repairDuration}m, Total Down: ${totalDowntime}m, Spares: ${partsSummary})`,
       user: activeIncident.technicianName || effectiveTechName,
       startTime: nowTime,
       rawDate: todayStr,
@@ -333,13 +333,13 @@ export const TechnicianAttendModal: React.FC<TechnicianAttendModalProps> = ({
         `🔧 *Action Taken:* ${actionTaken || 'Repaired and certified ready'}\n` +
         `🔩 *Spares Used:* ${partsSummary}\n` +
         `⏰ *Time:* ${nowTime}\n\n` +
-        `📢 *Status:* "Machine OK from my side - Ready to Run!" Operator can resume production immediately.`
+        `📢 *Status:* "Machine Repaired & Handed Over!" Operator should verify tooling/material and click "▶️ Accept Handover & Resume" on the screen.`
       );
       const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
       window.open(waUrl, '_blank');
     }
 
-    alert(`🎉 Machine ${targetMachine} repair completed successfully and is now certified RUNNING!`);
+    alert(`✅ Machine ${targetMachine} repair completed and marked "READY FOR HANDOVER"!\n\nAs per factory rule, the machine is not auto-running. The production operator will verify tooling and click "▶️ Verify & Resume" on their screen.`);
     onClose();
   };
 

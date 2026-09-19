@@ -453,7 +453,7 @@ Status: "This person is working here" has been activated.`);
       active: true
     };
 
-    // 3. Automatically un-hold the machine batches in state.jobs and state.packJobs
+    // 3. Keep machine batches Held with [REPAIRED_READY] so operator retains sole authority to Resume
     const updatedJobs = state.jobs.map((j) => {
       let hasChange = false;
       const batches = (j.runningBatches || []).map((b) => {
@@ -461,8 +461,8 @@ Status: "This person is working here" has been activated.`);
           hasChange = true;
           return {
             ...b,
-            status: 'Running' as const,
-            holdReason: undefined
+            status: 'Held' as const,
+            holdReason: `[REPAIRED_READY] Repaired by ${repairTechName} (${actionTaken || 'Ready for operator handover'})`
           };
         }
         return b;
@@ -474,8 +474,8 @@ Status: "This person is working here" has been activated.`);
       if (pj.machine === incident.machine && pj.status === 'Held') {
         return {
           ...pj,
-          status: 'Running' as const,
-          holdReason: undefined
+          status: 'Held' as const,
+          holdReason: `[REPAIRED_READY] Repaired by ${repairTechName} (${actionTaken || 'Ready for operator handover'})`
         };
       }
       return pj;
@@ -485,9 +485,9 @@ Status: "This person is working here" has been activated.`);
     const newLog = {
       jobId: incident.machine,
       product: 'Workstation',
-      stage: 'Maintenance Clearance',
+      stage: 'Maintenance Handover',
       machine: incident.machine,
-      action: `✅ Machine Repaired & Handover OK by Tech ${repairTechName} (Downtime: ${elapsedMins}m, Spares: ${partsSummary})`,
+      action: `✅ Machine Repaired & Handed Over by Tech ${repairTechName}. Awaiting operator verification to resume. (Downtime: ${elapsedMins}m, Spares: ${partsSummary})`,
       user: repairTechName,
       startTime: nowTime,
       rawDate: todayStr,
@@ -514,7 +514,7 @@ Status: "This person is working here" has been activated.`);
         `📋 *Work Done:* ${actionTaken || 'Repair complete, calibrated & certified OK'}\n` +
         `🔩 *Spare Parts:* ${partsSummary}\n` +
         `⏰ *Handover Time:* ${nowTime}\n\n` +
-        `📢 *Status:* "Ready for Run / Certified OK!" Production team can resume running.`
+        `📢 *Status:* "Repaired & Handed Over!" Production Operator will verify tooling/material and click "▶️ Accept Handover & Resume" on their screen.`
       );
       window.open(`https://wa.me/${cleanPhone}?text=${waText}`, '_blank');
     }
@@ -522,7 +522,7 @@ Status: "This person is working here" has been activated.`);
     setSelectedIncidentId(null);
     setActionTaken('');
     setSparePartsList([{ name: COMMON_SPARE_PARTS[0], qty: 1, unit: 'Nos', notes: '' }]);
-    alert(`✅ Machine ${incident.machine} is marked READY! Notification popup dispatched to production screen.`);
+    alert(`✅ Machine ${incident.machine} is marked REPAIRED & READY FOR HANDOVER!\n\nAs requested, the machine is not auto-running; production operator will verify tooling and click "▶️ Verify & Resume" on their screen.`);
   };
 
   // Toggle master Auto-Notify switch and persist in state
