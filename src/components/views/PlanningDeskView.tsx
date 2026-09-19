@@ -246,21 +246,21 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setEditingPlanId(null);
     setFormProduct(productList[0] || 'Spoon');
     setFormTargetLayers(9);
-    setFormTargetLengthMeters(1200);
-    setFormAdhesiveBrand(glueBrandList[0] || 'Pidilite W-10 (Food Grade Adhesive)');
+    setFormTargetLengthMeters(4000);
+    setFormAdhesiveBrand(glueBrandList[0] || 'Pidilite FS-35)');
     setFormTargetScrapLimitPct(2.5);
     setFormTargetScrapLimitKg(15);
     setFormAssignedMachine('Slitting-1');
     setFormAssignedShift('DAY');
     setFormPlannedDate(new Date().toISOString().split('T')[0]);
-    setFormTargetQuantity(70000);
+    setFormTargetQuantity(0);
     setFormPaperBrand(paperBrandList[0] || 'ITC');
     setFormTargetGsm('120 GSM, 60 GSM');
     setFormSelectedGsms(['120 GSM', '60 GSM']);
     setCustomGsmInput('');
     setFormNotes('');
     setFormPrintedRollRequired(true);
-    setFormPrintedRollDesign('ITC Printed Design');
+    setFormPrintedRollDesign('Wunderkraf');
     setFormPrintedRollIcon('Sparkles');
     setFormPrintedLayersCount(1);
     setFormPlannedLayers([
@@ -274,14 +274,14 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setEditingPlanId(plan.id);
     setFormProduct(plan.product);
     setFormTargetLayers(plan.targetLayers || 8);
-    setFormTargetLengthMeters(plan.targetLengthMeters || 1200);
+    setFormTargetLengthMeters(plan.targetLengthMeters || 4000);
     setFormAdhesiveBrand(plan.adhesiveBrand || glueBrandList[0]);
     setFormTargetScrapLimitPct(plan.targetScrapLimitPct || 2.5);
     setFormTargetScrapLimitKg(plan.targetScrapLimitKg || 15);
     setFormAssignedMachine(plan.assignedMachine || 'Slitting-1');
     setFormAssignedShift(plan.assignedShift || 'DAY');
     setFormPlannedDate(plan.plannedDate || new Date().toISOString().split('T')[0]);
-    setFormTargetQuantity(plan.targetQuantity || 70000);
+    setFormTargetQuantity(plan.targetQuantity || 0);
     setFormPaperBrand(plan.paperBrand || paperBrandList[0] || 'ITC');
     const initialGsms = plan.plannedGsms && plan.plannedGsms.length > 0
       ? plan.plannedGsms
@@ -1241,7 +1241,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                       const checked = e.target.checked;
                       setFormPrintedRollRequired(checked);
                       if (checked && !formPrintedRollDesign) {
-                        setFormPrintedRollDesign('ITC Printed Design');
+                        setFormPrintedRollDesign('Wunderkraf');
                       }
                     }}
                     className="w-4 h-4 text-indigo-600 border-indigo-300 rounded focus:ring-indigo-500"
@@ -1261,7 +1261,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                         type="text"
                         value={formPrintedRollDesign}
                         onChange={(e) => setFormPrintedRollDesign(e.target.value)}
-                        placeholder="e.g. ITC Printed Brand"
+                        placeholder="e.g. Wunderkraf"
                         className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-md text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
                         required
                       />
