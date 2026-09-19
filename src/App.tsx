@@ -8,6 +8,7 @@ import { initializeFactoryState, persistFactoryState, forceSyncWithCentral, subs
 import { Header } from './components/Header';
 import { NavigationHub } from './components/NavigationHub';
 import { LoginView } from './components/LoginView';
+import { Sidebar } from './components/Sidebar';
 
 // Department & Module Views
 import { MasterExecutiveDashboard } from './components/views/MasterExecutiveDashboard';
@@ -408,6 +409,7 @@ export const App: React.FC = () => {
       DASHBOARD: 'Dashboard',
       MARKETING: 'Marketing',
       DISPATCH: 'Dispatch',
+      PLANNING: 'Planning',
       SLITTING: 'Slitting',
       CUTTING: 'Cutting',
       FORMING: 'Forming',
@@ -416,10 +418,13 @@ export const App: React.FC = () => {
       STOCK: 'Stock',
       ORDERS: 'Orders',
       ANALYTICS: 'Analytics',
+      SCRAP: 'Scrap',
       SEARCH: 'Search',
       AUDIT: 'Audit',
       MAINTENANCE: 'Maintenance',
       PURCHASE: 'Purchase',
+      MANPOWER: 'Manpower',
+      OPENING_STOCK: 'Admin',
       ADMIN: 'Admin'
     };
 
@@ -607,28 +612,37 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Factory View Canvas */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-        {!currentUser ? (
+      {!currentUser ? (
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
           <LoginView
             users={state.users || DEFAULT_USERS}
             brandLogoBase64={state.brandLogoBase64}
             onLogin={handleLogin}
           />
-        ) : (
-          <>
-            {currentView === 'HUB' && (
-              <NavigationHub
-                state={state}
-                currentUser={currentUser}
-                onSelectView={handleNavigate}
-                onOpenRequisitionModal={() => {
-                  setRequisitionDefaultDept(undefined);
-                  setIsRequisitionModalOpen(true);
-                }}
-                onOpenManpowerModal={() => setIsManpowerModalOpen(true)}
-                onOpenAdmin={() => handleNavigate('ADMIN')}
-              />
-            )}
+        </main>
+      ) : (
+        <div className="flex-1 flex w-full relative min-h-0">
+          <Sidebar
+            currentView={currentView}
+            onSelectView={handleNavigate}
+            currentUser={currentUser}
+            state={state}
+          />
+          <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-5 lg:p-6">
+            <div className="max-w-7xl w-full mx-auto">
+              {currentView === 'HUB' && (
+                <NavigationHub
+                  state={state}
+                  currentUser={currentUser}
+                  onSelectView={handleNavigate}
+                  onOpenRequisitionModal={() => {
+                    setRequisitionDefaultDept(undefined);
+                    setIsRequisitionModalOpen(true);
+                  }}
+                  onOpenManpowerModal={() => setIsManpowerModalOpen(true)}
+                  onOpenAdmin={() => handleNavigate('ADMIN')}
+                />
+              )}
 
         {currentView === 'DASHBOARD' && (
           <MasterExecutiveDashboard
@@ -854,9 +868,10 @@ export const App: React.FC = () => {
             onNavigateToView={(view) => setCurrentView(view)}
           />
         )}
-          </>
-        )}
-      </main>
+            </div>
+          </main>
+        </div>
+      )}
 
       {/* Universal Floating Modals - Locked unless user is logged in */}
       {currentUser && (
