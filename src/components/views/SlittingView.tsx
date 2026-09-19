@@ -174,11 +174,11 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
   const [isAddReelModalOpen, setIsAddReelModalOpen] = useState(false);
   const [addReelJobId, setAddReelJobId] = useState('');
-  const [addReelWorker, setAddReelWorker] = useState(slitWorkers[0] || 'SLIT_RAMESH');
+  const [addReelWorker, setAddReelWorker] = useState(slitWorkers[0] || 'Abhay');
   const [addReelNo, setAddReelNo] = useState('');
   const [addReelGsm, setAddReelGsm] = useState(() => (state.targetGsmMaster && state.targetGsmMaster.length > 0 ? state.targetGsmMaster[0] : '120 GSM'));
   const [addReelRemarks, setAddReelRemarks] = useState('');
-  const [addReelWeightKg, setAddReelWeightKg] = useState('200');
+  const [addReelWeightKg, setAddReelWeightKg] = useState('');
 
   // Synchronize isPrintedRoll dynamically when selectedPlanId or selected GSM changes
   useEffect(() => {
@@ -190,7 +190,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
         if (matchedLayer) {
           if (matchedLayer.type === 'Printed') {
             setIsPrintedRoll(true);
-            setPrintedRollDesign(sp.printedRollDesign || 'ITC Printed Design');
+            setPrintedRollDesign(sp.printedRollDesign || 'Wunderkraf');
             setPrintedRollIcon(sp.printedRollIcon || 'Sparkles');
           } else {
             setIsPrintedRoll(false);
