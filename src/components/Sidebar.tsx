@@ -96,6 +96,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
     (j) => (j.runningBatches || []).some((b) => b.status === 'Running')
   ).length;
 
+  // Real-time counts for each of the 5 production desks
+  const slittingPendingCount = (state.productionPlans || []).filter(
+    (p) => p.status === 'Scheduled' || p.status === 'In-Progress'
+  ).length;
+
+  const cuttingPendingCount = (state.jobs || []).filter((j) => {
+    const parentJob = j.parentJobId ? (state.jobs || []).find(p => p.id === j.parentJobId) : null;
+    const rollsCount = parentJob ? (parentJob.availableRolls || 0) : (j.availableRolls || 0);
+    const hasRolls = rollsCount > 0;
+    
+    if (j.parentJobId) {
+      const parentIsReady = parentJob && (parentJob.status === 'READY_FOR_CUTTING' || parentJob.status === 'CUTTING_IN_PROGRESS');
+      return hasRolls && parentIsReady;
+    }
+    
+    const hasChildren = (state.jobs || []).some(child => child.parentJobId === j.id);
+    if (hasChildren) {
+      return false;
+    }
+
+    const isReadyOrInProgress = j.status === 'READY_FOR_CUTTING' || j.status === 'CUTTING_IN_PROGRESS';
+    return hasRolls && isReadyOrInProgress;
+  }).length;
+
+  const formingPendingCount = (state.jobs || []).filter(
+    (j) => (j.availableCuttingCrates || 0) > 0
+  ).length;
+
+  const qcPendingCount = (state.jobs || []).filter(
+    (j) => (j.availableFormingCrates || 0) > 0
+  ).length;
+
+  const packingPendingCount = (state.jobs || []).filter(
+    (j) => (j.availableQcCrates || 0) > 0
+  ).length;
+
   // Navigation Items matching the full factory ecosystem
   const allNavItems: NavItem[] = [
     {
@@ -133,7 +169,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       shortTitle: 'Slitting',
       icon: <Scroll className="w-5 h-5" />,
       perm: 'Slitting',
-      category: 'production'
+      category: 'production',
+      badge: slittingPendingCount > 0 ? slittingPendingCount : undefined,
+      badgeColor: 'bg-amber-500 text-white font-extrabold shadow-3xs'
     },
     {
       id: 'CUTTING',
@@ -141,7 +179,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       shortTitle: 'Cutting',
       icon: <Scissors className="w-5 h-5" />,
       perm: 'Cutting',
-      category: 'production'
+      category: 'production',
+      badge: cuttingPendingCount > 0 ? cuttingPendingCount : undefined,
+      badgeColor: 'bg-indigo-600 text-white font-extrabold shadow-3xs'
     },
     {
       id: 'FORMING',
@@ -149,7 +189,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       shortTitle: 'Forming',
       icon: <Cog className="w-5 h-5" />,
       perm: 'Forming',
-      category: 'production'
+      category: 'production',
+      badge: formingPendingCount > 0 ? formingPendingCount : undefined,
+      badgeColor: 'bg-violet-600 text-white font-extrabold shadow-3xs'
     },
     {
       id: 'QC',
@@ -157,7 +199,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       shortTitle: 'QC',
       icon: <SearchCheck className="w-5 h-5" />,
       perm: 'QC',
-      category: 'production'
+      category: 'production',
+      badge: qcPendingCount > 0 ? qcPendingCount : undefined,
+      badgeColor: 'bg-rose-500 text-white font-extrabold shadow-3xs'
     },
     {
       id: 'PACKING',
@@ -165,7 +209,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       shortTitle: 'Packing',
       icon: <Package className="w-5 h-5" />,
       perm: 'Packing',
-      category: 'production'
+      category: 'production',
+      badge: packingPendingCount > 0 ? packingPendingCount : undefined,
+      badgeColor: 'bg-sky-600 text-white font-extrabold shadow-3xs'
     },
     // Inventory & Orders
     {

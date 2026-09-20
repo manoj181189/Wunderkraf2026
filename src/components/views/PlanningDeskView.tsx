@@ -87,6 +87,14 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
   const [formSelectedGsms, setFormSelectedGsms] = useState<string[]>([defaultPlannedGsm]);
   const [customGsmInput, setCustomGsmInput] = useState<string>('');
 
+  // Option B Multi-Customer Split State
+  const [isMultiCustomerSplit, setIsMultiCustomerSplit] = useState<boolean>(false);
+  const [customerAllocations, setCustomerAllocations] = useState<{ id: string; name: string; qty: number }[]>([
+    { id: '1', name: 'Customer A', qty: 100000 },
+    { id: '2', name: 'Customer B', qty: 100000 },
+    { id: '3', name: 'Customer C', qty: 100000 }
+  ]);
+
   const handleToggleGsm = (gsmValue: string) => {
     setFormSelectedGsms((prev) => {
       if (prev.includes(gsmValue)) {
@@ -253,7 +261,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setFormAssignedMachine('Slitting-1');
     setFormAssignedShift('DAY');
     setFormPlannedDate(new Date().toISOString().split('T')[0]);
-    setFormTargetQuantity(0);
+    setFormTargetQuantity(300000); // default to 300k as requested
     setFormPaperBrand(paperBrandList[0] || 'ITC');
     setFormTargetGsm('120 GSM, 60 GSM');
     setFormSelectedGsms(['120 GSM', '60 GSM']);
@@ -266,6 +274,12 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setFormPlannedLayers([
       { gsm: 120, type: 'Plain', requiredReels: 8 },
       { gsm: 60, type: 'Printed', requiredReels: 1 }
+    ]);
+    setIsMultiCustomerSplit(false);
+    setCustomerAllocations([
+      { id: '1', name: 'Customer A', qty: 100000 },
+      { id: '2', name: 'Customer B', qty: 100000 },
+      { id: '3', name: 'Customer C', qty: 100000 }
     ]);
     setIsPlanModalOpen(true);
   };
@@ -301,6 +315,21 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setFormPlannedLayers(existingLayers.length > 0 ? existingLayers : [
       { gsm: parseNumericGsm(plan.targetGsm) || 120, type: 'Plain', requiredReels: plan.targetLayers || 8 }
     ]);
+    
+    setIsMultiCustomerSplit(plan.isMultiCustomerSplit || false);
+    if (plan.isMultiCustomerSplit && plan.customerAllocations) {
+      setCustomerAllocations(plan.customerAllocations.map((alloc, idx) => ({
+        id: String(idx + 1),
+        name: alloc.customerName,
+        qty: alloc.allocatedQty
+      })));
+    } else {
+      setCustomerAllocations([
+        { id: '1', name: 'Customer A', qty: 100000 },
+        { id: '2', name: 'Customer B', qty: 100000 },
+        { id: '3', name: 'Customer C', qty: 100000 }
+      ]);
+    }
     setIsPlanModalOpen(true);
   };
 
@@ -420,17 +449,22 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
         printedRollDesign: formPrintedRollRequired ? formPrintedRollDesign : undefined,
         printedRollIcon: formPrintedRollRequired ? formPrintedRollIcon : undefined,
         printedLayersCount: formPrintedRollRequired ? formPrintedLayersCount : undefined,
-        plainLayersCount: formPrintedRollRequired ? (formTargetLayers - formPrintedLayersCount) : undefined
+        plainLayersCount: formPrintedRollRequired ? (formTargetLayers - formPrintedLayersCount) : undefined,
+        isMultiCustomerSplit: isMultiCustomerSplit || undefined,
+        customerAllocations: isMultiCustomerSplit ? customerAllocations.map((alloc, idx) => ({
+          customerName: alloc.name,
+          allocatedQty: alloc.qty,
+          childJobId: `${jobId}-${String.fromCharCode(65 + idx)}`
+        })) : undefined
       };
 
-      onSaveState({
-        ...state,
-        seriesConfig: updatedSeriesConfig,
-        deletedPlanIds: (state.deletedPlanIds || []).filter((id) => id !== planId),
-        deletedJobIds: (state.deletedJobIds || []).filter((id) => id !== jobId),
-        productionPlans: [newPlan, ...productionPlans],
-        jobs: [{
-          id: jobId,
+      const childJobs: Job[] = isMultiCustomerSplit ? customerAllocations.map((alloc, idx) => {
+        const childId = `${jobId}-${String.fromCharCode(65 + idx)}`;
+        return {
+          id: childId,
+          parentJobId: jobId,
+          isChildJob: true,
+          customerName: alloc.name,
           planId: planId,
           product: formProduct,
           paperBrand: formPaperBrand,
@@ -445,11 +479,48 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
           availableCuttingCrates: 0,
           availableFormingCrates: 0,
           availableQcCrates: 0,
-          createdAt: new Date().toISOString()
-        }, ...(state.jobs || [])]
+          createdAt: new Date().toISOString(),
+          targetQuantity: alloc.qty
+        };
+      }) : [];
+
+      onSaveState({
+        ...state,
+        seriesConfig: updatedSeriesConfig,
+        deletedPlanIds: (state.deletedPlanIds || []).filter((id) => id !== planId),
+        deletedJobIds: (state.deletedJobIds || []).filter((id) => id !== jobId),
+        productionPlans: [newPlan, ...productionPlans],
+        jobs: [
+          {
+            id: jobId,
+            planId: planId,
+            product: formProduct,
+            paperBrand: formPaperBrand,
+            gsm: combinedGsmStr,
+            targetLayers: formTargetLayers,
+            targetGsm: combinedGsmStr,
+            plannedGsms: effectiveGsms,
+            plannedLayers: effectivePlannedLayers,
+            stage: 'Planning',
+            status: 'Pending',
+            availableRolls: 0,
+            availableCuttingCrates: 0,
+            availableFormingCrates: 0,
+            availableQcCrates: 0,
+            createdAt: new Date().toISOString(),
+            childJobIds: isMultiCustomerSplit ? childJobs.map(cj => cj.id) : undefined,
+            isMultiCustomerSplit: isMultiCustomerSplit || undefined
+          },
+          ...childJobs,
+          ...(state.jobs || [])
+        ]
       });
       setIsPlanModalOpen(false);
-      alert(`✅ New Production Plan Created!\nPlan ID: [${planId}]\nJob ID: [${jobId}]\nTarget: ${formTargetLayers} Layers (${effectivePlannedLayers.map(l => `${l.requiredReels}x ${l.gsm} GSM ${l.type}`).join(' + ')}) | ${formTargetLengthMeters} Meters | ${formAdhesiveBrand}`);
+      alert(
+        isMultiCustomerSplit
+          ? `✅ Parent Plan [${planId}] Created!\n• Parent Job: [${jobId}] (handles Slitting)\n• Child Jobs Created for Customers: ${customerAllocations.map((c, idx) => `\n   - [${jobId}-${String.fromCharCode(65 + idx)}] ${c.name}: ${c.qty.toLocaleString()} Pcs`).join('')}`
+          : `✅ New Production Plan Created!\nPlan ID: [${planId}]\nJob ID: [${jobId}]\nTarget: ${formTargetLayers} Layers (${effectivePlannedLayers.map(l => `${l.requiredReels}x ${l.gsm} GSM ${l.type}`).join(' + ')}) | ${formTargetLengthMeters} Meters`
+      );
     }
   };
 
@@ -1558,7 +1629,116 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                   onChange={(e) => setFormTargetQuantity(Number(e.target.value))}
                   step={1000}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-800"
+                  disabled={isMultiCustomerSplit}
                 />
+              </div>
+
+              {/* Option B: Parent-Child Job Splitting UI */}
+              <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isMultiCustomerSplit"
+                    checked={isMultiCustomerSplit}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsMultiCustomerSplit(checked);
+                      if (checked) {
+                        // Automatically set target qty to sum of allocations
+                        const totalAlloc = customerAllocations.reduce((sum, item) => sum + item.qty, 0);
+                        setFormTargetQuantity(totalAlloc);
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 border-blue-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="isMultiCustomerSplit" className="font-extrabold text-[11px] uppercase tracking-wider text-blue-900 cursor-pointer select-none flex items-center gap-1.5">
+                    <Boxes className="w-4 h-4 text-blue-700" />
+                    <span>Split into Multi-Customer Jobs (Option B)</span>
+                  </label>
+                </div>
+
+                {isMultiCustomerSplit && (
+                  <div className="space-y-2.5 pl-6 animate-in fade-in duration-200">
+                    <div className="text-[10px] font-black text-slate-500 uppercase">
+                      Configure Customer Allocations (चाइल्ड जॉब्स का बटवारा):
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {customerAllocations.map((alloc, index) => (
+                        <div key={alloc.id} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-blue-100 shadow-3xs">
+                          <div className="flex-1">
+                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Customer Name:</label>
+                            <input
+                              type="text"
+                              value={alloc.name}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setCustomerAllocations(prev => prev.map(item => item.id === alloc.id ? { ...item, name: val } : item));
+                              }}
+                              placeholder="Customer Name"
+                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800"
+                              required
+                            />
+                          </div>
+
+                          <div className="w-1/3">
+                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Allocated Qty (Pcs):</label>
+                            <input
+                              type="number"
+                              value={alloc.qty}
+                              onChange={(e) => {
+                                const val = Number(e.target.value) || 0;
+                                const updated = customerAllocations.map(item => item.id === alloc.id ? { ...item, qty: val } : item);
+                                setCustomerAllocations(updated);
+                                const totalAlloc = updated.reduce((sum, item) => sum + item.qty, 0);
+                                setFormTargetQuantity(totalAlloc);
+                              }}
+                              step={1000}
+                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-black text-slate-900 text-right"
+                              required
+                            />
+                          </div>
+
+                          {customerAllocations.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = customerAllocations.filter(item => item.id !== alloc.id);
+                                setCustomerAllocations(updated);
+                                const totalAlloc = updated.reduce((sum, item) => sum + item.qty, 0);
+                                setFormTargetQuantity(totalAlloc);
+                              }}
+                              className="p-1 mt-3.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition cursor-pointer"
+                              title="Delete allocation"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-between items-center bg-blue-100/60 p-2.5 rounded-lg border border-blue-200">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextId = String(customerAllocations.length + 1);
+                          const newAlloc = { id: nextId, name: `Customer ${String.fromCharCode(65 + customerAllocations.length)}`, qty: 100000 };
+                          const updated = [...customerAllocations, newAlloc];
+                          setCustomerAllocations(updated);
+                          const totalAlloc = updated.reduce((sum, item) => sum + item.qty, 0);
+                          setFormTargetQuantity(totalAlloc);
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-extrabold text-blue-700 hover:text-blue-900 bg-white border border-blue-300 hover:bg-slate-50 rounded-md transition cursor-pointer flex items-center gap-1 shadow-3xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Customer
+                      </button>
+                      <span className="text-[11px] font-black text-blue-950">
+                        Sum Total Qty: {customerAllocations.reduce((sum, item) => sum + item.qty, 0).toLocaleString()} Pcs
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

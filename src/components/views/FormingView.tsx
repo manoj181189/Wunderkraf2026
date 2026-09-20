@@ -1776,9 +1776,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
               <option value="">-- SELECT CUT CRATES QUEUE --</option>
               {pendingCutJobs.map((j) => {
                 const jm = getJobCuttingMetrics(j);
+                const custSuffix = j.customerName ? ` [Customer: ${j.customerName}]` : '';
                 return (
                   <option key={j.id} value={j.id}>
-                    {j.id} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {j.availableCuttingCrates} Crates = {jm.totalNetPieces.toLocaleString()} Net Blanks @ {jm.netPcsPerCrate.toLocaleString()} pcs/crate{jm.hasRejectionDeduction ? ` [-${jm.cuttingRejectedPcs} cutting defect pcs]` : ''})
+                    {j.id}{custSuffix} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {j.availableCuttingCrates} Crates = {jm.totalNetPieces.toLocaleString()} Net Blanks)
                   </option>
                 );
               })}
@@ -1795,7 +1796,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <span className="font-extrabold text-sm text-indigo-900">
-                        📦 Available Stock: {selectedPendingJob.availableCuttingCrates} Cut Crates
+                        📦 Available Stock: {selectedPendingJob.availableCuttingCrates} Cut Crates {selectedPendingJob.customerName ? `[${selectedPendingJob.customerName}]` : ''}
                       </span>
                       <span className="bg-indigo-200/80 text-indigo-900 font-black px-2 py-0.5 rounded text-[11px]">
                         {jm.totalNetPieces.toLocaleString()} Net Flat Blanks
@@ -2583,7 +2584,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   >
                     {cuttingLotsForJob.map((lot) => (
                       <option key={lot.id} value={lot.id}>
-                        👨‍🏭 {lot.worker} ({lot.id}) — Consumed: {lot.consumedQty || 0} Crates
+                        👨‍🏭 {lot.producedByOperator} ({lot.id}) — Consumed: {lot.consumedQty || 0} Crates
                       </option>
                     ))}
                     <option value="">

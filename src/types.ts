@@ -181,6 +181,7 @@ export interface RunningBatch {
   slices?: OperatorRunSlice[];
   helpers?: string[];
   helperCount?: number;
+  motherReelsAllocated?: string[];
   glueBrand?: string;
   glueUsageKg?: number;
   glueEntries?: {
@@ -243,6 +244,7 @@ export interface Job {
   status?: string;
   availableRolls: number;
   availableCuttingCrates: number;
+  totalCutCrates?: number;
   availableFormingCrates: number;
   availableForQcCrates?: number;
   availableQcCrates?: number;
@@ -298,6 +300,12 @@ export interface Job {
   plainLayersCount?: number;
   isOpeningBalance?: boolean;
   lotId?: string;
+  parentJobId?: string;
+  isChildJob?: boolean;
+  customerName?: string;
+  childJobIds?: string[];
+  isMultiCustomerSplit?: boolean;
+  targetQuantity?: number;
 }
 
 export interface DispatchLog {
@@ -558,6 +566,8 @@ export interface WipLot {
   timestamp: string;
   parentLotId?: string; // Hard-link to the previous stage lot
   isQcApproved?: boolean;
+  sourceOperator?: string;
+  sourceLotId?: string;
 }
 
 export interface FactoryState {
@@ -659,6 +669,8 @@ export interface ProductionPlan {
   actualScrapKg?: number;
   actualScrapPct?: number;
   actualGlueConsumedKg?: number;
+  isMultiCustomerSplit?: boolean;
+  customerAllocations?: { customerName: string; allocatedQty: number; childJobId?: string }[];
 }
 
 export interface MotherReelItem {

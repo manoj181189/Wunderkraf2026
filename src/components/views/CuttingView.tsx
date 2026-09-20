@@ -256,9 +256,39 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
   const [showLiveManpowerRoster, setShowLiveManpowerRoster] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Option B Surplus Modal State
+  const [showSurplusModal, setShowSurplusModal] = useState(false);
+  const [surplusData, setSurplusData] = useState<{
+    surplusPcs: number;
+    surplusCrates: number;
+    childJobId: string;
+    parentJobId: string;
+    targetQty: number;
+    cumulativeOutputPieces: number;
+  } | null>(null);
+  const [selectedSurplusOption, setSelectedSurplusOption] = useState<'current_customer' | 'next_customer' | 'buffer'>('current_customer');
+  const [targetNextJobId, setTargetNextJobId] = useState<string>('');
+
   // Pending queue of slit rolls
   let pendingSlitJobs = jobs.filter((j) => {
-    const hasRolls = (j.availableRolls || 0) > 0;
+    // If it's a child job, its available rolls are from its parent!
+    const parentJob = j.parentJobId ? jobs.find(p => p.id === j.parentJobId) : null;
+    const rollsCount = parentJob ? (parentJob.availableRolls || 0) : (j.availableRolls || 0);
+    const hasRolls = rollsCount > 0;
+    
+    // If it's a child job, it is ready for cutting if the parent is ready or in progress
+    if (j.parentJobId) {
+      const parentIsReady = parentJob && (parentJob.status === 'READY_FOR_CUTTING' || parentJob.status === 'CUTTING_IN_PROGRESS');
+      return hasRolls && parentIsReady;
+    }
+    
+    // If it is a parent job, we only show it in cutting if it has no child jobs.
+    // If it has child jobs, we only want to show the child jobs in cutting so the user doesn't cut the parent directly!
+    const hasChildren = jobs.some(child => child.parentJobId === j.id);
+    if (hasChildren) {
+      return false; // Hide the parent job, show its child jobs instead!
+    }
+
     const isReadyOrInProgress = j.status === 'READY_FOR_CUTTING' || j.status === 'CUTTING_IN_PROGRESS';
     return hasRolls && isReadyOrInProgress;
   });
@@ -560,8 +590,12 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     }
 
     const job = jobs.find((j) => j.id === selectedPendingJobId);
-    if (!job || (job.availableRolls || 0) < rollsCount) {
-      alert(`Insufficient slit rolls! Available: ${job?.availableRolls || 0}`);
+    if (!job) return;
+
+    // Resolve where available rolls come from (Parent job handles Slitting and holds rolls)
+    const rollSourceJob = job.parentJobId ? jobs.find(p => p.id === job.parentJobId) : job;
+    if (!rollSourceJob || (rollSourceJob.availableRolls || 0) < rollsCount) {
+      alert(`Insufficient slit rolls! Available: ${rollSourceJob?.availableRolls || 0}`);
       return;
     }
 
@@ -582,18 +616,20 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     if (activeRunning && activeRunning.job.id === job.id) {
       // Same-job Top-up
       updatedJobs = jobs.map((j) => {
-        if (j.id !== job.id) return j;
-        return {
-          ...j,
-          availableRolls: (j.availableRolls || 0) - rollsCount,
-          runningBatches: (j.runningBatches || []).map((b) => {
+        let updatedJ = { ...j };
+        if (j.id === rollSourceJob.id) {
+          updatedJ.availableRolls = (j.availableRolls || 0) - rollsCount;
+        }
+        if (j.id === job.id) {
+          updatedJ.runningBatches = (j.runningBatches || []).map((b) => {
             if (b.batchId !== activeRunning.batch.batchId) return b;
             return {
               ...b,
               issuedQty: (b.issuedQty || 0) + rollsCount
             };
-          })
-        };
+          });
+        }
+        return updatedJ;
       });
       logMessage = `Cutting Top-up on ${selectedMachine} (+${rollsCount} Rolls Added to Running Batch)`;
       alert(`✅ Top-up Successful! Added ${rollsCount} more rolls to running Job ${job.id} on ${selectedMachine}.`);
@@ -626,14 +662,19 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       };
 
       updatedJobs = jobs.map((j) => {
-        if (j.id !== job.id) return j;
-        return {
-          ...j,
-          tracedLots: { ...(j.tracedLots || {}), Cutting: batchId, Slitting: j.tracedLots?.Slitting || slitBatchId },
-          availableRolls: (j.availableRolls || 0) - rollsCount,
-          status: 'CUTTING_IN_PROGRESS',
-          runningBatches: [...(j.runningBatches || []), newBatch]
-        };
+        let updatedJ = { ...j };
+        if (j.id === rollSourceJob.id) {
+          updatedJ.availableRolls = (j.availableRolls || 0) - rollsCount;
+        }
+        if (j.id === job.id) {
+          updatedJ.tracedLots = { ...(j.tracedLots || {}), Cutting: batchId, Slitting: j.tracedLots?.Slitting || slitBatchId };
+          updatedJ.status = 'CUTTING_IN_PROGRESS';
+          updatedJ.runningBatches = [...(j.runningBatches || []), newBatch];
+        }
+        if (job.parentJobId && j.id === job.parentJobId) {
+          updatedJ.status = 'CUTTING_IN_PROGRESS';
+        }
+        return updatedJ;
       });
 
       logMessage = `Started Cutting on ${selectedMachine} (${rollsCount} Rolls Issued) | Worker: ${operatorName.toUpperCase()}`;
@@ -1357,6 +1398,278 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     }
   };
 
+  const handleConfirmSurplusDistribution = () => {
+    if (!activeBatchObj || !surplusData) return;
+    
+    const cratesDone = parseFloat(outputCrates) || 0;
+    const looseDone = parseInt(loosePiecesInput, 10) || 0;
+    const materialScrapKgVal = parseFloat(scrapKg) || 0;
+    const rejectedPcsVal = parseInt(rejectedPcsInput, 10) || 0;
+    
+    const { job, batch } = activeBatchObj;
+    
+    const pendingGlueQty = parseFloat(glueIssueInput) || 0;
+    const finalBatchGlueKg = Number(((batch.glueUsageKg || 0) + pendingGlueQty).toFixed(2));
+    const finalJobGlueKg = Number(((job.glueUsageKg || 0) + pendingGlueQty).toFixed(2));
+    
+    const grossCutPcs = Math.round(cratesDone * effectiveCutPcs) + looseDone;
+    const totalCutPcs = Math.max(0, grossCutPcs - rejectedPcsVal);
+    const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const brandToDeduct = job.targetGlueBrand || 'Pidilite W-10 (Food Grade Adhesive)';
+    
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Determine quantities based on allocation strategy
+    let currentJobCratesDelta = cratesDone;
+    let currentJobPcsDelta = totalCutPcs;
+    let transferWipLots: WipLot[] = [];
+    let extraNotes = '';
+
+    if (selectedSurplusOption === 'next_customer' && targetNextJobId) {
+      // Transfer surplus to next customer's job
+      const surplusCratesToTransfer = Math.floor(surplusData.surplusPcs / effectiveCutPcs);
+      const surplusPcsToTransfer = surplusCratesToTransfer * effectiveCutPcs;
+      
+      if (surplusCratesToTransfer > 0) {
+        currentJobCratesDelta = Math.max(0, cratesDone - surplusCratesToTransfer);
+        currentJobPcsDelta = Math.max(0, totalCutPcs - surplusPcsToTransfer);
+        
+        // Create WIP lot directly assigned to targetNextJobId
+        const transferLot: WipLot = {
+          id: `LOT-CUT-XFER-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          jobId: targetNextJobId,
+          product: job.product,
+          stage: 'Cutting',
+          producedQty: surplusCratesToTransfer,
+          consumedQty: 0,
+          remainingQty: surplusCratesToTransfer,
+          piecesPerCrate: effectiveCutPcs,
+          totalPieces: surplusPcsToTransfer,
+          producedByOperator: batch.worker || operatorName || 'UNKNOWN',
+          machine: selectedMachine,
+          shift: batch.shift || shift,
+          timestamp: new Date().toISOString(),
+          sourceOperator: batch.worker || operatorName,
+          sourceLotId: batch.batchId
+        };
+        transferWipLots.push(transferLot);
+        extraNotes = ` | Allocated ${surplusCratesToTransfer} Crates (${surplusPcsToTransfer.toLocaleString()} Pcs) to sibling Job [${targetNextJobId}]`;
+      }
+    } else if (selectedSurplusOption === 'buffer') {
+      // Transfer surplus to Buffer Stock
+      const surplusCratesToTransfer = Math.floor(surplusData.surplusPcs / effectiveCutPcs);
+      const surplusPcsToTransfer = surplusCratesToTransfer * effectiveCutPcs;
+      
+      if (surplusCratesToTransfer > 0) {
+        currentJobCratesDelta = Math.max(0, cratesDone - surplusCratesToTransfer);
+        currentJobPcsDelta = Math.max(0, totalCutPcs - surplusPcsToTransfer);
+        
+        // Create WIP lot assigned to BUFFER-STOCK
+        const bufferLot: WipLot = {
+          id: `LOT-CUT-BUFFER-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          jobId: `BUFFER-${job.product.toUpperCase()}`,
+          product: job.product,
+          stage: 'Cutting',
+          producedQty: surplusCratesToTransfer,
+          consumedQty: 0,
+          remainingQty: surplusCratesToTransfer,
+          piecesPerCrate: effectiveCutPcs,
+          totalPieces: surplusPcsToTransfer,
+          producedByOperator: batch.worker || operatorName || 'UNKNOWN',
+          machine: selectedMachine,
+          shift: batch.shift || shift,
+          timestamp: new Date().toISOString(),
+          sourceOperator: batch.worker || operatorName,
+          sourceLotId: batch.batchId
+        };
+        transferWipLots.push(bufferLot);
+        extraNotes = ` | Allocated ${surplusCratesToTransfer} Crates (${surplusPcsToTransfer.toLocaleString()} Pcs) to Buffer Stock [BUFFER-${job.product.toUpperCase()}]`;
+      }
+    }
+
+    // Now update jobs
+    const updatedJobs = jobs.map((j) => {
+      let updatedJ = { ...j };
+      
+      if (j.id === job.id) {
+        updatedJ.pcsPerCrateCutting = effectiveCutPcs;
+        updatedJ.availableCuttingCrates = (j.availableCuttingCrates || 0) + currentJobCratesDelta;
+        updatedJ.totalCutPieces = (j.totalCutPieces || 0) + currentJobPcsDelta;
+        updatedJ.cuttingLoosePcs = (j.cuttingLoosePcs || 0) + looseDone;
+        updatedJ.cuttingScrapKg = (j.cuttingScrapKg || 0) + materialScrapKgVal;
+        updatedJ.cuttingMaterialScrapKg = (j.cuttingMaterialScrapKg || 0) + materialScrapKgVal;
+        updatedJ.cuttingRejectedPcs = (j.cuttingRejectedPcs || 0) + rejectedPcsVal;
+        updatedJ.cuttingScrapPcs = (j.cuttingScrapPcs || 0) + rejectedPcsVal;
+        updatedJ.cuttingPcsPerKg = effectivePcsPerKg;
+        updatedJ.glueUsageKg = finalJobGlueKg;
+        updatedJ.glueBrand = brandToDeduct;
+        updatedJ.runningBatches = (j.runningBatches || []).map((b) => {
+          if (b.batchId !== batch.batchId) return b;
+          const finalSlices = [...(b.slices || [])];
+          finalSlices.push({
+            sliceId: `SLC-${Date.now()}-${finalSlices.length + 1}`,
+            operator: b.worker,
+            shift: b.shift || 'DAY',
+            date: new Date().toISOString().split('T')[0],
+            machine: b.machine,
+            stage: 'Cutting',
+            startTime: finalSlices.length > 0 ? finalSlices[finalSlices.length - 1].handoverTime : b.startTime,
+            handoverTime: stopTime,
+            producedQty: cratesDone,
+            producedPieces: totalCutPcs,
+            grossPieces: grossCutPcs,
+            scrapQty: materialScrapKgVal,
+            scrapKg: materialScrapKgVal,
+            scrapPcs: rejectedPcsVal,
+            cuttingMaterialScrapKg: materialScrapKgVal,
+            rejectedPieces: rejectedPcsVal,
+            pcsPerKg: effectivePcsPerKg,
+            helpers: b.helpers,
+            notes: `Surplus allocated: ${selectedSurplusOption}`
+          });
+          return {
+            ...b,
+            status: 'Completed',
+            endTime: stopTime,
+            producedQty: (b.producedQty || 0) + cratesDone,
+            pcsPerCrate: effectiveCutPcs,
+            producedPieces: (b.producedPieces || 0) + totalCutPcs,
+            grossPieces: (b.grossPieces || 0) + grossCutPcs,
+            loosePieces: looseDone,
+            scrapKg: (b.scrapKg || 0) + materialScrapKgVal,
+            cuttingMaterialScrapKg: (b.cuttingMaterialScrapKg || 0) + materialScrapKgVal,
+            scrapPcs: (b.scrapPcs || 0) + rejectedPcsVal,
+            rejectedPieces: (b.rejectedPieces || 0) + rejectedPcsVal,
+            pcsPerKg: effectivePcsPerKg,
+            glueBrand: brandToDeduct,
+            glueUsageKg: finalBatchGlueKg,
+            slices: finalSlices
+          };
+        });
+      }
+
+      // If we transferred to a sibling job, credit its available cutting crates directly
+      if (selectedSurplusOption === 'next_customer' && j.id === targetNextJobId) {
+        const surplusCratesToTransfer = Math.floor(surplusData.surplusPcs / effectiveCutPcs);
+        const surplusPcsToTransfer = surplusCratesToTransfer * effectiveCutPcs;
+        updatedJ.availableCuttingCrates = (j.availableCuttingCrates || 0) + surplusCratesToTransfer;
+        updatedJ.totalCutPieces = (j.totalCutPieces || 0) + surplusPcsToTransfer;
+      }
+
+      return updatedJ;
+    });
+
+    // Create current job's WIP lot
+    let nextWipLots = [...(state.wipLots || [])];
+    if (currentJobCratesDelta > 0) {
+      const finishedLot: WipLot = {
+        id: `LOT-CUT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        jobId: job.id,
+        product: job.product,
+        stage: 'Cutting',
+        producedQty: currentJobCratesDelta,
+        consumedQty: 0,
+        remainingQty: currentJobCratesDelta,
+        piecesPerCrate: effectiveCutPcs,
+        totalPieces: currentJobPcsDelta,
+        producedByOperator: batch.worker || operatorName || 'UNKNOWN',
+        machine: selectedMachine,
+        shift: batch.shift || shift,
+        timestamp: new Date().toISOString()
+      };
+      nextWipLots = [finishedLot, ...nextWipLots];
+    }
+
+    // Add transfer/buffer lots
+    if (transferWipLots.length > 0) {
+      nextWipLots = [...transferWipLots, ...nextWipLots];
+    }
+
+    // Warehouse stock deductions
+    let glueDeductedMsg = '';
+    let remainingToDeduct = pendingGlueQty;
+    const updatedRequisitions = (state.materialRequisitions || []).map((req) => {
+      if (
+        remainingToDeduct > 0 &&
+        ((req.itemName && req.itemName.toLowerCase().includes('glue')) ||
+          (req.itemCategory && req.itemCategory.toLowerCase().includes('adhesive'))) &&
+        (req.status === 'RECEIVED' || req.status === 'ACKNOWLEDGED') &&
+        (req.receivedQty || 0) > 0
+      ) {
+        const deduct = Math.min(remainingToDeduct, req.receivedQty || 0);
+        remainingToDeduct -= deduct;
+        glueDeductedMsg = ` (Deducted ${deduct} KG from Warehouse Stock ${req.id})`;
+        return {
+          ...req,
+          receivedQty: Number(((req.receivedQty || 0) - deduct).toFixed(2))
+        };
+      }
+      return req;
+    });
+
+    let nextGlueLogs = [...(state.glueUsageLogs || [])];
+    if (pendingGlueQty > 0) {
+      const newGlueEntry: GlueUsageEntry = {
+        id: `GLUE-${Date.now()}`,
+        date: dateStr,
+        time: timeStr,
+        shift: batch.shift || shift,
+        machine: selectedMachine,
+        stage: 'Cutting',
+        jobId: job.id,
+        batchId: batch.batchId,
+        product: job.product,
+        glueBrand: brandToDeduct,
+        quantityKg: pendingGlueQty,
+        operator: batch.worker || operatorName,
+        user: 'cut_user',
+        createdAt: now.toISOString()
+      };
+      nextGlueLogs = [newGlueEntry, ...nextGlueLogs];
+    }
+
+    const newLog = {
+      jobId: job.id,
+      product: job.product,
+      stage: 'Cutting',
+      machine: selectedMachine,
+      shift: batch.shift,
+      action: `⏹️ Finished Cutting Batch ${batch.batchId} with Surplus Allocation. Total: ${totalCutPcs} Pcs | Current job got: ${currentJobCratesDelta} Crates (${currentJobPcsDelta} Pcs)${extraNotes}`,
+      worker: batch.worker,
+      user: 'cut_user',
+      startTime: batch.startTime,
+      endTime: stopTime,
+      rawDate: dateStr,
+      timestamp: now.toLocaleString()
+    };
+
+    onSaveState({
+      ...state,
+      jobs: updatedJobs,
+      glueUsageLogs: nextGlueLogs,
+      materialRequisitions: updatedRequisitions,
+      wipLots: nextWipLots,
+      logs: [...state.logs, newLog]
+    });
+
+    // Reset fields
+    setOutputCrates('');
+    setLoosePiecesInput('0');
+    setPcsPerCrateOverride('');
+    setScrapKg('0');
+    setRejectedPcsInput('');
+    setPcsPerKgInput('');
+    setActualGlueConsumed('');
+    setGlueIssueInput('');
+    setGlueSuccessMsg('');
+    setSelectedActiveBatchId('');
+    setShowSurplusModal(false);
+    setSurplusData(null);
+    alert(`✅ Option B Surplus Run Finished!\nTotal: ${totalCutPcs.toLocaleString()} Pcs\n• Current Job Got: ${currentJobCratesDelta} Crates (${currentJobPcsDelta.toLocaleString()} Pcs)\n• ${extraNotes || 'Allocated to current customer'}`);
+  };
+
   const handleFinish = () => {
     try {
       if (!activeBatchObj) return alert('Select batch to finish!');
@@ -1369,6 +1682,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       
       const cratesDone = parseFloat(outputCrates) || 0;
       const looseDone = parseInt(loosePiecesInput, 10) || 0;
+      const rejectedPcsVal = parseInt(rejectedPcsInput, 10) || 0;
       
       if (cratesDone <= 0 && looseDone <= 0) {
         alert('Cannot finish job: Actual Sheets Cut (Crates or Loose pieces) is required or invalid.');
@@ -1378,6 +1692,36 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       if (scrapKg.trim() === '' || isNaN(parseFloat(scrapKg))) {
         alert('Cannot finish job: Cutting Skeleton Scrap (KG) is required or invalid.');
         return;
+      }
+
+      // Check for Option B Surplus (Target over-cutting)
+      const { job } = activeBatchObj;
+      const grossCutPcs = Math.round(cratesDone * effectiveCutPcs) + looseDone;
+      const totalCutPcs = Math.max(0, grossCutPcs - rejectedPcsVal);
+      const prevTotalCut = job.totalCutPieces || 0;
+      const cumulativeOutputPieces = prevTotalCut + totalCutPcs;
+      const targetQty = job.targetQuantity || 0;
+
+      if (job.parentJobId && targetQty > 0 && cumulativeOutputPieces > targetQty) {
+        const surplusPcs = cumulativeOutputPieces - targetQty;
+        const surplusCrates = Number((surplusPcs / effectiveCutPcs).toFixed(1));
+        
+        // Find other child jobs of the same parent
+        const siblingJobs = jobs.filter(j => j.parentJobId === job.parentJobId && j.id !== job.id);
+        const firstSiblingId = siblingJobs[0]?.id || '';
+
+        setSurplusData({
+          surplusPcs,
+          surplusCrates,
+          childJobId: job.id,
+          parentJobId: job.parentJobId,
+          targetQty,
+          cumulativeOutputPieces
+        });
+        setSelectedSurplusOption('current_customer');
+        setTargetNextJobId(firstSiblingId);
+        setShowSurplusModal(true);
+        return; // Pause execution, show modal
       }
 
       executeFinishJob();
@@ -3465,6 +3809,142 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 className="px-4 py-2 text-xs font-extrabold text-white bg-teal-600 hover:bg-teal-700 rounded-xl cursor-pointer shadow-xs flex items-center gap-1"
               >
                 <Check className="w-4 h-4" /> Save Specification & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Option B Surplus Allocation Modal */}
+      {showSurplusModal && surplusData && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl border border-blue-200 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5 border-b border-blue-100 pb-3">
+              <Box className="w-6 h-6 text-blue-600" />
+              <div>
+                <h3 className="text-sm font-extrabold text-blue-950 m-0 uppercase tracking-wide">
+                  Surplus Quantity Detected (अतिरिक्त माल वितरण)
+                </h3>
+                <p className="text-[11px] text-slate-500 m-0">
+                  Target: {surplusData.targetQty.toLocaleString()} Pcs | Produced: {surplusData.cumulativeOutputPieces.toLocaleString()} Pcs
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-700">Excess Surplus Pieces:</span>
+                <span className="font-black text-blue-800 text-sm">{surplusData.surplusPcs.toLocaleString()} Pcs</span>
+              </div>
+              <div className="flex justify-between items-center text-xs border-t border-blue-100 pt-2">
+                <span className="font-bold text-slate-700">Estimated Cutting Crates:</span>
+                <span className="font-black text-blue-800 text-sm">{surplusData.surplusCrates} Crates</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="block font-bold text-xs text-slate-700 uppercase">
+                Choose Surplus Allocation Strategy (अतिरिक्त माल कहा डाले?):
+              </span>
+
+              <div className="space-y-2">
+                {/* Option 1: Give to current customer */}
+                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                  selectedSurplusOption === 'current_customer'
+                    ? 'border-blue-500 bg-blue-50/40 text-blue-950'
+                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                }`}>
+                  <input
+                    type="radio"
+                    name="surplusOption"
+                    value="current_customer"
+                    checked={selectedSurplusOption === 'current_customer'}
+                    onChange={() => setSelectedSurplusOption('current_customer')}
+                    className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="text-xs">
+                    <span className="block font-extrabold">Keep with Current Customer ({activeBatchObj?.job.customerName || 'This Job'})</span>
+                    <span className="block text-[10px] text-slate-500 font-medium">Add all pieces to this job's forming inventory (will become extra available cut crates).</span>
+                  </div>
+                </label>
+
+                {/* Option 2: Transfer to Next Customer */}
+                {jobs.filter(j => j.parentJobId === surplusData.parentJobId && j.id !== surplusData.childJobId).length > 0 && (
+                  <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                    selectedSurplusOption === 'next_customer'
+                      ? 'border-blue-500 bg-blue-50/40 text-blue-950'
+                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                }`}>
+                    <input
+                      type="radio"
+                      name="surplusOption"
+                      value="next_customer"
+                      checked={selectedSurplusOption === 'next_customer'}
+                      onChange={() => setSelectedSurplusOption('next_customer')}
+                      className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div className="text-xs flex-1">
+                      <span className="block font-extrabold">Transfer to Next Sibling Job (अगले कस्टमर के खाते में डालें)</span>
+                      <span className="block text-[10px] text-slate-500 font-medium">Deduct surplus from current run, and directly top-up the next customer's cutting stock.</span>
+                      
+                      {selectedSurplusOption === 'next_customer' && (
+                        <div className="mt-2.5 space-y-1 animate-in slide-in-from-top-1 duration-150">
+                          <span className="block text-[10px] font-bold text-slate-500 uppercase">Select Target Sibling Job:</span>
+                          <select
+                            value={targetNextJobId}
+                            onChange={(e) => setTargetNextJobId(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-md text-xs font-bold text-slate-800"
+                          >
+                            {jobs
+                              .filter(j => j.parentJobId === surplusData.parentJobId && j.id !== surplusData.childJobId)
+                              .map(j => (
+                                <option key={j.id} value={j.id}>
+                                  {j.id} - Customer: {j.customerName || 'N/A'} (Req: {j.targetQuantity?.toLocaleString()} Pcs)
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                )}
+
+                {/* Option 3: Move to Buffer Stock */}
+                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                  selectedSurplusOption === 'buffer'
+                    ? 'border-blue-500 bg-blue-50/40 text-blue-950'
+                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                }`}>
+                  <input
+                    type="radio"
+                    name="surplusOption"
+                    value="buffer"
+                    checked={selectedSurplusOption === 'buffer'}
+                    onChange={() => setSelectedSurplusOption('buffer')}
+                    className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="text-xs">
+                    <span className="block font-extrabold">Move to Buffer Stock (बफर स्टॉक में डालें)</span>
+                    <span className="block text-[10px] text-slate-500 font-medium">Create a separate parent buffer WIP Lot for warehouse stock, which can be claimed later.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setShowSurplusModal(false)}
+                className="px-4 py-2 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Go Back / Edit Counts
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSurplusDistribution}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-extrabold transition shadow-sm cursor-pointer flex items-center gap-1"
+              >
+                <Check className="w-4 h-4" /> Save & Allocate Surplus
               </button>
             </div>
           </div>
