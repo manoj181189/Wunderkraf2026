@@ -109,6 +109,7 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   const [activeTab, setActiveTab] = useState<AdminTab>('brand_items_paper');
   const [masterPasswordInput, setMasterPasswordInput] = useState(state.adminPassword || '1234');
   const [masterSubTab, setMasterSubTab] = useState<MasterDataSubTab>('jobs');
+  const [deletePassword, setDeletePassword] = useState('');
 
   // Coordination Matrix State
   const [coordinationMatrixList, setCoordinationMatrixList] = useState<CoordinationMatrixItem[]>(() => {
@@ -566,6 +567,8 @@ _If you received this message, your contact number and routing configuration are
     confirmLabel?: string;
     onConfirm: () => void;
     isDanger?: boolean;
+    requiresPassword?: boolean;
+    passwordTarget?: string;
   } | null>(null);
 
   // ==========================================
@@ -1071,11 +1074,6 @@ _If you received this message, your contact number and routing configuration are
   };
 
   const handleDeleteJob = (jobId: string) => {
-    const pass = prompt(`Enter Master Password 'MANOJ' to Delete Job [${jobId}]:`);
-    if (pass !== 'MANOJ') {
-      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
-      return;
-    }
     const warningInfo = getJobDeletionWarningInfo(jobId, state);
     const hasDownstream = warningInfo.hasSlitting || warningInfo.hasCutting || warningInfo.hasForming || warningInfo.hasPacking;
     
@@ -1089,9 +1087,12 @@ _If you received this message, your contact number and routing configuration are
       message: message,
       confirmLabel: 'Yes, Delete & Cascade Everything',
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
         executeDeleteJob(jobId);
         setConfirmModal(null);
+        setDeletePassword('');
       }
     });
   };
@@ -1162,20 +1163,18 @@ _If you received this message, your contact number and routing configuration are
   };
 
   const handleDeletePlan = (planId: string) => {
-    const pass = prompt(`Enter Master Password 'MANOJ' to Delete Plan [${planId}]:`);
-    if (pass !== 'MANOJ') {
-      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
-      return;
-    }
     setConfirmModal({
       isOpen: true,
       title: 'Delete Production Plan',
       message: `Are you sure you want to permanently delete Production Plan [${planId}]? This cannot be undone.`,
       confirmLabel: 'Yes, Delete Plan',
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
         executeDeletePlan(planId);
         setConfirmModal(null);
+        setDeletePassword('');
       }
     });
   };
@@ -1249,20 +1248,18 @@ _If you received this message, your contact number and routing configuration are
   };
 
   const handleDeleteOrder = (ordId: string) => {
-    const pass = prompt(`Enter Master Password 'MANOJ' to Delete Order [${ordId}]:`);
-    if (pass !== 'MANOJ') {
-      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
-      return;
-    }
     setConfirmModal({
       isOpen: true,
       title: 'Delete Customer Order',
       message: `Are you sure you want to permanently delete Customer Order [${ordId}] completely from the database?`,
       confirmLabel: 'Yes, Delete Order',
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
         executeDeleteOrder(ordId);
         setConfirmModal(null);
+        setDeletePassword('');
       }
     });
   };
@@ -8308,17 +8305,44 @@ ${formLines.join('\n')}
               {confirmModal.message}
             </p>
 
+            {confirmModal.requiresPassword && (
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-[10px] font-black text-rose-600 uppercase tracking-wider">
+                  Enter Master Password to Confirm:
+                </label>
+                <input
+                  type="password"
+                  placeholder="Enter password..."
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition"
+                  autoFocus
+                />
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setConfirmModal(null)}
+                onClick={() => {
+                  setConfirmModal(null);
+                  setDeletePassword('');
+                }}
                 className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={confirmModal.onConfirm}
+                onClick={() => {
+                  if (confirmModal.requiresPassword) {
+                    if (deletePassword !== (confirmModal.passwordTarget || 'MANOJ')) {
+                      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
+                      return;
+                    }
+                  }
+                  confirmModal.onConfirm();
+                }}
                 className={`px-4 py-2 text-xs font-black text-white rounded-xl cursor-pointer shadow-xs transition ${
                   confirmModal.isDanger
                     ? 'bg-red-600 hover:bg-red-700'

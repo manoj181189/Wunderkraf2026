@@ -1078,25 +1078,44 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
   };
 
   const handleResume = () => {
-    if (!activeBatchObj) return alert('Select batch to resume!');
-    const { job, batch } = activeBatchObj;
-    if (batch.status === 'Running') return alert('Batch is already running.');
-
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const nowIso = new Date().toISOString();
 
-    const updatedJobs = jobs.map((j) => {
-      if (j.id !== job.id) return j;
-      return {
-        ...j,
-        runningBatches: (j.runningBatches || []).map((b) => {
-          if (b.batchId !== batch.batchId) return b;
-          return { ...b, status: 'Running', endTime: undefined, holdReason: undefined };
-        })
-      };
-    });
+    let updatedJobs = jobs;
+    let newLogs = [...(state.logs || [])];
 
-    // Clear any active readyAlerts or incidents for this machine
+    if (activeBatchObj) {
+      const { job, batch } = activeBatchObj;
+      if (batch.status !== 'Running') {
+        updatedJobs = jobs.map((j) => {
+          if (j.id !== job.id) return j;
+          return {
+            ...j,
+            runningBatches: (j.runningBatches || []).map((b) => {
+              if (b.batchId !== batch.batchId) return b;
+              return { ...b, status: 'Running', endTime: undefined, holdReason: undefined };
+            })
+          };
+        });
+
+        const newLog = {
+          jobId: job.id,
+          product: job.product,
+          stage: 'Cutting',
+          machine: selectedMachine,
+          shift: batch.shift,
+          action: `▶️ Cutting Run Resumed to RUNNING | Worker: ${batch.worker}`,
+          worker: batch.worker,
+          user: 'cut_user',
+          startTime: nowTime,
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleString()
+        };
+        newLogs.push(newLog);
+      }
+    }
+
+    // Always clear any active readyAlerts or incidents for this machine
     const updatedIncidents = (state.maintenanceIncidents || []).map((inc) => {
       if (inc.machine === selectedMachine && (inc.status === 'REPAIRED_READY' || inc.status === 'OPEN' || inc.status === 'IN_PROGRESS')) {
         return {
@@ -1107,33 +1126,20 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       }
       return inc;
     });
+
     const updatedReadyAlerts = (state.machineReadyAlerts || []).filter(
       (a) => a.machine !== selectedMachine
     );
-
-    const newLog = {
-      jobId: job.id,
-      product: job.product,
-      stage: 'Cutting',
-      machine: selectedMachine,
-      shift: batch.shift,
-      action: `▶️ Cutting Run Resumed to RUNNING | Worker: ${batch.worker}`,
-      worker: batch.worker,
-      user: 'cut_user',
-      startTime: nowTime,
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
 
     onSaveState({
       ...state,
       jobs: updatedJobs,
       maintenanceIncidents: updatedIncidents,
       machineReadyAlerts: updatedReadyAlerts,
-      logs: [...state.logs, newLog]
+      logs: newLogs
     });
 
-    alert(`▶️ Job [${job.id}] resumed to RUNNING on ${selectedMachine}!`);
+    alert(`▶️ Machine [${selectedMachine}] status verified and cleared successfully!`);
   };
 
 
