@@ -531,9 +531,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
           if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remAddUnissue > 0) {
             if (b.slices && b.slices.length > 0) {
               let restoredFromBatch = 0;
+              const targetSliceIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
               // Pass 1: Restore to specific matching source slice first (e.g. Tushar's slice)
               let updatedSlices = b.slices.map(slice => {
-                if (remAddUnissue > 0 && targetSourceLotId && slice.sliceId === targetSourceLotId) {
+                if (remAddUnissue > 0 && targetSliceIds.length > 0 && targetSliceIds.includes(slice.sliceId)) {
                   const sliceConsumed = slice.consumedQty || 0;
                   const restore = Math.min(sliceConsumed, remAddUnissue);
                   if (restore > 0) {
@@ -563,7 +564,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
               }
             } else {
-              if (!targetSourceLotId || b.batchId === targetSourceLotId || remAddUnissue > 0) {
+              const targetBatchIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
+              if (targetBatchIds.length === 0 || targetBatchIds.includes(b.batchId) || remAddUnissue > 0) {
                 const consumedP = b.consumedQty || 0;
                 const restore = Math.min(consumedP, remAddUnissue);
                 if (restore > 0) {
@@ -576,26 +578,29 @@ export const FormingView: React.FC<FormingViewProps> = ({
           return b;
         })
         .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0 || (b.consumedQty || 0) > 0);
+      const nextCutCrates = (j.availableCuttingCrates || 0) + qty;
+      const cappedCutCrates = j.totalCutCrates ? Math.min(nextCutCrates, j.totalCutCrates) : nextCutCrates;
       return {
         ...j,
-        availableCuttingCrates: (j.availableCuttingCrates || 0) + qty,
+        availableCuttingCrates: cappedCutCrates,
         runningBatches: updatedBatches
       };
     });
 
     // Also restore wipLots if applicable
     let remWipUnissue = qty;
+    const targetWipIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
     const updatedWipLots = (state.wipLots || []).map(lot => {
       if (lot.jobId === job.id && lot.stage === 'Cutting' && remWipUnissue > 0) {
-        if (!targetSourceLotId || lot.id === targetSourceLotId) {
+        if (targetWipIds.length === 0 || targetWipIds.includes(lot.id)) {
           const consumed = lot.consumedQty || 0;
           const restore = Math.min(consumed, remWipUnissue);
           if (restore > 0) {
             remWipUnissue -= restore;
             return {
               ...lot,
-              consumedQty: lot.consumedQty - restore,
-              remainingQty: lot.remainingQty + restore
+              consumedQty: Math.max(0, lot.consumedQty - restore),
+              remainingQty: (lot.remainingQty || 0) + restore
             };
           }
         }
@@ -1016,9 +1021,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
           if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remCancelReturn > 0) {
             if (b.slices && b.slices.length > 0) {
               let restoredFromBatch = 0;
+              const targetCancelSliceIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
               // Pass 1: Target matching slice first
               let updatedSlices = b.slices.map(slice => {
-                if (remCancelReturn > 0 && targetSourceLotId && slice.sliceId === targetSourceLotId) {
+                if (remCancelReturn > 0 && targetCancelSliceIds.length > 0 && targetCancelSliceIds.includes(slice.sliceId)) {
                   const sliceConsumed = slice.consumedQty || 0;
                   const restore = Math.min(sliceConsumed, remCancelReturn);
                   if (restore > 0) {
@@ -1048,7 +1054,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
               }
             } else {
-              if (!targetSourceLotId || b.batchId === targetSourceLotId || remCancelReturn > 0) {
+              const targetCancelBatchIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
+              if (targetCancelBatchIds.length === 0 || targetCancelBatchIds.includes(b.batchId) || remCancelReturn > 0) {
                 const consumedP = b.consumedQty || 0;
                 const restore = Math.min(consumedP, remCancelReturn);
                 if (restore > 0) {
@@ -1074,17 +1081,18 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
     // Also restore wipLots
     let remWipCancel = cratesToReturn;
+    const targetWipCancelIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
     const updatedWipLots = (state.wipLots || []).map(lot => {
       if (lot.jobId === job.id && lot.stage === 'Cutting' && remWipCancel > 0) {
-        if (!targetSourceLotId || lot.id === targetSourceLotId) {
+        if (targetWipCancelIds.length === 0 || targetWipCancelIds.includes(lot.id)) {
           const consumed = lot.consumedQty || 0;
           const restore = Math.min(consumed, remWipCancel);
           if (restore > 0) {
             remWipCancel -= restore;
             return {
               ...lot,
-              consumedQty: lot.consumedQty - restore,
-              remainingQty: lot.remainingQty + restore
+              consumedQty: Math.max(0, lot.consumedQty - restore),
+              remainingQty: (lot.remainingQty || 0) + restore
             };
           }
         }
@@ -1883,23 +1891,6 @@ export const FormingView: React.FC<FormingViewProps> = ({
                         }
                       });
 
-                      // Add WIP Lots (New ERP Approach) without duplication
-                      const wipLots = state.wipLots?.filter(lot => lot.jobId === selectedPendingJob.id && lot.stage === 'Cutting') || [];
-                      wipLots.forEach(lot => {
-                        if (!selectableLots.some(sl => sl.id === lot.id)) {
-                          selectableLots.push({
-                            id: lot.id,
-                            batchId: lot.id,
-                            worker: lot.producedByOperator,
-                            shift: lot.shift,
-                            machine: lot.machine,
-                            totalQty: lot.producedQty,
-                            consumedQty: lot.consumedQty,
-                            remainingQty: lot.remainingQty,
-                            date: lot.timestamp.split('T')[0]
-                          });
-                        }
-                      });
 
                       if (selectableLots.length === 0) {
                         return <div className="text-slate-400 italic text-[11px]">No specific cutting lot metadata found (Legacy or Direct entry).</div>;
@@ -1908,7 +1899,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
                       // If no lot is currently selected, pick the first one with remaining quantity
                       const activeSelectionId = selectedCuttingBatchId || selectableLots.find(l => l.remainingQty > 0)?.id || selectableLots[0].id;
 
-                      return selectableLots.map(lot => {
+                      // Deduplicate lots by ID to prevent inflation
+                      const uniqueLots = Array.from(new Map(selectableLots.map(l => [l.id, l])).values());
+                      return uniqueLots.map(lot => {
                         const isSelected = activeSelectionId === lot.id;
                         
                         return (
