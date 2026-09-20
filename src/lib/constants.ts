@@ -562,6 +562,59 @@ export const COMMON_SPARE_PARTS = [
   'Vaccum sucker',
 ];
 
+export const DEFAULT_OPERATIONAL_PAUSE_REASONS = [
+  'Operator Lunch Break (दोपहर का भोजन - 45 Min)',
+  'Operator Tea Break (चाय का विराम - 15 Min)',
+  'Shift Handover / Briefing (शिफ्ट बदलाव)',
+  'Routine Tool Cleaning / Die & Punch Setting',
+  'Waiting for Raw Material / Roll / Crates',
+  'Temporary Production Halt / Intercom Call',
+  'Other Operational Pause'
+];
+
+export const DEFAULT_BREAKDOWN_REASONS_MAP: Record<string, string[]> = {
+  'Cutting': [
+    'Blade Wear & Dull Cutters',
+    'Die Alignment Error',
+    'Paper Feed Jam / Web Slippage',
+    'Sensor Fault / Safety Barrier Trip',
+    'Motor Overload / Inverter Drive Trip'
+  ],
+  'Forming': [
+    'Temperature Deviation (Mould Heater)',
+    'Hydraulic / Pneumatic Pressure Loss',
+    'Speed Mismatch / Cycle Timing Error',
+    'Mould Tooling & Teflon Strip Damage',
+    'Paper Forming Wrinkle / Tear'
+  ],
+  'QC': [
+    'Leak Test Fail (Water Penetration)',
+    'Burst / Compression Test Fail',
+    'Dimension Out-of-Tolerance (Angle/Depth)',
+    'Visual Blemish / Print Ink Smudge / Spot',
+    'Rim Curl / Edge Flange Defect'
+  ],
+  'Slitting': [
+    'Rewind Tension / Core Slippage',
+    'Slitting Circular Blade Dull / Burr',
+    'Jumbo Reel Unwind Chuck Loose',
+    'Web Alignment Guide Sensor Drift'
+  ],
+  'Packing': [
+    'Tape Dispenser / Box Sealer Jam',
+    'Pouch Sealing Temperature Drift',
+    'Weighing Scale Sensor Drift',
+    'Conveyor Belt Slippage / Stoppage'
+  ],
+  'General': [
+    'Mechanical Heater / Tooling Issue',
+    'Electrical / Sensor Fault',
+    'Pneumatic / Hydraulic Pressure Drop',
+    'Routine Cleaning & Preventative Check',
+    'Other Technical Breakdown'
+  ]
+};
+
 export const DEFAULT_CUSTOMER_COMPLAINTS: CustomerComplaint[] = [
   {
     id: 'CMP-2026-001',
@@ -739,6 +792,8 @@ export const INITIAL_STATE: FactoryState = {
   maintenanceSparePartsMaster: [
     'Vaccum sucker'
   ],
+  maintenancePauseReasonsMaster: DEFAULT_OPERATIONAL_PAUSE_REASONS,
+  maintenanceBreakdownReasonsMaster: DEFAULT_BREAKDOWN_REASONS_MAP,
   autoNotifyDeptHeadsOnCritical: true,
   departmentHeads: DEFAULT_DEPARTMENT_HEADS,
   crateCapacityMaster: DEFAULT_CRATE_CAPACITY_MASTER,

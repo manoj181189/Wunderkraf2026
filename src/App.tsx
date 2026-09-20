@@ -478,7 +478,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 selection:bg-blue-200">
+    <div className="h-screen bg-slate-100 flex flex-col font-sans text-slate-900 selection:bg-blue-200 overflow-hidden">
       {/* Universal Top Header */}
       <Header
         currentUser={currentUser}
@@ -621,7 +621,7 @@ export const App: React.FC = () => {
           />
         </main>
       ) : (
-        <div className="flex-1 flex w-full relative min-h-0">
+        <div className="flex-1 flex w-full relative min-h-0 overflow-hidden">
           <Sidebar
             currentView={currentView}
             onSelectView={handleNavigate}

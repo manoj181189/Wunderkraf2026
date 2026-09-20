@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PauseCircle, AlertTriangle, Send, X, RefreshCw, Phone, User, Wrench, ShieldAlert, Coffee, CheckCircle2, Clock } from 'lucide-react';
 import { FactoryState, MaintenanceIncident } from '../types';
-import { MACHINES, DEFAULT_MAINTENANCE_CONTACTS } from '../lib/constants';
+import { MACHINES, DEFAULT_MAINTENANCE_CONTACTS, DEFAULT_OPERATIONAL_PAUSE_REASONS, DEFAULT_BREAKDOWN_REASONS_MAP } from '../lib/constants';
 
 interface HoldModalProps {
   isOpen: boolean;
@@ -30,65 +30,16 @@ export const HoldModal: React.FC<HoldModalProps> = ({
   else if (stationName.startsWith('Slitting-')) detectedStage = 'Slitting';
   else if (stationName.startsWith('QC-')) detectedStage = 'QC';
 
-  const getDepartmentReasons = (stage: string) => {
-    switch (stage) {
-      case 'Cutting':
-        return [
-          'Blade Wear & Dull Cutters',
-          'Die Alignment Error',
-          'Paper Feed Jam / Web Slippage',
-          'Sensor Fault / Safety Barrier Trip',
-          'Motor Overload / Inverter Drive Trip'
-        ];
-      case 'Forming':
-        return [
-          'Temperature Deviation (Mould Heater)',
-          'Hydraulic / Pneumatic Pressure Loss',
-          'Speed Mismatch / Cycle Timing Error',
-          'Mould Tooling & Teflon Strip Damage',
-          'Paper Forming Wrinkle / Tear'
-        ];
-      case 'QC':
-        return [
-          'Leak Test Fail (Water Penetration)',
-          'Burst / Compression Test Fail',
-          'Dimension Out-of-Tolerance (Angle/Depth)',
-          'Visual Blemish / Print Ink Smudge / Spot',
-          'Rim Curl / Edge Flange Defect'
-        ];
-      case 'Slitting':
-        return [
-          'Rewind Tension / Core Slippage',
-          'Slitting Circular Blade Dull / Burr',
-          'Jumbo Reel Unwind Chuck Loose',
-          'Web Alignment Guide Sensor Drift'
-        ];
-      default:
-        return [
-          'Mechanical Heater / Tooling Issue',
-          'Electrical / Sensor Fault',
-          'Pneumatic / Hydraulic Pressure Drop',
-          'Routine Cleaning & Preventative Check',
-          'Other Technical Breakdown'
-        ];
-    }
-  };
-
-  const deptReasons = getDepartmentReasons(detectedStage);
+  const breakdownReasonsMap = state.maintenanceBreakdownReasonsMaster || DEFAULT_BREAKDOWN_REASONS_MAP;
+  const deptReasons = breakdownReasonsMap[detectedStage] || breakdownReasonsMap['General'] || DEFAULT_BREAKDOWN_REASONS_MAP['General'];
 
   // Tab Selection: 'PAUSE' (Lunch/Tea/Operational) vs 'BREAKDOWN' (Technical Maintenance)
   const [holdMode, setHoldMode] = useState<'PAUSE' | 'BREAKDOWN'>('PAUSE');
 
-  // Operational Pause states
-  const operationalReasons = [
-    'Operator Lunch Break (दोपहर का भोजन - 45 Min)',
-    'Operator Tea Break (चाय का विराम - 15 Min)',
-    'Shift Handover / Briefing (शिफ्ट बदलाव)',
-    'Routine Tool Cleaning / Die & Punch Setting',
-    'Waiting for Raw Material / Roll / Crates',
-    'Temporary Production Halt / Intercom Call',
-    'Other Operational Pause'
-  ];
+  // Operational Pause states (Loaded dynamically from Admin Master Settings)
+  const operationalReasons = (state.maintenancePauseReasonsMaster && state.maintenancePauseReasonsMaster.length > 0)
+    ? state.maintenancePauseReasonsMaster
+    : DEFAULT_OPERATIONAL_PAUSE_REASONS;
   const [pauseReason, setPauseReason] = useState(operationalReasons[0]);
   const [pauseRemarks, setPauseRemarks] = useState('');
 

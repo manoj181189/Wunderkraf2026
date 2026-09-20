@@ -82,7 +82,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
   const [lastShownSpecBatchId, setLastShownSpecBatchId] = useState('');
 
   // Assigned Helpers for Cutting Station
-  const [assignedHelpers, setAssignedHelpers] = useState<string[]>(['MUKESH_HELPER']);
+  const [assignedHelpers, setAssignedHelpers] = useState<string[]>([]);
   const [newHelperInput, setNewHelperInput] = useState('');
 
   // Dialog states for Quick Actions (Replacing window.prompt)
@@ -2199,7 +2199,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                   }}
                   className="py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                 >
-                  <Undo2 className="w-3.5 h-3.5" /> Issue Return
+                  {/* Issue Return removed per user request */}
                 </button>
                 <button
                   type="button"
@@ -2491,9 +2491,12 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                     <span className="text-[10px] font-extrabold text-blue-950 uppercase tracking-wide">
                       Mother Jumbo Reels Used in this Job ({allReels.length} Reels):
                     </span>
-                    <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                    <button 
+                      onClick={() => onNavigateToTraceability?.(selectedPendingJob.id)}
+                      className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 cursor-pointer hover:bg-emerald-200 transition"
+                    >
                       ✓ 100% Traceability Active
-                    </span>
+                    </button>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {allReels.map((r, idx) => (
@@ -3138,57 +3141,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         </div>
       )}
 
-      {/* Quick Un-issue Modal */}
-      {isUnissueModalOpen && activeBatchObj && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in duration-150">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <Undo2 className="w-5 h-5 text-amber-600" />
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900 m-0">Issue Return (Un-issue Slit Rolls)</h3>
-                <p className="text-[11px] text-slate-500 m-0">Return excess rolls back to Slitting Stock</p>
-              </div>
-            </div>
 
-            <div className="bg-amber-50 p-3 rounded-xl text-xs space-y-1 text-amber-900">
-              <div>Job: <b>{activeBatchObj.job.id}</b> ({activeBatchObj.job.product})</div>
-              <div>Currently Issued to Machine: <b>{activeBatchObj.batch.issuedQty} Rolls</b></div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Enter Rolls Quantity to Return:
-              </label>
-              <input
-                type="number"
-                min="1"
-                max={activeBatchObj.batch.issuedQty}
-                value={unissueQtyInput}
-                onChange={(e) => setUnissueQtyInput(e.target.value)}
-                className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm font-bold text-slate-800 outline-none"
-                autoFocus
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsUnissueModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmQuickUnissue}
-                className="px-4 py-2 text-xs font-extrabold text-white bg-amber-600 hover:bg-amber-700 rounded-xl cursor-pointer shadow-xs flex items-center gap-1"
-              >
-                <Undo2 className="w-4 h-4" /> Confirm Return
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Cancel Run Confirm Modal */}
       {isCancelConfirmOpen && activeBatchObj && (

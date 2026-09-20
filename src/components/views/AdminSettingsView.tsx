@@ -41,7 +41,8 @@ import {
   Wifi,
   Scale,
   Undo2,
-  History
+  History,
+  Coffee
 } from 'lucide-react';
 import {
   FactoryState,
@@ -67,6 +68,8 @@ import {
   DEFAULT_CRATE_CAPACITY_MASTER,
   DEFAULT_COORDINATION_MATRIX,
   DEFAULT_MAINTENANCE_CONTACTS,
+  DEFAULT_OPERATIONAL_PAUSE_REASONS,
+  DEFAULT_BREAKDOWN_REASONS_MAP,
   TARGET_LAYERS_DEFAULT,
   TARGET_GSM_DEFAULT
 } from '../../lib/constants';
@@ -725,6 +728,25 @@ _If you received this message, your contact number and routing configuration are
   const [editingSparePartText, setEditingSparePartText] = useState('');
   const [maxRollPieces, setMaxRollPieces] = useState<number>(state.maxPiecesPerSlitRoll || 12000);
   const [strictRollAudit, setStrictRollAudit] = useState<boolean>(state.strictAuditRollYield || false);
+
+  // Operational Pause Reasons Master state
+  const [pauseReasons, setPauseReasons] = useState<string[]>(() => {
+    return state.maintenancePauseReasonsMaster && state.maintenancePauseReasonsMaster.length > 0
+      ? state.maintenancePauseReasonsMaster
+      : DEFAULT_OPERATIONAL_PAUSE_REASONS;
+  });
+  const [newPauseReasonInput, setNewPauseReasonInput] = useState('');
+  const [editingPauseReasonIdx, setEditingPauseReasonIdx] = useState<number | null>(null);
+  const [editingPauseReasonText, setEditingPauseReasonText] = useState('');
+
+  // Department Breakdown Faults Master state
+  const [breakdownReasonsMap, setBreakdownReasonsMap] = useState<Record<string, string[]>>(() => {
+    return state.maintenanceBreakdownReasonsMaster || DEFAULT_BREAKDOWN_REASONS_MAP;
+  });
+  const [selectedBreakdownDept, setSelectedBreakdownDept] = useState<string>('Cutting');
+  const [newFaultReasonInput, setNewFaultReasonInput] = useState('');
+  const [editingFaultReasonIdx, setEditingFaultReasonIdx] = useState<number | null>(null);
+  const [editingFaultReasonText, setEditingFaultReasonText] = useState('');
 
   // ==========================================
   // TAB 4: SEQUENCES & SHIFTS STATE
@@ -2397,15 +2419,21 @@ ${formLines.join('\n')}
 
   // Maintenance Master Handlers
   const handleSaveMaintenanceMaster = () => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can modify Maintenance Master settings.');
+      return;
+    }
     onSaveState({
       ...state,
       maintenanceContacts: maintenanceContacts,
       maintenanceTechniciansMaster: maintenanceContacts.map(c => c.name),
       maintenanceSparePartsMaster: maintSpareParts,
+      maintenancePauseReasonsMaster: pauseReasons,
+      maintenanceBreakdownReasonsMaster: breakdownReasonsMap,
       maxPiecesPerSlitRoll: Number(maxRollPieces) || 12000,
       strictAuditRollYield: strictRollAudit
     });
-    showToast('✅ Maintenance Master, Rights & Roll Yield Limits Saved Successfully!');
+    showToast('✅ Maintenance Master, Rights, Pause & Breakdown Dropdowns Saved Successfully!');
   };
 
   const handleAddTech = () => {
@@ -2459,6 +2487,132 @@ ${formLines.join('\n')}
 
   const handleRemoveSparePart = (idx: number) => {
     setMaintSpareParts(maintSpareParts.filter((_, i) => i !== idx));
+  };
+
+  // Operational Pause Handlers
+  const handleAddPauseReason = () => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can add pause reasons.');
+      return;
+    }
+    const clean = newPauseReasonInput.trim();
+    if (!clean) return;
+    if (pauseReasons.includes(clean)) return alert('⚠️ Pause reason already exists in list!');
+    setPauseReasons([...pauseReasons, clean]);
+    setNewPauseReasonInput('');
+  };
+
+  const handleStartEditPauseReason = (idx: number) => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can edit pause reasons.');
+      return;
+    }
+    setEditingPauseReasonIdx(idx);
+    setEditingPauseReasonText(pauseReasons[idx] || '');
+  };
+
+  const handleSaveEditPauseReason = (idx: number) => {
+    const clean = editingPauseReasonText.trim();
+    if (!clean) return;
+    const updated = [...pauseReasons];
+    updated[idx] = clean;
+    setPauseReasons(updated);
+    setEditingPauseReasonIdx(null);
+    setEditingPauseReasonText('');
+  };
+
+  const handleCancelEditPauseReason = () => {
+    setEditingPauseReasonIdx(null);
+    setEditingPauseReasonText('');
+  };
+
+  const handleRemovePauseReason = (idx: number) => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can delete pause reasons.');
+      return;
+    }
+    setPauseReasons(pauseReasons.filter((_, i) => i !== idx));
+  };
+
+  const handleResetPauseReasonsToDefault = () => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can reset master settings.');
+      return;
+    }
+    if (confirm('Are you sure you want to reset Operational Pause Reasons to factory defaults?')) {
+      setPauseReasons([...DEFAULT_OPERATIONAL_PAUSE_REASONS]);
+      showToast('🔄 Operational Pause reasons reset to factory defaults.');
+    }
+  };
+
+  // Department Breakdown Reasons Handlers
+  const currentDeptFaults = breakdownReasonsMap[selectedBreakdownDept] || [];
+
+  const handleAddFaultReason = () => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can add fault reasons.');
+      return;
+    }
+    const clean = newFaultReasonInput.trim();
+    if (!clean) return;
+    if (currentDeptFaults.includes(clean)) return alert(`⚠️ Fault reason already exists in ${selectedBreakdownDept}!`);
+    const updated = {
+      ...breakdownReasonsMap,
+      [selectedBreakdownDept]: [...currentDeptFaults, clean]
+    };
+    setBreakdownReasonsMap(updated);
+    setNewFaultReasonInput('');
+  };
+
+  const handleStartEditFaultReason = (idx: number) => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can edit fault reasons.');
+      return;
+    }
+    setEditingFaultReasonIdx(idx);
+    setEditingFaultReasonText(currentDeptFaults[idx] || '');
+  };
+
+  const handleSaveEditFaultReason = (idx: number) => {
+    const clean = editingFaultReasonText.trim();
+    if (!clean) return;
+    const updatedDeptList = [...currentDeptFaults];
+    updatedDeptList[idx] = clean;
+    const updated = {
+      ...breakdownReasonsMap,
+      [selectedBreakdownDept]: updatedDeptList
+    };
+    setBreakdownReasonsMap(updated);
+    setEditingFaultReasonIdx(null);
+    setEditingFaultReasonText('');
+  };
+
+  const handleCancelEditFaultReason = () => {
+    setEditingFaultReasonIdx(null);
+    setEditingFaultReasonText('');
+  };
+
+  const handleRemoveFaultReason = (idx: number) => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can delete fault reasons.');
+      return;
+    }
+    const updated = {
+      ...breakdownReasonsMap,
+      [selectedBreakdownDept]: currentDeptFaults.filter((_, i) => i !== idx)
+    };
+    setBreakdownReasonsMap(updated);
+  };
+
+  const handleResetFaultReasonsToDefault = () => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can reset master settings.');
+      return;
+    }
+    if (confirm('Are you sure you want to reset all department breakdown fault reasons to factory defaults?')) {
+      setBreakdownReasonsMap({ ...DEFAULT_BREAKDOWN_REASONS_MAP });
+      showToast('🔄 Breakdown fault reasons reset to factory defaults.');
+    }
   };
 
   const handleRevokeMaintenanceRightsFromUser = (userKey: string) => {
@@ -2686,6 +2840,8 @@ ${formLines.join('\n')}
           ...state,
           maintenanceIncidents: [],
           maintenanceTechniciansMaster: INITIAL_STATE.maintenanceTechniciansMaster,
+          maintenancePauseReasonsMaster: INITIAL_STATE.maintenancePauseReasonsMaster,
+          maintenanceBreakdownReasonsMaster: INITIAL_STATE.maintenanceBreakdownReasonsMaster,
           machineReadyAlerts: [],
           logs: state.logs.filter(l => l.stage !== 'Maintenance')
         };
@@ -6588,6 +6744,293 @@ ${formLines.join('\n')}
                   <span className="text-xs font-bold text-slate-800">Strict Roll Audit Yield Validation</span>
                 </label>
               </div>
+            </div>
+
+            {/* ========================================================================= */}
+            {/* 4 & 5. OPERATIONAL PAUSE & BREAKDOWN DROPDOWN REASONS MASTER */}
+            {/* ========================================================================= */}
+            <div className="col-span-1 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+              
+              {/* 4. Operational Pause Reasons Master */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Coffee className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <h5 className="text-xs font-black text-slate-900 uppercase m-0">
+                        ☕ Operational Pause Dropdown Options ({pauseReasons.length})
+                      </h5>
+                      <p className="text-[10px] text-slate-500 m-0">
+                        Meal/Tea Breaks & Routine Pauses (No breakdown tickets created)
+                      </p>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleResetPauseReasonsToDefault}
+                      className="text-[10px] font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer transition"
+                      title="Reset to factory default pause reasons"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset Defaults
+                    </button>
+                  )}
+                </div>
+
+                {isAdmin ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newPauseReasonInput}
+                      onChange={(e) => setNewPauseReasonInput(e.target.value)}
+                      placeholder="e.g. Afternoon Tea Break (15 Min)"
+                      className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddPauseReason();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddPauseReason}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Reason
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800 font-medium">
+                    🔒 Admin rights required to add or edit Operational Pause dropdown options.
+                  </div>
+                )}
+
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  {pauseReasons.map((reason, idx) => (
+                    <div key={idx} className="p-2 bg-white rounded-lg border border-slate-200 text-xs">
+                      {editingPauseReasonIdx === idx ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={editingPauseReasonText}
+                            onChange={(e) => setEditingPauseReasonText(e.target.value)}
+                            className="flex-1 px-2 py-1 bg-blue-50 border border-blue-300 rounded text-xs font-bold text-slate-800 outline-none"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEditPauseReason(idx);
+                              if (e.key === 'Escape') handleCancelEditPauseReason();
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEditPauseReason(idx)}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition cursor-pointer"
+                            title="Save Changes"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditPauseReason}
+                            className="p-1 text-slate-400 hover:bg-slate-100 rounded transition cursor-pointer"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-700 font-black text-[10px] flex items-center justify-center">
+                              {idx + 1}
+                            </span>
+                            <span className="font-bold text-slate-800">{reason}</span>
+                          </div>
+                          {isAdmin && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditPauseReason(idx)}
+                                className="text-slate-400 hover:text-blue-600 p-1 rounded transition cursor-pointer hover:bg-blue-50"
+                                title="Edit Reason"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePauseReason(idx)}
+                                className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer hover:bg-rose-50"
+                                title="Delete Reason"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5. Department Breakdown Faults Master */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <div>
+                      <h5 className="text-xs font-black text-slate-900 uppercase m-0">
+                        🛑 Department Breakdown Faults Master ({currentDeptFaults.length})
+                      </h5>
+                      <p className="text-[10px] text-slate-500 m-0">
+                        Technical fault dropdown reasons mapped per department
+                      </p>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleResetFaultReasonsToDefault}
+                      className="text-[10px] font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer transition"
+                      title="Reset to factory default breakdown reasons"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset Defaults
+                    </button>
+                  )}
+                </div>
+
+                {/* Department Selector Tabs */}
+                <div className="flex flex-wrap gap-1.5 bg-white p-1.5 rounded-lg border border-slate-200">
+                  {['Cutting', 'Forming', 'Slitting', 'Packing', 'QC', 'General'].map((dept) => {
+                    const count = (breakdownReasonsMap[dept] || []).length;
+                    const isSelected = selectedBreakdownDept === dept;
+                    return (
+                      <button
+                        key={dept}
+                        type="button"
+                        onClick={() => {
+                          setSelectedBreakdownDept(dept);
+                          setEditingFaultReasonIdx(null);
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                          isSelected
+                            ? 'bg-rose-600 text-white shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <span>{dept}</span>
+                        <span className={`text-[9px] px-1 py-0.2 rounded font-black ${
+                          isSelected ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {isAdmin ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newFaultReasonInput}
+                      onChange={(e) => setNewFaultReasonInput(e.target.value)}
+                      placeholder={`Add new ${selectedBreakdownDept} breakdown reason...`}
+                      className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddFaultReason();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddFaultReason}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Fault
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800 font-medium">
+                    🔒 Admin rights required to add or edit Breakdown fault reasons.
+                  </div>
+                )}
+
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  {currentDeptFaults.map((fault, idx) => (
+                    <div key={idx} className="p-2 bg-white rounded-lg border border-slate-200 text-xs">
+                      {editingFaultReasonIdx === idx ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={editingFaultReasonText}
+                            onChange={(e) => setEditingFaultReasonText(e.target.value)}
+                            className="flex-1 px-2 py-1 bg-rose-50 border border-rose-300 rounded text-xs font-bold text-slate-800 outline-none"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEditFaultReason(idx);
+                              if (e.key === 'Escape') handleCancelEditFaultReason();
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEditFaultReason(idx)}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition cursor-pointer"
+                            title="Save Changes"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditFaultReason}
+                            className="p-1 text-slate-400 hover:bg-slate-100 rounded transition cursor-pointer"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-rose-50 text-rose-700 font-black text-[10px] flex items-center justify-center">
+                              {idx + 1}
+                            </span>
+                            <span className="font-bold text-slate-800">{fault}</span>
+                          </div>
+                          {isAdmin && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditFaultReason(idx)}
+                                className="text-slate-400 hover:text-blue-600 p-1 rounded transition cursor-pointer hover:bg-blue-50"
+                                title="Edit Fault Reason"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFaultReason(idx)}
+                                className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer hover:bg-rose-50"
+                                title="Delete Fault Reason"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
           </div>
         </div>

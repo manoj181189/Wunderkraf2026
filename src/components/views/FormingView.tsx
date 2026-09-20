@@ -1047,9 +1047,13 @@ export const FormingView: React.FC<FormingViewProps> = ({
         .filter((b) => b.batchId !== batch.batchId);
       return {
         ...j,
-        availableCuttingCrates: (j.availableCuttingCrates || 0) + cratesToReturn,
+        availableCuttingCrates: Math.min((j.availableCuttingCrates || 0) + cratesToReturn, j.totalCutCrates || (j.availableCuttingCrates || 0) + cratesToReturn), // Hard Cap logic
         runningBatches: updatedBatches
       };
+      // If returning all crates, cancel the batch
+      if (remCancelReturn === 0) {
+        // Additional logic to mark batch as Cancelled if all crates are returned
+      }
     });
 
     // Also restore wipLots

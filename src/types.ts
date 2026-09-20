@@ -590,6 +590,8 @@ export interface FactoryState {
   productPrefixMap?: Record<string, string>;
   maintenanceTechniciansMaster?: string[];
   maintenanceSparePartsMaster?: string[];
+  maintenancePauseReasonsMaster?: string[];
+  maintenanceBreakdownReasonsMaster?: Record<string, string[]>;
   maxPiecesPerSlitRoll?: number;
   strictAuditRollYield?: boolean;
   maintenanceRightsMaster?: Record<string, string[]>;
