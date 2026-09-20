@@ -54,8 +54,8 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
     });
   });
 
-  const pendingQcJobs = jobs.filter((j) => (j.availableFormingCrates || 0) > 0);
-  const totalPendingQcCrates = pendingQcJobs.reduce((sum, j) => sum + (j.availableFormingCrates || 0), 0);
+  const pendingQcJobs = jobs.filter((j) => ((j.availableFormingCrates || 0) + (j.availableForQcCrates || 0)) > 0);
+  const totalPendingQcCrates = pendingQcJobs.reduce((sum, j) => sum + (j.availableFormingCrates || 0) + (j.availableForQcCrates || 0), 0);
   const totalActiveQcCrates = activeQcBatches.reduce((sum, item) => sum + (item.batch.issuedQty || 0), 0);
   const totalQcInspectors = Array.from(new Set(activeQcBatches.map((item) => item.batch.worker).filter(Boolean)));
 
@@ -467,7 +467,7 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-slate-500 font-semibold">QC Crates Count:</span>
-                  <span className="font-extrabold text-amber-900">{j.availableFormingCrates || 0} Crates Queued</span>
+                  <span className="font-extrabold text-amber-900">{(j.availableFormingCrates || 0) + (j.availableForQcCrates || 0)} Crates Queued</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-slate-500 font-semibold">Stage Status:</span>
