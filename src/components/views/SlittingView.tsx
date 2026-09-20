@@ -1123,13 +1123,25 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       };
     });
 
+    const allocatedReelIds = batch.motherReelsAllocated || [];
+    const updatedMotherReels = motherReelInventory.map((mr) => {
+      if (allocatedReelIds.includes(mr.id)) {
+        return {
+          ...mr,
+          status: 'Available' as const,
+          allocatedJobId: undefined
+        };
+      }
+      return mr;
+    });
+
     const newLog = {
       jobId: job.id,
       product: job.product,
       stage: 'Slitting Cancelled',
       machine: 'Slitting-1',
       shift: batch.shift,
-      action: `❌ Slitting Run Cancelled & Reverted (Batch ${batch.batchId} deleted)`,
+      action: `❌ Slitting Run Cancelled & Reverted (Batch ${batch.batchId} deleted, Mother Reels released)`,
       worker: batch.worker,
       user: 'slit_user',
       rawDate: new Date().toISOString().split('T')[0],
@@ -1139,12 +1151,13 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      motherReelInventory: updatedMotherReels,
       logs: [...state.logs, newLog]
     });
 
     setIsCancelConfirmOpen(false);
     setSelectedActiveBatchId('');
-    alert('✅ Slitting run cancelled and batch removed.');
+    alert('✅ Slitting run cancelled, batch removed, and Mother Reels returned to Inventory.');
   };
 
   return (

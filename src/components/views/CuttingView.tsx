@@ -1294,6 +1294,26 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         nextGlueLogs = [newGlueEntry, ...nextGlueLogs];
       }
 
+      const finishedLot: WipLot = {
+        id: `LOT-CUT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        jobId: job.id,
+        product: job.product,
+        stage: 'Cutting',
+        producedQty: cratesDone,
+        consumedQty: 0,
+        remainingQty: cratesDone,
+        piecesPerCrate: effectiveCutPcs,
+        totalPieces: totalCutPcs,
+        producedByOperator: batch.worker || operatorName || 'UNKNOWN',
+        machine: selectedMachine,
+        shift: batch.shift || shift,
+        timestamp: new Date().toISOString()
+      };
+
+      const nextWipLots = cratesDone > 0 
+        ? [finishedLot, ...(state.wipLots || [])]
+        : (state.wipLots || []);
+
       const newLog = {
         jobId: job.id,
         product: job.product,
@@ -1314,6 +1334,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         jobs: updatedJobs,
         glueUsageLogs: nextGlueLogs,
         materialRequisitions: updatedRequisitions,
+        wipLots: nextWipLots,
         logs: [...state.logs, newLog]
       });
 

@@ -83,6 +83,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
   const [isUnissueModalOpen, setIsUnissueModalOpen] = useState(false);
   const [unissueQtyInput, setUnissueQtyInput] = useState('');
+  const [unissueTargetLotId, setUnissueTargetLotId] = useState('');
   const [selectedCuttingBatchId, setSelectedCuttingBatchId] = useState('');
 
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
@@ -345,10 +346,22 @@ export const FormingView: React.FC<FormingViewProps> = ({
           availableCuttingCrates: Math.max(0, (j.availableCuttingCrates || 0) - cratesCount),
           runningBatches: modifiedCuttingBatches.map((b) => {
             if (b.batchId !== activeRunning.batch.batchId) return b;
+            const currentOps = b.sourceOperator || '';
+            const newOp = selectedCuttingLotWorker || '';
+            const nextSourceOperator = currentOps 
+              ? (currentOps.split(', ').includes(newOp) ? currentOps : `${currentOps}, ${newOp}`)
+              : newOp;
+
+            const currentLots = b.sourceLotId || '';
+            const newLotId = selectedCuttingBatchId || '';
+            const nextSourceLotId = currentLots
+              ? (currentLots.split(', ').includes(newLotId) ? currentLots : `${currentLots}, ${newLotId}`)
+              : newLotId;
+
             return {
               ...b,
-              sourceLotId: b.sourceLotId || selectedCuttingBatchId || undefined,
-              sourceOperator: b.sourceOperator || selectedCuttingLotWorker || undefined,
+              sourceLotId: nextSourceLotId || undefined,
+              sourceOperator: nextSourceOperator || undefined,
               issuedQty: (b.issuedQty || 0) + cratesCount,
               inputPieces: (b.inputPieces || 0) + issuedInputPieces,
               pcsPerCrate: netCutPcsPerCrate
@@ -504,14 +517,16 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return;
     }
     const remaining = curIssued - qty;
-    const targetSourceLotId = batch.sourceLotId || batch.parentBatchId;
+    const targetSourceLotId = unissueTargetLotId || batch.sourceLotId || batch.parentBatchId;
     let remAddUnissue = qty;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
       const updatedBatches = (j.runningBatches || [])
         .map((b) => {
           if (b.batchId === batch.batchId) {
-            return { ...b, issuedQty: remaining };
+            const originalInputPieces = b.inputPieces || (curIssued * standardCutPcs);
+            const nextInputPieces = Math.max(0, originalInputPieces - (qty * standardCutPcs));
+            return { ...b, issuedQty: remaining, inputPieces: nextInputPieces };
           }
           if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remAddUnissue > 0) {
             if (b.slices && b.slices.length > 0) {
@@ -610,6 +625,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
     setIsUnissueModalOpen(false);
     setUnissueQtyInput('');
+    setUnissueTargetLotId('');
     if (remaining === 0) {
       setSelectedActiveBatchId('');
     }
@@ -1589,6 +1605,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    const cuttingLots = (state.wipLots || []).filter(
+                      (lot) => lot.jobId === activeBatchObj.job.id && lot.stage === 'Cutting' && (lot.consumedQty || 0) > 0
+                    );
+                    setUnissueTargetLotId(cuttingLots[0]?.id || activeBatchObj.batch.sourceLotId || '');
                     setUnissueQtyInput(String(activeBatchObj.batch.issuedQty || '1'));
                     setIsUnissueModalOpen(true);
                   }}
@@ -2509,64 +2529,120 @@ export const FormingView: React.FC<FormingViewProps> = ({
       )}
 
       {/* Quick Un-issue Modal */}
-      {isUnissueModalOpen && activeBatchObj && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in duration-150">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <Undo2 className="w-5 h-5 text-amber-600" />
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900 m-0">Issue Return (Un-issue Cut Crates)</h3>
-                <p className="text-[11px] text-slate-500 m-0">Return excess cut crates back to Cutting Stock</p>
-              </div>
-            </div>
+      {isUnissueModalOpen && activeBatchObj && (() => {
+        const cuttingLotsForJob = (state.wipLots || []).filter(
+          (lot) => lot.jobId === activeBatchObj.job.id && lot.stage === 'Cutting' && (lot.consumedQty || 0) > 0
+        );
+        const chosenLotObj = cuttingLotsForJob.find(l => l.id === unissueTargetLotId);
+        const maxReturnable = chosenLotObj
+          ? Math.min(activeBatchObj.batch.issuedQty || 0, chosenLotObj.consumedQty || 0)
+          : (activeBatchObj.batch.issuedQty || 0);
 
-            <div className="bg-amber-50 p-3 rounded-xl text-xs space-y-1 text-amber-900">
-              <div>Job: <b>{activeBatchObj.job.id}</b> ({activeBatchObj.job.product})</div>
-              <div>Currently Issued to Machine: <b>{activeBatchObj.batch.issuedQty} Crates</b></div>
-              {activeBatchObj.batch.sourceOperator && (
-                <div className="text-amber-800 font-semibold flex items-center gap-1">
-                  <span>↩️ Returning directly to Cutting Operator Lot:</span>
-                  <span className="font-extrabold bg-amber-200/80 text-amber-950 px-1.5 py-0.5 rounded text-[11px]">
-                    👨‍🏭 {activeBatchObj.batch.sourceOperator}
-                  </span>
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in duration-150">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Undo2 className="w-5 h-5 text-amber-600" />
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 m-0">Issue Return (Un-issue Cut Crates)</h3>
+                  <p className="text-[11px] text-slate-500 m-0">Return excess cut crates back to Cutting Stock</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 p-3 rounded-xl text-xs space-y-1 text-amber-900">
+                <div>Job: <b>{activeBatchObj.job.id}</b> ({activeBatchObj.job.product})</div>
+                <div>Currently Issued to Machine: <b>{activeBatchObj.batch.issuedQty} Crates</b></div>
+                {activeBatchObj.batch.sourceOperator && (
+                  <div className="text-amber-800 font-semibold flex items-center gap-1">
+                    <span>↩️ Original Starting Operator:</span>
+                    <span className="font-extrabold bg-amber-200/80 text-amber-950 px-1.5 py-0.5 rounded text-[11px]">
+                      👨‍🏭 {activeBatchObj.batch.sourceOperator}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {cuttingLotsForJob.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Select Cutting Operator Lot to Return To:
+                  </label>
+                  <select
+                    value={unissueTargetLotId}
+                    onChange={(e) => {
+                      setUnissueTargetLotId(e.target.value);
+                      const chosenLot = cuttingLotsForJob.find(l => l.id === e.target.value);
+                      if (chosenLot) {
+                        const cappedQty = Math.min(activeBatchObj.batch.issuedQty || 0, chosenLot.consumedQty || 0);
+                        if (parseFloat(unissueQtyInput) > cappedQty || !unissueQtyInput) {
+                          setUnissueQtyInput(String(cappedQty));
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-amber-300 rounded-lg text-xs font-bold text-slate-800 bg-white outline-none focus:border-amber-500"
+                  >
+                    {cuttingLotsForJob.map((lot) => (
+                      <option key={lot.id} value={lot.id}>
+                        👨‍🏭 {lot.worker} ({lot.id}) — Consumed: {lot.consumedQty || 0} Crates
+                      </option>
+                    ))}
+                    <option value="">
+                      Auto-Restore across all consumed lots (LIFO)
+                    </option>
+                  </select>
                 </div>
               )}
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Enter Crates Quantity to Return:
-              </label>
-              <input
-                type="number"
-                min="1"
-                max={activeBatchObj.batch.issuedQty}
-                value={unissueQtyInput}
-                onChange={(e) => setUnissueQtyInput(e.target.value)}
-                className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm font-bold text-slate-800 outline-none"
-                autoFocus
-              />
-            </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                  <span>Enter Crates Quantity to Return:</span>
+                  {chosenLotObj && (
+                    <span className="text-[10px] text-amber-700 font-black">
+                      Max: {chosenLotObj.consumedQty} Crates
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={maxReturnable}
+                  value={unissueQtyInput}
+                  onChange={(e) => {
+                    const entered = parseFloat(e.target.value) || 0;
+                    if (entered > maxReturnable) {
+                      setUnissueQtyInput(String(maxReturnable));
+                    } else {
+                      setUnissueQtyInput(e.target.value);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm font-bold text-slate-800 outline-none focus:border-amber-500"
+                  autoFocus
+                />
+              </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsUnissueModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmQuickUnissue}
-                className="px-4 py-2 text-xs font-extrabold text-white bg-amber-600 hover:bg-amber-700 rounded-xl cursor-pointer shadow-xs flex items-center gap-1"
-              >
-                <Undo2 className="w-4 h-4" /> Confirm Return
-              </button>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUnissueModalOpen(false);
+                    setUnissueTargetLotId('');
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmQuickUnissue}
+                  className="px-4 py-2 text-xs font-extrabold text-white bg-amber-600 hover:bg-amber-700 rounded-xl cursor-pointer shadow-xs flex items-center gap-1"
+                >
+                  <Undo2 className="w-4 h-4" /> Confirm Return
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Cancel Run Confirm Modal */}
       {isCancelConfirmOpen && activeBatchObj && (
