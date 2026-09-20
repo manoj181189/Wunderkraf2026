@@ -49,7 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
       >
         <div className="w-12 h-12 rounded-lg bg-white p-1 flex items-center justify-center shadow-sm overflow-hidden flex-shrink-0 group-hover:scale-105 transition">
           <img 
-            src={brandLogoBase64 || "/logo.png"} 
+            src={brandLogoBase64 || "logo.png"} 
             alt="Wünderkraf Logo" 
             className="w-full h-full object-contain" 
             onError={(e) => {

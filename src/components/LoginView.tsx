@@ -34,7 +34,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
       {/* Brand Monogram */}
       <div className="w-24 h-24 mx-auto mb-5 bg-slate-50 border border-slate-200 rounded-2xl p-2 shadow-inner flex items-center justify-center overflow-hidden">
         <img 
-          src={brandLogoBase64 || "/logo.png"} 
+          src={brandLogoBase64 || "logo.png"} 
           alt="Brand Logo" 
           className="w-full h-full object-contain" 
           onError={(e) => {
