@@ -268,9 +268,28 @@ export const FormingView: React.FC<FormingViewProps> = ({
             });
             
             const totalSlicesConsumed = updatedSlices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+            
+            // Calculate and deduct from direct batch-level quantity if remaining and selected ID is batchId
+            let extraBatchConsumed = 0;
+            if (remDeduct > 0 && selectedCuttingBatchId === b.batchId) {
+              const slicesTotalP = b.slices.reduce((sum, s) => sum + (s.producedQty || 0), 0);
+              const slicesConsumedP = b.slices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+              const untrackedProduced = Math.max(0, (b.producedQty || 0) - slicesTotalP);
+              const untrackedConsumed = Math.max(0, (b.consumedQty || 0) - slicesConsumedP);
+              const untrackedRemaining = Math.max(0, untrackedProduced - untrackedConsumed);
+
+              if (untrackedRemaining > 0) {
+                const dec = Math.min(untrackedRemaining, remDeduct);
+                remDeduct -= dec;
+                extraBatchConsumed = dec;
+              }
+            }
+
+            const initialUntrackedConsumed = Math.max(0, (b.consumedQty || 0) - b.slices.reduce((sum, s) => sum + (s.consumedQty || 0), 0));
+
             return {
               ...b,
-              consumedQty: totalSlicesConsumed,
+              consumedQty: totalSlicesConsumed + initialUntrackedConsumed + extraBatchConsumed,
               slices: updatedSlices
             };
           }
@@ -545,8 +564,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 }
                 return slice;
               });
-              // Pass 2: If still remaining, restore across slices in reverse order
-              if (remAddUnissue > 0) {
+              // Pass 2: If still remaining, restore across slices in reverse order ONLY if NO target lot was specified
+              if (remAddUnissue > 0 && (!unissueTargetLotId || targetSliceIds.length === 0)) {
                 updatedSlices = [...updatedSlices].reverse().map(slice => {
                   if (remAddUnissue > 0) {
                     const sliceConsumed = slice.consumedQty || 0;
@@ -560,8 +579,21 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   return slice;
                 }).reverse();
               }
-              if (restoredFromBatch > 0) {
-                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
+              
+              // Pass 3: If still remaining and target lot is the batch level ID (or generic fallback)
+              let restoredFromBatchLevel = 0;
+              if (remAddUnissue > 0) {
+                const totalSlicesConsumed = updatedSlices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+                const untrackedConsumed = Math.max(0, (b.consumedQty || 0) - totalSlicesConsumed);
+                if (untrackedConsumed > 0 && (targetSliceIds.length === 0 || targetSliceIds.includes(b.batchId))) {
+                  const restore = Math.min(untrackedConsumed, remAddUnissue);
+                  remAddUnissue -= restore;
+                  restoredFromBatchLevel += restore;
+                }
+              }
+
+              if (restoredFromBatch > 0 || restoredFromBatchLevel > 0) {
+                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch - restoredFromBatchLevel), slices: updatedSlices };
               }
             } else {
               const targetBatchIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -1050,8 +1082,21 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   return slice;
                 }).reverse();
               }
-              if (restoredFromBatch > 0) {
-                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
+              
+              // Pass 3: Target batch level direct/untracked consumption
+              let restoredFromBatchLevel = 0;
+              if (remCancelReturn > 0) {
+                const totalSlicesConsumed = updatedSlices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+                const untrackedConsumed = Math.max(0, (b.consumedQty || 0) - totalSlicesConsumed);
+                if (untrackedConsumed > 0 && (targetCancelSliceIds.length === 0 || targetCancelSliceIds.includes(b.batchId))) {
+                  const restore = Math.min(untrackedConsumed, remCancelReturn);
+                  remCancelReturn -= restore;
+                  restoredFromBatchLevel += restore;
+                }
+              }
+
+              if (restoredFromBatch > 0 || restoredFromBatchLevel > 0) {
+                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch - restoredFromBatchLevel), slices: updatedSlices };
               }
             } else {
               const targetCancelBatchIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -1612,14 +1657,34 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const cuttingLots = (state.wipLots || []).filter(
-                      (lot) => lot.jobId === activeBatchObj.job.id && lot.stage === 'Cutting' && (lot.consumedQty || 0) > 0
-                    );
-                    setUnissueTargetLotId(cuttingLots[0]?.id || activeBatchObj.batch.sourceLotId || '');
-                    setUnissueQtyInput(String(activeBatchObj.batch.issuedQty || '1'));
-                    setIsUnissueModalOpen(true);
-                  }}
+                onClick={() => {
+                  const cuttingBatches = (activeBatchObj.job.runningBatches || []).filter(
+                    b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
+                  );
+                  const localConsumedLots: string[] = [];
+                  cuttingBatches.forEach(cb => {
+                    if (cb.slices && cb.slices.length > 0) {
+                      const slicesConsumedP = cb.slices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+                      cb.slices.forEach(slice => {
+                        if ((slice.consumedQty || 0) > 0) {
+                          localConsumedLots.push(slice.sliceId);
+                        }
+                      });
+                      const untrackedConsumed = Math.max(0, (cb.consumedQty || 0) - slicesConsumedP);
+                      if (untrackedConsumed > 0) {
+                        localConsumedLots.push(cb.batchId);
+                      }
+                    } else {
+                      if ((cb.consumedQty || 0) > 0) {
+                        localConsumedLots.push(cb.batchId);
+                      }
+                    }
+                  });
+
+                  setUnissueTargetLotId(localConsumedLots[0] || activeBatchObj.batch.sourceLotId || '');
+                  setUnissueQtyInput(String(activeBatchObj.batch.issuedQty || '1'));
+                  setIsUnissueModalOpen(true);
+                }}
                   className="py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                 >
                   <Undo2 className="w-3.5 h-3.5" /> Issue Return
@@ -1861,6 +1926,11 @@ export const FormingView: React.FC<FormingViewProps> = ({
                         const consumedP = cb.consumedQty || 0;
                         
                         if (cb.slices && cb.slices.length > 0) {
+                          // Track slice-level totals to find untracked batch-level quantity
+                          const slicesTotalP = cb.slices.reduce((sum, s) => sum + (s.producedQty || 0), 0);
+                          const slicesConsumedP = cb.slices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+                          const slicesRemainingP = cb.slices.reduce((sum, s) => sum + Math.max(0, (s.producedQty || 0) - (s.consumedQty || 0)), 0);
+
                           cb.slices.forEach(slice => {
                             const sliceTotal = slice.producedQty || 0;
                             const sliceConsumed = slice.consumedQty || 0;
@@ -1877,6 +1947,25 @@ export const FormingView: React.FC<FormingViewProps> = ({
                               date: slice.date
                             });
                           });
+
+                          // Inject virtual lot for Direct/Untracked batch level crates if remaining exists
+                          const untrackedProduced = Math.max(0, totalP - slicesTotalP);
+                          const untrackedConsumed = Math.max(0, consumedP - slicesConsumedP);
+                          const untrackedRemaining = Math.max(0, (totalP - consumedP) - slicesRemainingP);
+
+                          if (untrackedRemaining > 0) {
+                            selectableLots.push({
+                              id: cb.batchId, // Use batchId so it is distinct from sliceIds
+                              batchId: cb.batchId,
+                              worker: cb.worker || 'Direct Forwarded',
+                              shift: cb.shift || 'N/A',
+                              machine: cb.machine || 'Cutting',
+                              totalQty: untrackedProduced,
+                              consumedQty: untrackedConsumed,
+                              remainingQty: untrackedRemaining,
+                              date: cb.startTime?.split(' ')[0]
+                            });
+                          }
                         } else {
                           selectableLots.push({
                             id: cb.batchId,
@@ -2524,9 +2613,58 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
       {/* Quick Un-issue Modal */}
       {isUnissueModalOpen && activeBatchObj && (() => {
-        const cuttingLotsForJob = (state.wipLots || []).filter(
-          (lot) => lot.jobId === activeBatchObj.job.id && lot.stage === 'Cutting' && (lot.consumedQty || 0) > 0
+        const cuttingBatches = (activeBatchObj.job.runningBatches || []).filter(
+          b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
         );
+
+        const cuttingLotsForJob: {
+          id: string;
+          batchId: string;
+          producedByOperator: string;
+          consumedQty: number;
+        }[] = [];
+
+        cuttingBatches.forEach(cb => {
+          const totalP = cb.producedQty || 0;
+          const consumedP = cb.consumedQty || 0;
+
+          if (cb.slices && cb.slices.length > 0) {
+            const slicesTotalP = cb.slices.reduce((sum, s) => sum + (s.producedQty || 0), 0);
+            const slicesConsumedP = cb.slices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+
+            cb.slices.forEach(slice => {
+              const sliceConsumed = slice.consumedQty || 0;
+              if (sliceConsumed > 0) {
+                cuttingLotsForJob.push({
+                  id: slice.sliceId,
+                  batchId: cb.batchId,
+                  producedByOperator: `${slice.operator} (${slice.shift})`,
+                  consumedQty: sliceConsumed
+                });
+              }
+            });
+
+            const untrackedConsumed = Math.max(0, consumedP - slicesConsumedP);
+            if (untrackedConsumed > 0) {
+              cuttingLotsForJob.push({
+                id: cb.batchId,
+                batchId: cb.batchId,
+                producedByOperator: cb.worker || 'Direct Forwarded',
+                consumedQty: untrackedConsumed
+              });
+            }
+          } else {
+            if (consumedP > 0) {
+              cuttingLotsForJob.push({
+                id: cb.batchId,
+                batchId: cb.batchId,
+                producedByOperator: cb.worker || 'Direct/Untracked',
+                consumedQty: consumedP
+              });
+            }
+          }
+        });
+
         const chosenLotObj = cuttingLotsForJob.find(l => l.id === unissueTargetLotId);
         const maxReturnable = chosenLotObj
           ? Math.min(activeBatchObj.batch.issuedQty || 0, chosenLotObj.consumedQty || 0)

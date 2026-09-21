@@ -69,6 +69,7 @@ export const QCView: React.FC<QCViewProps> = ({
 
   const [isUnissueModalOpen, setIsUnissueModalOpen] = useState(false);
   const [unissueQtyInput, setUnissueQtyInput] = useState('');
+  const [unissueTargetLotId, setUnissueTargetLotId] = useState('');
 
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
@@ -501,7 +502,7 @@ export const QCView: React.FC<QCViewProps> = ({
     }
 
     const remaining = curIssued - qty;
-    const targetSourceLotId = batch.sourceLotId || batch.parentBatchId;
+    const targetSourceLotId = unissueTargetLotId || batch.sourceLotId || batch.parentBatchId;
 
     let remAddUnissue = qty;
     const updatedJobs = jobs.map((j) => {
@@ -514,9 +515,11 @@ export const QCView: React.FC<QCViewProps> = ({
           if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remAddUnissue > 0) {
             if (b.slices && b.slices.length > 0) {
               let restoredFromBatch = 0;
+              const targetSliceIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
+              
               // Pass 1: Target matching slice
               let updatedSlices = b.slices.map(slice => {
-                if (remAddUnissue > 0 && targetSourceLotId && slice.sliceId === targetSourceLotId) {
+                if (remAddUnissue > 0 && targetSliceIds.length > 0 && targetSliceIds.includes(slice.sliceId)) {
                   const sliceConsumed = slice.consumedQty || 0;
                   const restore = Math.min(sliceConsumed, remAddUnissue);
                   if (restore > 0) {
@@ -527,8 +530,9 @@ export const QCView: React.FC<QCViewProps> = ({
                 }
                 return slice;
               });
-              // Pass 2: Fallback in reverse order
-              if (remAddUnissue > 0) {
+
+              // Pass 2: Fallback in reverse order ONLY if no specific target lot was matched / selected
+              if (remAddUnissue > 0 && (!unissueTargetLotId || targetSliceIds.length === 0)) {
                 updatedSlices = [...updatedSlices].reverse().map(slice => {
                   if (remAddUnissue > 0) {
                     const sliceConsumed = slice.consumedQty || 0;
@@ -542,11 +546,25 @@ export const QCView: React.FC<QCViewProps> = ({
                   return slice;
                 }).reverse();
               }
-              if (restoredFromBatch > 0) {
-                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch), slices: updatedSlices };
+
+              // Pass 3: Target batch level direct/untracked consumption
+              let restoredFromBatchLevel = 0;
+              if (remAddUnissue > 0) {
+                const totalSlicesConsumed = updatedSlices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+                const untrackedConsumed = Math.max(0, (b.consumedQty || 0) - totalSlicesConsumed);
+                if (untrackedConsumed > 0 && (targetSliceIds.length === 0 || targetSliceIds.includes(b.batchId))) {
+                  const restore = Math.min(untrackedConsumed, remAddUnissue);
+                  remAddUnissue -= restore;
+                  restoredFromBatchLevel += restore;
+                }
+              }
+
+              if (restoredFromBatch > 0 || restoredFromBatchLevel > 0) {
+                return { ...b, consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch - restoredFromBatchLevel), slices: updatedSlices };
               }
             } else {
-              if (!targetSourceLotId || b.batchId === targetSourceLotId || remAddUnissue > 0) {
+              const targetBatchIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
+              if (targetBatchIds.length === 0 || targetBatchIds.includes(b.batchId) || remAddUnissue > 0) {
                 const consumedP = b.consumedQty || 0;
                 const restore = Math.min(consumedP, remAddUnissue);
                 if (restore > 0) {
@@ -1288,6 +1306,30 @@ export const QCView: React.FC<QCViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  const formingBatches = (activeBatchObj.job.runningBatches || []).filter(
+                    b => b.stage === 'Forming' || b.machine?.startsWith('Forming')
+                  );
+                  const localFormingLots: string[] = [];
+                  formingBatches.forEach(fb => {
+                    if (fb.slices && fb.slices.length > 0) {
+                      const slicesConsumedP = fb.slices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+                      fb.slices.forEach(slice => {
+                        if ((slice.consumedQty || 0) > 0) {
+                          localFormingLots.push(slice.sliceId);
+                        }
+                      });
+                      const untrackedConsumed = Math.max(0, (fb.consumedQty || 0) - slicesConsumedP);
+                      if (untrackedConsumed > 0) {
+                        localFormingLots.push(fb.batchId);
+                      }
+                    } else {
+                      if ((fb.consumedQty || 0) > 0) {
+                        localFormingLots.push(fb.batchId);
+                      }
+                    }
+                  });
+
+                  setUnissueTargetLotId(localFormingLots[0] || activeBatchObj.batch.sourceLotId || '');
                   setUnissueQtyInput(String(activeBatchObj.batch.issuedQty || '1'));
                   setIsUnissueModalOpen(true);
                 }}
@@ -2332,6 +2374,95 @@ export const QCView: React.FC<QCViewProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Real list of forming lots/slices that have been consumed */}
+            {(() => {
+              const formingBatches = (activeBatchObj.job.runningBatches || []).filter(
+                b => b.stage === 'Forming' || b.machine?.startsWith('Forming')
+              );
+
+              const formingLotsForJob: {
+                id: string;
+                batchId: string;
+                producedByOperator: string;
+                consumedQty: number;
+              }[] = [];
+
+              formingBatches.forEach(fb => {
+                const totalP = fb.producedQty || 0;
+                const consumedP = fb.consumedQty || 0;
+
+                if (fb.slices && fb.slices.length > 0) {
+                  const slicesTotalP = fb.slices.reduce((sum, s) => sum + (s.producedQty || 0), 0);
+                  const slicesConsumedP = fb.slices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+
+                  fb.slices.forEach(slice => {
+                    const sliceConsumed = slice.consumedQty || 0;
+                    if (sliceConsumed > 0) {
+                      formingLotsForJob.push({
+                        id: slice.sliceId,
+                        batchId: fb.batchId,
+                        producedByOperator: `${slice.operator} (${slice.shift})`,
+                        consumedQty: sliceConsumed
+                      });
+                    }
+                  });
+
+                  const untrackedConsumed = Math.max(0, consumedP - slicesConsumedP);
+                  if (untrackedConsumed > 0) {
+                    formingLotsForJob.push({
+                      id: fb.batchId,
+                      batchId: fb.batchId,
+                      producedByOperator: fb.worker || 'Direct Forwarded',
+                      consumedQty: untrackedConsumed
+                    });
+                  }
+                } else {
+                  if (consumedP > 0) {
+                    formingLotsForJob.push({
+                      id: fb.batchId,
+                      batchId: fb.batchId,
+                      producedByOperator: fb.worker || 'Direct/Untracked',
+                      consumedQty: consumedP
+                    });
+                  }
+                }
+              });
+
+              if (formingLotsForJob.length > 0) {
+                return (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Select Forming Operator Lot to Return To:
+                    </label>
+                    <select
+                      value={unissueTargetLotId}
+                      onChange={(e) => {
+                        setUnissueTargetLotId(e.target.value);
+                        const chosenLot = formingLotsForJob.find(l => l.id === e.target.value);
+                        if (chosenLot) {
+                          const cappedQty = Math.min(activeBatchObj.batch.issuedQty || 0, chosenLot.consumedQty || 0);
+                          if (parseFloat(unissueQtyInput) > cappedQty || !unissueQtyInput) {
+                            setUnissueQtyInput(String(cappedQty));
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-amber-300 rounded-lg text-xs font-bold text-slate-800 bg-white outline-none focus:border-amber-500"
+                    >
+                      {formingLotsForJob.map((lot) => (
+                        <option key={lot.id} value={lot.id}>
+                          👨‍🏭 {lot.producedByOperator} ({lot.id}) — Consumed: {lot.consumedQty || 0} Crates
+                        </option>
+                      ))}
+                      <option value="">
+                        Auto-Restore across all consumed lots (LIFO)
+                      </option>
+                    </select>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
