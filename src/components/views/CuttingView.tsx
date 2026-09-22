@@ -369,7 +369,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
   const standardCutPcs = activeBatchObj?.job.pcsPerCrateCutting || (activeBatchObj ? state.crateCapacityMaster?.[activeBatchObj.job.product]?.cuttingPcs : 10000) || 10000;
   const effectiveCutPcs = pcsPerCrateOverride !== '' ? (parseInt(pcsPerCrateOverride, 10) || standardCutPcs) : standardCutPcs;
 
-  const defaultPcsPerKg = activeBatchObj?.job.cuttingPcsPerKg || activeBatchObj?.batch.pcsPerKg || DEFAULT_PCS_PER_KG_MAP[activeBatchObj?.job.product || ''] || 500;
+  const defaultPcsPerKg = activeBatchObj?.job.cuttingPcsPerKg || activeBatchObj?.batch.pcsPerKg || (activeBatchObj ? (state.pcsPerKgMaster?.[activeBatchObj.job.product] || 500) : 500);
   const effectivePcsPerKg = pcsPerKgInput !== '' ? (parseFloat(pcsPerKgInput) || defaultPcsPerKg) : defaultPcsPerKg;
 
   // CRITICAL USER DIRECTIVE:
@@ -1851,7 +1851,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
-          {MACHINES['Cutting'].map((mName) => {
+          {(state.machinesMaster?.['Cutting'] || ['Cutting-1', 'Cutting-2']).map((mName) => {
             let mActiveBatch: { job: Job; batch: RunningBatch } | undefined;
             for (const j of jobs) {
               if (j.runningBatches) {
@@ -3691,9 +3691,9 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         machine={selectedMachine}
         stage="Cutting"
         shift={shift}
-        currentOperator={activeBatchObj?.batch.worker || operatorName}
+        currentOperator={activeBatchObj?.batch?.worker || operatorName}
         currentHelpers={
-          activeBatchObj?.batch.helpers && activeBatchObj.batch.helpers.length > 0
+          activeBatchObj?.batch?.helpers && activeBatchObj.batch.helpers.length > 0
             ? activeBatchObj.batch.helpers
             : assignedHelpers
         }

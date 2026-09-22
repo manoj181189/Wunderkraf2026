@@ -40,6 +40,7 @@ import {
   Cloud,
   Wifi,
   Scale,
+  TrendingUp,
   Undo2,
   History,
   Coffee
@@ -88,7 +89,7 @@ interface AdminSettingsViewProps {
   currentUser?: { username: string; perms: string[] } | null;
 }
 
-type AdminTab = 'brand_items_paper' | 'crate_master' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward' | 'employee_master';
+type AdminTab = 'brand_items_paper' | 'crate_master' | 'machines' | 'scrap_yield' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward' | 'employee_master';
 type MasterDataSubTab = 'plans' | 'jobs' | 'reconcile' | 'batches' | 'orders' | 'logs' | 'numbering' | 'vault';
 
 export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
@@ -446,6 +447,87 @@ _If you received this message, your contact number and routing configuration are
     return TARGET_GSM_DEFAULT;
   });
   const [newTargetGsmInput, setNewTargetGsmInput] = useState('');
+
+  // ==========================================
+  // MACHINE MASTER (By Department)
+  // ==========================================
+  const [machinesMaster, setMachinesMaster] = useState<Record<string, string[]>>(() => {
+    return state.machinesMaster || {
+      'Slitting': ['Slitting-1'],
+      'Cutting': ['Cutting-1', 'Cutting-2'],
+      'Forming': ['Forming-1', 'Forming-2', 'Forming-3', 'Forming-4', 'Forming-5', 'Forming-6', 'Forming-7'],
+      'QC': ['QC-Desk'],
+      'Packing': ['Packing-1', 'Packing-2', 'Manual-1', 'Manual-2', 'Manual-3']
+    };
+  });
+  const [newMachineDept, setNewMachineDept] = useState('Cutting');
+  const [newMachineName, setNewMachineName] = useState('');
+
+  const handleAddMachine = () => {
+    if (!newMachineName.trim()) return;
+    const cleanName = newMachineName.trim();
+    const currentList = machinesMaster[newMachineDept] || [];
+    if (currentList.includes(cleanName)) {
+      alert(`⚠️ Machine "${cleanName}" already exists in ${newMachineDept}!`);
+      return;
+    }
+    const updated = {
+      ...machinesMaster,
+      [newMachineDept]: [...currentList, cleanName]
+    };
+    setMachinesMaster(updated);
+    onSaveState({
+      ...state,
+      machinesMaster: updated
+    });
+    setNewMachineName('');
+    showToast(`✅ Added Machine ${cleanName} to ${newMachineDept}`);
+  };
+
+  const handleDeleteMachine = (dept: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${name} from ${dept}?`)) return;
+    const updated = {
+      ...machinesMaster,
+      [dept]: (machinesMaster[dept] || []).filter(m => m !== name)
+    };
+    setMachinesMaster(updated);
+    onSaveState({
+      ...state,
+      machinesMaster: updated
+    });
+    showToast(`🗑️ Deleted Machine ${name}`);
+  };
+
+  // ==========================================
+  // SCRAP & YIELD MASTER (Pcs/Kg & Scrap Limits)
+  // ==========================================
+  const [pcsPerKgMaster, setPcsPerKgMaster] = useState<Record<string, number>>(() => {
+    return state.pcsPerKgMaster || {
+      'Spoon': 450,
+      'Fork': 480,
+      'Knife': 550,
+      'Dessert Spoon': 600
+    };
+  });
+  const [scrapLimitsMaster, setScrapLimitsMaster] = useState<Record<string, number>>(() => {
+    return state.scrapLimitsMaster || {
+      'Slitting': 2.0,
+      'Cutting': 2.5,
+      'Forming': 1.5
+    };
+  });
+
+  const handleUpdatePcsPerKg = (prod: string, val: number) => {
+    const updated = { ...pcsPerKgMaster, [prod]: Math.max(1, val) };
+    setPcsPerKgMaster(updated);
+    onSaveState({ ...state, pcsPerKgMaster: updated });
+  };
+
+  const handleUpdateScrapLimit = (dept: string, val: number) => {
+    const updated = { ...scrapLimitsMaster, [dept]: Math.max(0, val) };
+    setScrapLimitsMaster(updated);
+    onSaveState({ ...state, scrapLimitsMaster: updated });
+  };
 
   const [newProductSeq, setNewProductSeq] = useState('1');
   const [editingProductIdx, setEditingProductIdx] = useState<number | null>(null);
@@ -1627,8 +1709,26 @@ _If you received this message, your contact number and routing configuration are
       ...(state.seriesConfig?.productSeqs || {}),
       [cleanName]: parsedSeq
     };
-    if (oldName && oldName !== cleanName && updatedSeqs[oldName]) {
-      delete updatedSeqs[oldName];
+
+    const updatedCrateMaster = {
+      ...(state.crateCapacityMaster || {})
+    };
+
+    const updatedPcsPerKgMaster = {
+      ...(state.pcsPerKgMaster || {})
+    };
+
+    if (oldName && oldName !== cleanName) {
+      if (updatedSeqs[oldName]) delete updatedSeqs[oldName];
+      if (updatedCrateMaster[oldName]) {
+        updatedCrateMaster[cleanName] = updatedCrateMaster[oldName];
+        delete updatedCrateMaster[oldName];
+      }
+      if (updatedPcsPerKgMaster[oldName]) {
+        updatedPcsPerKgMaster[cleanName] = updatedPcsPerKgMaster[oldName];
+        delete updatedPcsPerKgMaster[oldName];
+      }
+      if (updatedPrefixMap[oldName]) delete updatedPrefixMap[oldName];
     }
 
     setProductsList(updatedProducts);
@@ -1668,10 +1768,26 @@ _If you received this message, your contact number and routing configuration are
       isDanger: true,
       onConfirm: () => {
         const updatedProducts = productsList.filter((p) => p !== prodName);
+        const updatedPrefixMap = { ...(state.productPrefixMap || {}) };
+        delete updatedPrefixMap[prodName];
+        const updatedSeqs = { ...(state.seriesConfig?.productSeqs || {}) };
+        delete updatedSeqs[prodName];
+        const updatedCrateMaster = { ...(state.crateCapacityMaster || {}) };
+        delete updatedCrateMaster[prodName];
+        const updatedPcsPerKgMaster = { ...(state.pcsPerKgMaster || {}) };
+        delete updatedPcsPerKgMaster[prodName];
+
         setProductsList(updatedProducts);
         onSaveState({
           ...state,
-          products: updatedProducts
+          products: updatedProducts,
+          productPrefixMap: updatedPrefixMap,
+          seriesConfig: {
+            ...state.seriesConfig,
+            productSeqs: updatedSeqs
+          },
+          crateCapacityMaster: updatedCrateMaster,
+          pcsPerKgMaster: updatedPcsPerKgMaster
         });
         setConfirmModal(null);
         showToast(`🗑️ Product "${prodName}" removed.`);
@@ -3012,7 +3128,31 @@ ${formLines.join('\n')}
           }`}
         >
           <Box className="w-4 h-4" />
-          <span>🧺 Crate Capacity Master ({Object.keys(crateMaster).length} Products Matrix)</span>
+          <span>🧺 Crate Capacity Master ({Object.keys(crateMaster).length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('machines')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+            activeTab === 'machines'
+              ? 'bg-[#1a365d] text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Cog className="w-4 h-4" />
+          <span>⚙️ Machines Master ({Object.values(machinesMaster).flat().length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('scrap_yield')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+            activeTab === 'scrap_yield'
+              ? 'bg-[#1a365d] text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Scale className="w-4 h-4" />
+          <span>⚖️ Scrap & Yield Master</span>
         </button>
 
         <button
@@ -3828,6 +3968,190 @@ ${formLines.join('\n')}
                   <Plus className="w-4 h-4" />
                   <span>Add to Master Matrix</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'machines' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
+                  <Cog className="w-5 h-5" />
+                </span>
+                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide m-0">
+                  Machine Master Configuration
+                </h4>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 m-0">
+                Manage the list of machines available in each production department. These appear in dropdowns across the ERP.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Add Machine Form */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+              <h5 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
+                ➕ Add New Machine
+              </h5>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Department:</label>
+                  <select
+                    value={newMachineDept}
+                    onChange={(e) => setNewMachineDept(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                  >
+                    {['Slitting', 'Cutting', 'Forming', 'QC', 'Packing', 'Printing'].map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Machine Name / ID:</label>
+                  <input
+                    type="text"
+                    value={newMachineName}
+                    onChange={(e) => setNewMachineName(e.target.value)}
+                    placeholder="e.g. Cutting-3"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                  />
+                </div>
+                <button
+                  onClick={handleAddMachine}
+                  className="w-full py-2.5 bg-[#2b6cb0] hover:bg-[#1a365d] text-white font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Register Machine</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Machines List */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-black text-slate-800 uppercase text-xs">
+                Registered Machines by Department
+              </div>
+              <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto">
+                {Object.entries(machinesMaster).map(([dept, machines]) => (
+                  <div key={dept} className="space-y-2">
+                    <h6 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1">{dept}</h6>
+                    <div className="flex flex-wrap gap-2">
+                      {machines.map(m => (
+                        <div key={m} className="bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-2 group hover:bg-white transition shadow-2xs">
+                          <span className="text-xs font-bold text-slate-700">{m}</span>
+                          <button
+                            onClick={() => handleDeleteMachine(dept, m)}
+                            className="text-slate-400 hover:text-red-600 transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {machines.length === 0 && <span className="text-[11px] text-slate-400 italic px-1">No machines registered.</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'scrap_yield' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
+                  <Scale className="w-5 h-5" />
+                </span>
+                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide m-0">
+                  Scrap & Yield Master Data
+                </h4>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 m-0">
+                Configure standard Pieces-per-KG for each product and department-wise scrap tolerance limits.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Pcs/Kg Master */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-black text-slate-800 uppercase text-xs flex justify-between">
+                <span>Product Yield (Pcs per KG)</span>
+                <TrendingUp className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-100/75 border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-4 font-black uppercase text-[10px]">Product</th>
+                      <th className="py-2.5 px-4 font-black uppercase text-[10px]">Std. Pcs / KG</th>
+                      <th className="py-2.5 px-4 font-black uppercase text-[10px] text-center">Update</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {productsList.map(prod => (
+                      <tr key={prod} className="hover:bg-slate-50">
+                        <td className="py-3 px-4 font-bold text-slate-700">{prod}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              value={pcsPerKgMaster[prod] || 450}
+                              onChange={(e) => handleUpdatePcsPerKg(prod, parseInt(e.target.value))}
+                              className="w-20 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-[10px] text-slate-400">pcs/kg</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Scrap Limits Master */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-black text-slate-800 uppercase text-xs flex justify-between">
+                <span>Scrap Tolerance Limits (%)</span>
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="p-4 space-y-4">
+                {['Slitting', 'Cutting', 'Forming'].map(dept => (
+                  <div key={dept} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 group hover:border-amber-300 transition">
+                    <div>
+                      <span className="text-xs font-black text-slate-700 uppercase">{dept}</span>
+                      <p className="text-[10px] text-slate-500 m-0">Standard scrap threshold for {dept}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={scrapLimitsMaster[dept] || 2.5}
+                        onChange={(e) => handleUpdateScrapLimit(dept, parseFloat(e.target.value))}
+                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-black text-amber-700 outline-none focus:border-amber-500 text-center"
+                      />
+                      <span className="text-xs font-bold text-slate-400">%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="px-4 py-3 bg-amber-50 border-t border-amber-100">
+                <p className="text-[10px] text-amber-800 font-medium m-0 flex items-start gap-1.5">
+                  <span className="shrink-0 mt-0.5 font-black">ⓘ</span>
+                  <span>If actual scrap exceeds these limits during production, a warning will be flagged on the batch report.</span>
+                </p>
               </div>
             </div>
           </div>

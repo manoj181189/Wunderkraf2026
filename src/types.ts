@@ -598,6 +598,8 @@ export interface FactoryState {
   products?: string[];
   paperBrands?: string[];
   productPrefixMap?: Record<string, string>;
+  machinesMaster?: Record<string, string[]>;
+  pcsPerKgMaster?: Record<string, number>;
   maintenanceTechniciansMaster?: string[];
   maintenanceSparePartsMaster?: string[];
   maintenancePauseReasonsMaster?: string[];
@@ -615,7 +617,7 @@ export interface FactoryState {
   glueBrands?: string[];
   targetLayersMaster?: number[];
   targetGsmMaster?: string[];
-  scrapLimitsMaster?: number[];
+  scrapLimitsMaster?: Record<string, number>;
   scrapToleranceKgMaster?: number[];
   glueUsageLogs?: GlueUsageEntry[];
   productionPlans?: ProductionPlan[];

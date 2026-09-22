@@ -783,6 +783,8 @@ export const INITIAL_STATE: FactoryState = {
   products: PRODUCTS,
   paperBrands: PAPER_BRANDS,
   productPrefixMap: PRODUCT_PREFIX_MAP,
+  machinesMaster: MACHINES,
+  pcsPerKgMaster: DEFAULT_PCS_PER_KG_MAP,
   maxPiecesPerSlitRoll: 55000,
   strictAuditRollYield: false,
   maintenanceTechniciansMaster: [
@@ -801,6 +803,11 @@ export const INITIAL_STATE: FactoryState = {
   glueBrands: GLUE_BRANDS,
   targetLayersMaster: TARGET_LAYERS_DEFAULT,
   targetGsmMaster: TARGET_GSM_DEFAULT,
+  scrapLimitsMaster: {
+    'Slitting': 2.0,
+    'Cutting': 2.5,
+    'Forming': 1.5
+  },
   glueUsageLogs: [],
   productionPlans: [],
   motherReelInventory: [],

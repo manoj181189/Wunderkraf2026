@@ -1,6 +1,6 @@
 import { autoRegisterWorker } from '../../lib/workerUtils';
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, Play, Pause, Lock, Square, XCircle, Plus, AlertCircle, Check, Search, Tag, ShieldCheck, Layers, Eye, AlertTriangle, RotateCcw, Calendar, Clock, CheckCircle2, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Play, Pause, Lock, Square, XCircle, Plus, AlertCircle, Check, Search, Tag, ShieldCheck, Layers, Eye, AlertTriangle, RotateCcw, Calendar, Clock, CheckCircle2, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, Cog } from 'lucide-react';
 import { FactoryState, Job, JobReelItem, ProductType, RunningBatch, OperatorRunSlice, LogEntry, PlannedLayer, ShiftHandoverRecord } from '../../types';
 import { PRODUCTS, PAPER_BRANDS, DEPT_WORKERS, PRODUCT_PREFIX_MAP } from '../../lib/constants';
 import {
@@ -93,6 +93,9 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     }
     return paperBrandList[0] || 'ITC';
   });
+  const [selectedMachine, setSelectedMachine] = useState('Slitting-1');
+  const slitMachines = state.machinesMaster?.['Slitting'] || ['Slitting-1'];
+
   const [operatorName, setOperatorName] = useState(slitWorkers[0] || 'SLIT_RAMESH');
   const [shift, setShift] = useState<'DAY' | 'NIGHT'>(() => {
     if (preSelectedPlanId) {
@@ -206,7 +209,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
   jobs.forEach((j) => {
     if (j.runningBatches) {
       j.runningBatches.forEach((b) => {
-        if (b.machine === 'Slitting-1' && (b.status === 'Running' || b.status === 'Held')) {
+        if (b.machine === selectedMachine && (b.status === 'Running' || b.status === 'Held')) {
           activeBatches.push({ job: j, batch: b });
         }
       });
@@ -259,7 +262,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
         if (w.name.toUpperCase() === operator.trim().toUpperCase()) {
           return {
             ...w,
-            assignedMachine: 'Slitting-1',
+            assignedMachine: selectedMachine,
             isPresent: true,
             status: 'PRODUCING' as const,
             inTime: w.inTime || nowTime
@@ -268,7 +271,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
         if (helpers.some((h) => h.toUpperCase() === w.name.toUpperCase())) {
           return {
             ...w,
-            assignedMachine: 'Slitting-1',
+            assignedMachine: selectedMachine,
             pairedWithOperator: operator.trim().toUpperCase(),
             isPresent: true,
             status: 'PRODUCING' as const,
@@ -276,7 +279,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
           };
         }
         // Unpair previously assigned helpers for this machine or operator
-        if (w.role === 'HELPER' && (w.assignedMachine === 'Slitting-1' || w.pairedWithOperator === operator.trim().toUpperCase())) {
+        if (w.role === 'HELPER' && (w.assignedMachine === selectedMachine || w.pairedWithOperator === operator.trim().toUpperCase())) {
           return {
             ...w,
             assignedMachine: undefined,
@@ -291,8 +294,8 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
         jobId: job.id,
         product: job.product,
         stage: 'Slitting',
-        machine: 'Slitting-1',
-        action: `👥 Station Crew Assigned: Operator [${operator}] with ${helpers.length} Helpers (${helpers.join(', ')}) on Slitting-1 for Batch [${batch.batchId}]`,
+        machine: selectedMachine,
+        action: `👥 Station Crew Assigned: Operator [${operator}] with ${helpers.length} Helpers (${helpers.join(', ')}) on ${selectedMachine} for Batch [${batch.batchId}]`,
         worker: operator,
         user: 'slit_supervisor',
         rawDate: new Date().toISOString().split('T')[0],
@@ -325,7 +328,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     let baseJobsList = state.jobs;
     if (currentRunningBatch) {
       const switchConfirm = window.confirm(
-        `Job [${currentRunningBatch.job.id}] (Reel: ${currentRunningBatch.batch.reelNo || currentRunningBatch.job.reelNo}) is currently running on machine [Slitting-1].\n\nOnly one active job can run at a time.\nWould you like to put Job [${currentRunningBatch.job.id}] on HOLD and start this new job?`
+        `Job [${currentRunningBatch.job.id}] (Reel: ${currentRunningBatch.batch.reelNo || currentRunningBatch.job.reelNo}) is currently running on machine [${selectedMachine}].\n\nOnly one active job can run at a time.\nWould you like to put Job [${currentRunningBatch.job.id}] on HOLD and start this new job?`
       );
       if (!switchConfirm) return;
 
@@ -386,7 +389,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     const newBatch: RunningBatch = {
       batchId,
       stage: 'Slitting',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       shift,
       startTime: nowTime,
       status: 'Running',
@@ -458,7 +461,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       jobId: newJobId,
       product,
       stage: 'Slitting',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       shift,
       action: isHotFoilLayer
         ? `🚀 Started Specialty Hot Foil / Hot Layer Reel [${effectiveReelNo}] | Weight: ${parsedJumboWeight} KG | Job: ${newJobId} | Worker: ${operatorName.toUpperCase()}`
@@ -508,7 +511,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       updatedJobs = [newJob, ...baseJobsList];
     }
 
-    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, operatorName, 'Slitting', 'Slitting-1', shift);
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, operatorName, 'Slitting', selectedMachine, shift);
 
     onSaveState({
       ...state,
@@ -527,7 +530,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     setSelectedMotherReelId('');
     setIsHotFoilLayer(false);
     setSelectedActiveBatchId(batchId);
-    alert(`✅ New Slitting Reel Started!\nJob ID: [${newJobId}]\nReel No: [${effectiveReelNo}]\nGSM: [${effectiveGsm}]\non Slitting-1.`);
+    alert(`✅ New Slitting Reel Started!\nJob ID: [${newJobId}]\nReel No: [${effectiveReelNo}]\nGSM: [${effectiveGsm}]\non ${selectedMachine}.`);
   };
 
   const handleConfirmAddReelToJob = () => {
@@ -555,7 +558,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     let baseJobsListForAdd = jobs;
     if (currentRunningBatch && currentRunningBatch.job.id !== targetJob.id) {
       const switchConfirm = window.confirm(
-        `Job [${currentRunningBatch.job.id}] is currently running on machine [Slitting-1].\n\nOnly one active job can run at a time.\nWould you like to put Job [${currentRunningBatch.job.id}] on HOLD and switch to Job [${targetJob.id}]?`
+        `Job [${currentRunningBatch.job.id}] is currently running on machine [${selectedMachine}].\n\nOnly one active job can run at a time.\nWould you like to put Job [${currentRunningBatch.job.id}] on HOLD and switch to Job [${targetJob.id}]?`
       );
       if (!switchConfirm) return;
 
@@ -589,7 +592,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     const newBatch: RunningBatch = {
       batchId,
       stage: 'Slitting',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       shift,
       startTime: nowTime,
       status: 'Running',
@@ -664,7 +667,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       jobId: targetJob.id,
       product: targetJob.product,
       stage: 'Slitting Re-open',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       shift,
       action: addReelIsHotFoilLayer
         ? `➕ Added Specialty Hot Foil / Hot Layer Reel [${effectiveReelNo}] (Weight: ${parsedAddWeight} KG) to Existing Job ${targetJob.id} | Worker: ${addReelWorker.toUpperCase()}`
@@ -676,7 +679,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
-    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, addReelWorker, 'Slitting', 'Slitting-1', shift);
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, addReelWorker, 'Slitting', selectedMachine, shift);
 
     onSaveState({
       ...state,
@@ -697,7 +700,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
   const handleResumeSlitting = () => {
     if (!activeBatchObj) return alert('No active or held slitting batch!');
     const { job, batch } = activeBatchObj;
-    if (batch.status === 'Running') return alert('This job is already running on Slitting-1.');
+    if (batch.status === 'Running') return alert(`This job is already running on ${selectedMachine}.`);
 
     // Single active job constraint: cannot resume if another job is currently Running on Slitting-1
     const otherRunning = activeBatches.find(
@@ -707,7 +710,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       alert(
         `⚠️ Single Active Job Constraint:
 
-Job [${otherRunning.job.id}] (Reel: ${otherRunning.batch.reelNo || otherRunning.job.reelNo}) is already running on machine [Slitting-1]!
+Job [${otherRunning.job.id}] (Reel: ${otherRunning.batch.reelNo || otherRunning.job.reelNo}) is already running on machine [${selectedMachine}]!
 
 Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id}] first!`
       );
@@ -730,7 +733,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
 
     // Clear any active readyAlerts or incidents for Slitting-1
     const updatedIncidents = (state.maintenanceIncidents || []).map((inc) => {
-      if (inc.machine === 'Slitting-1' && (inc.status === 'REPAIRED_READY' || inc.status === 'OPEN' || inc.status === 'IN_PROGRESS')) {
+      if (inc.machine === selectedMachine && (inc.status === 'REPAIRED_READY' || inc.status === 'OPEN' || inc.status === 'IN_PROGRESS')) {
         return {
           ...inc,
           status: 'ACKNOWLEDGED' as const,
@@ -740,14 +743,14 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       return inc;
     });
     const updatedReadyAlerts = (state.machineReadyAlerts || []).filter(
-      (a) => a.machine !== 'Slitting-1'
+      (a) => a.machine !== selectedMachine
     );
 
     const newLog = {
       jobId: job.id,
       product: job.product,
       stage: 'Slitting',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       shift: batch.shift,
       action: `▶️ Slitting Resumed from Pause/Hold | Worker: ${batch.worker}`,
       worker: batch.worker,
@@ -789,7 +792,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       relievedByOperator: handoverData.relievedByOperator,
       shift: batch.shift || 'DAY',
       date: new Date().toISOString().split('T')[0],
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       stage: 'Slitting',
       startTime: batch.startTime,
       handoverTime: handoverData.handoverTime,
@@ -812,7 +815,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       jobId: job.id,
       batchId: batch.batchId,
       department: 'Slitting',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       outgoingOperator: batch.worker,
       relievedByOperator: handoverData.relievedByOperator,
       currentShift: batch.shift || 'DAY',
@@ -855,7 +858,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       jobId: job.id,
       product: job.product,
       stage: 'Slitting',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       shift: handoverData.nextShift,
       action: `🔄 Shift Handover: Operator [${batch.worker}] handed over active run [${batch.batchId}] to [${handoverData.relievedByOperator}] (${handoverData.nextShift}). Locked slice: ${handoverData.sliceProducedQty} Rolls, ${handoverData.sliceScrapQty}kg Scrap, Meter: ${handoverData.meterReading || 'N/A'}.`,
       worker: handoverData.relievedByOperator,
@@ -1047,7 +1050,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       jobId: job.id,
       product: job.product,
       stage: 'Slitting',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       shift: batch.shift,
       action: `⏹ Slitting Finished (${rollsCount} Rolls, ${weightKg} KG Output | Jumbo In: ${inputWeight} KG | Scrap: ${finalScrapKg} KG (${finalScrapPercent}% Wastage))`,
       worker: batch.worker,
@@ -1139,7 +1142,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       jobId: job.id,
       product: job.product,
       stage: 'Slitting Cancelled',
-      machine: 'Slitting-1',
+      machine: selectedMachine,
       shift: batch.shift,
       action: `❌ Slitting Run Cancelled & Reverted (Batch ${batch.batchId} deleted, Mother Reels released)`,
       worker: batch.worker,
@@ -1187,20 +1190,38 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       </div>
 
       {/* Machine Breakdown & Technician Live Attendance Banner */}
-      <MachineBreakdownBanner
-        machineName="Slitting-1"
-        state={state}
-        onOpenAttendModal={onOpenAttendModal || onOpenHoldModal}
-        onOpenHoldModal={onOpenHoldModal}
-        onResume={handleResumeSlitting}
-      />
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-1">
+          {slitMachines.map(m => (
+            <button
+              key={m}
+              onClick={() => setSelectedMachine(m)}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                selectedMachine === m
+                  ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-300'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Cog className="w-4 h-4" />
+              {m}
+            </button>
+          ))}
+        </div>
+        <MachineBreakdownBanner
+          machineName={selectedMachine}
+          state={state}
+          onOpenAttendModal={onOpenAttendModal || onOpenHoldModal}
+          onOpenHoldModal={onOpenHoldModal}
+          onResume={handleResumeSlitting}
+        />
+      </div>
 
       {/* Active Batches Selector */}
       {activeBatches.length > 0 && (
         <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-slate-700 uppercase">
-              Active / Held Slitting Batches on Slitting-1 ({activeBatches.length}):
+              Active / Held Slitting Batches on {selectedMachine} ({activeBatches.length}):
             </label>
             <span
               className={`text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -1606,7 +1627,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 </button>
                 <button
                   type="button"
-                  onClick={() => onOpenHoldModal('Slitting-1')}
+                  onClick={() => onOpenHoldModal(selectedMachine)}
                   className="py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                 >
                   <Pause className="w-3.5 h-3.5" /> Call In-Charge / Report Hold
@@ -1663,7 +1684,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
               </span>
             </div>
             <p className="text-[11px] text-amber-900 m-0 leading-relaxed font-medium">
-              Job <b>[{currentRunningBatch.job.id}]</b> is currently active running on machine <b>Slitting-1</b>. Only one job can run at a time. Hold or Complete current job before starting a new one, or add-on new reel to this active job <b>without stopping</b>:
+              Job <b>[{currentRunningBatch.job.id}]</b> is currently active running on machine <b>{selectedMachine}</b>. Only one job can run at a time. Hold or Complete current job before starting a new one, or add-on new reel to this active job <b>without stopping</b>:
             </p>
             <div className="flex items-center gap-2 flex-wrap pt-1">
               <button
@@ -1679,7 +1700,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
               </button>
               <button
                 type="button"
-                onClick={() => onOpenHoldModal('Slitting-1')}
+                onClick={() => onOpenHoldModal(selectedMachine)}
                 className="py-1.5 px-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
               >
                 <Pause className="w-3.5 h-3.5" />
@@ -2215,7 +2236,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
             }`}
             title={
               currentRunningBatch
-                ? `Job [${currentRunningBatch.job.id}] is running on machine Slitting-1. Only one job can run at a time.`
+                ? `Job [${currentRunningBatch.job.id}] is running on machine ${selectedMachine}. Only one job can run at a time.`
                 : 'Start Slitting (Auto-Generate Job ID)'
             }
           >
@@ -2739,7 +2760,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
               </select>
               {currentRunningBatch && addReelJobId && addReelJobId !== currentRunningBatch.job.id && (
                 <div className="mt-1.5 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-900 font-semibold">
-                  ⚠️ <b>Single Active Job Info:</b> Job <b>{currentRunningBatch.job.id}</b> is currently running on machine Slitting-1. Until it is Held or Completed, new reel/entry can only be added-on to this active job <b>{currentRunningBatch.job.id}</b>.
+                  ⚠️ <b>Single Active Job Info:</b> Job <b>{currentRunningBatch.job.id}</b> is currently running on machine {selectedMachine}. Until it is Held or Completed, new reel/entry can only be added-on to this active job <b>{currentRunningBatch.job.id}</b>.
                 </div>
               )}
               {addReelJobId && (() => {
@@ -3059,11 +3080,11 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       <StationCrewModal
         isOpen={isCrewModalOpen}
         onClose={() => setIsCrewModalOpen(false)}
-        machine="Slitting-1"
+        machine={selectedMachine}
         stage="Slitting"
-        shift={activeBatchObj?.batch.shift || "DAY"}
-        currentOperator={activeBatchObj?.batch.worker || ""}
-        currentHelpers={activeBatchObj?.batch.helpers || []}
+        shift={activeBatchObj?.batch?.shift || "DAY"}
+        currentOperator={activeBatchObj?.batch?.worker || ""}
+        currentHelpers={activeBatchObj?.batch?.helpers || []}
         state={state}
         onConfirmCrew={handleConfirmCrew}
       />
@@ -3075,7 +3096,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
           onClose={() => setIsShiftHandoverModalOpen(false)}
           batch={activeBatchObj.batch}
           job={activeBatchObj.job}
-          machine="Slitting-1"
+          machine={selectedMachine}
           stageName="Slitting"
           availableWorkers={slitWorkers}
           unitLabel="Rolls"

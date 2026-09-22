@@ -71,14 +71,17 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
 
+  const machinesList = state.machinesMaster?.['Slitting'] || ['Slitting-1'];
+  const stdScrapLimit = state.scrapLimitsMaster?.['Slitting'] || 2.5;
+
   // Form Fields
   const [formProduct, setFormProduct] = useState<ProductType>(productList[0] || 'Spoon');
   const [formTargetLayers, setFormTargetLayers] = useState<number>(8);
   const [formTargetLengthMeters, setFormTargetLengthMeters] = useState<number>(4000);
   const [formAdhesiveBrand, setFormAdhesiveBrand] = useState<string>(glueBrandList[0] || 'Pidilite W-10 (Food Grade Adhesive)');
-  const [formTargetScrapLimitPct, setFormTargetScrapLimitPct] = useState<number>(2.5);
+  const [formTargetScrapLimitPct, setFormTargetScrapLimitPct] = useState<number>(stdScrapLimit);
   const [formTargetScrapLimitKg, setFormTargetScrapLimitKg] = useState<number>(15);
-  const [formAssignedMachine, setFormAssignedMachine] = useState<string>('Slitting-1');
+  const [formAssignedMachine, setFormAssignedMachine] = useState<string>(machinesList[0] || 'Slitting-1');
   const [formAssignedShift, setFormAssignedShift] = useState<'DAY' | 'NIGHT'>('DAY');
   const [formPlannedDate, setFormPlannedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [formTargetQuantity, setFormTargetQuantity] = useState<number>(300000);
@@ -258,7 +261,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setFormAdhesiveBrand(glueBrandList[0] || 'Pidilite FS-35)');
     setFormTargetScrapLimitPct(2.5);
     setFormTargetScrapLimitKg(15);
-    setFormAssignedMachine('Slitting-1');
+    setFormAssignedMachine(machinesList[0] || 'Slitting-1');
     setFormAssignedShift('DAY');
     setFormPlannedDate(new Date().toISOString().split('T')[0]);
     setFormTargetQuantity(300000); // default to 300k as requested
@@ -1592,8 +1595,9 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                     onChange={(e) => setFormAssignedMachine(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white"
                   >
-                    <option value="Slitting-1">Slitting-1</option>
-                    <option value="Slitting-2">Slitting-2</option>
+                    {machinesList.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
                   </select>
                 </div>
 

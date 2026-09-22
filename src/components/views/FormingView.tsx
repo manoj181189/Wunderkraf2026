@@ -545,7 +545,12 @@ export const FormingView: React.FC<FormingViewProps> = ({
           if (b.batchId === batch.batchId) {
             const originalInputPieces = b.inputPieces || (curIssued * standardCutPcs);
             const nextInputPieces = Math.max(0, originalInputPieces - (qty * standardCutPcs));
-            return { ...b, issuedQty: remaining, inputPieces: nextInputPieces };
+            return { 
+              ...b, 
+              issuedQty: remaining, 
+              inputPieces: nextInputPieces,
+              status: remaining === 0 ? 'Cancelled' : b.status
+            };
           }
           if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remAddUnissue > 0) {
             if (b.slices && b.slices.length > 0) {
@@ -609,9 +614,11 @@ export const FormingView: React.FC<FormingViewProps> = ({
           }
           return b;
         })
-        .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0 || (b.consumedQty || 0) > 0);
+        .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0 || (b.consumedQty || 0) > 0 || b.status === 'Cancelled' || b.status === 'Completed');
       const nextCutCrates = (j.availableCuttingCrates || 0) + qty;
-      const cappedCutCrates = j.totalCutCrates ? Math.min(nextCutCrates, j.totalCutCrates) : nextCutCrates;
+      const jobMetrics = getJobCuttingMetrics(j);
+      const limitCrates = jobMetrics.totalCutCrates || j.totalCutCrates || nextCutCrates;
+      const cappedCutCrates = Math.min(nextCutCrates, limitCrates);
       return {
         ...j,
         availableCuttingCrates: cappedCutCrates,
@@ -959,26 +966,120 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return;
     }
 
-    // Zero-tolerance auto-calculation: Any remaining difference is counted as rejection scrap
-    const autoRejectionPieces = Math.max(0, totalInputPieces - cumulativeOutputPieces);
-    const finalScrapPcs = Math.max(scrapPcsVal, autoRejectionPieces);
+    // Smart Auto-Calculation of unused cutting crates:
+    // Any remaining pieces that correspond to complete cutting crates are returned to stock
+    const unusedPieces = Math.max(0, totalInputPieces - cumulativeOutputPieces);
+    const unusedCrates = Math.max(0, Math.floor(unusedPieces / standardCutPcs));
 
-    const totalFormedPcs = Math.round(cratesDone * effectiveFormPcs) + looseDone;
-    const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let finalInputCrates = inputCrates;
+    let finalInputPieces = totalInputPieces;
+    let remAddUnissue = unusedCrates;
+
+    // Target source lot for precise trace
+    const targetSourceLotId = batch.sourceLotId || batch.parentBatchId;
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
+      const updatedBatches = (j.runningBatches || [])
+        .map((b) => {
+          if (b.batchId === batch.batchId) {
+            // Deduct returned crates from this batch's final issued inputs
+            finalInputCrates = Math.max(0, inputCrates - unusedCrates);
+            finalInputPieces = Math.max(0, totalInputPieces - (unusedCrates * standardCutPcs));
+            return {
+              ...b,
+              issuedQty: finalInputCrates,
+              inputPieces: finalInputPieces
+            };
+          }
+          if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remAddUnissue > 0) {
+            if (b.slices && b.slices.length > 0) {
+              let restoredFromBatch = 0;
+              const targetSliceIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
+              
+              // Pass 1: Restore to specific matching source slice first
+              let updatedSlices = b.slices.map(slice => {
+                if (remAddUnissue > 0 && targetSliceIds.length > 0 && targetSliceIds.includes(slice.sliceId)) {
+                  const sliceConsumed = slice.consumedQty || 0;
+                  const restore = Math.min(sliceConsumed, remAddUnissue);
+                  if (restore > 0) {
+                    remAddUnissue -= restore;
+                    restoredFromBatch += restore;
+                    return { ...slice, consumedQty: Math.max(0, sliceConsumed - restore) };
+                  }
+                }
+                return slice;
+              });
+
+              // Pass 2: Restore across slices in reverse order (LIFO) if remaining
+              if (remAddUnissue > 0) {
+                updatedSlices = [...updatedSlices].reverse().map(slice => {
+                  if (remAddUnissue > 0) {
+                    const sliceConsumed = slice.consumedQty || 0;
+                    const restore = Math.min(sliceConsumed, remAddUnissue);
+                    if (restore > 0) {
+                      remAddUnissue -= restore;
+                      restoredFromBatch += restore;
+                      return { ...slice, consumedQty: Math.max(0, sliceConsumed - restore) };
+                    }
+                  }
+                  return slice;
+                }).reverse();
+              }
+
+              // Pass 3: Restore batch-level untracked quantity
+              let restoredFromBatchLevel = 0;
+              if (remAddUnissue > 0) {
+                const totalSlicesConsumed = updatedSlices.reduce((sum, s) => sum + (s.consumedQty || 0), 0);
+                const untrackedConsumed = Math.max(0, (b.consumedQty || 0) - totalSlicesConsumed);
+                if (untrackedConsumed > 0) {
+                  const restore = Math.min(untrackedConsumed, remAddUnissue);
+                  remAddUnissue -= restore;
+                  restoredFromBatchLevel += restore;
+                }
+              }
+
+              if (restoredFromBatch > 0 || restoredFromBatchLevel > 0) {
+                return {
+                  ...b,
+                  consumedQty: Math.max(0, (b.consumedQty || 0) - restoredFromBatch - restoredFromBatchLevel),
+                  slices: updatedSlices
+                };
+              }
+            } else {
+              const consumedP = b.consumedQty || 0;
+              const restore = Math.min(consumedP, remAddUnissue);
+              if (restore > 0) {
+                remAddUnissue -= restore;
+                return { ...b, consumedQty: Math.max(0, consumedP - restore) };
+              }
+            }
+          }
+          return b;
+        });
+
+      const nextCutCrates = (j.availableCuttingCrates || 0) + unusedCrates;
+      const jobMetrics = getJobCuttingMetrics(j);
+      const limitCrates = jobMetrics.totalCutCrates || j.totalCutCrates || nextCutCrates;
+      const cappedCutCrates = Math.min(nextCutCrates, limitCrates);
+
+      // Recalculate auto rejection pieces based on final adjusted input pieces
+      const autoRejectionPieces = Math.max(0, finalInputPieces - cumulativeOutputPieces);
+      const finalScrapPcs = Math.max(scrapPcsVal, autoRejectionPieces);
+      const totalFormedPcs = Math.round(cratesDone * effectiveFormPcs) + looseDone;
+
       return {
         ...j,
         pcsPerCrateForming: effectiveFormPcs,
+        availableCuttingCrates: cappedCutCrates,
         availableFormingCrates: (j.availableFormingCrates || 0) + cratesDone,
         isReadyForQcInspection: true,
-        stage: (j.availableCuttingCrates || 0) <= 0 ? 'QC' : j.stage,
+        stage: cappedCutCrates <= 0 ? 'QC' : j.stage,
         totalFormedPieces: (j.totalFormedPieces || 0) + totalFormedPcs,
         formingLoosePcs: (j.formingLoosePcs || 0) + looseDone,
         formingScrapPcs: (j.formingScrapPcs || 0) + finalScrapPcs,
         formingRejectedPcs: (j.formingRejectedPcs || 0) + finalScrapPcs,
-        runningBatches: (j.runningBatches || []).map((b) => {
+        runningBatches: updatedBatches.map((b) => {
           if (b.batchId !== batch.batchId) return b;
           const finalSlices = [...(b.slices || [])];
           finalSlices.push({
@@ -989,7 +1090,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
             machine: selectedMachine,
             stage: 'Forming',
             startTime: finalSlices.length > 0 ? finalSlices[finalSlices.length - 1].handoverTime : b.startTime,
-            handoverTime: stopTime,
+            handoverTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             producedQty: cratesDone,
             producedPieces: totalFormedPcs,
             scrapQty: finalScrapPcs,
@@ -999,7 +1100,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
           return {
             ...b,
             status: 'Completed',
-            endTime: stopTime,
+            endTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             producedQty: (b.producedQty || 0) + cratesDone,
             pcsPerCrate: effectiveFormPcs,
             producedPieces: (b.producedPieces || 0) + totalFormedPcs,
@@ -1011,13 +1112,44 @@ export const FormingView: React.FC<FormingViewProps> = ({
       };
     });
 
+    // Also restore wipLots if applicable
+    let remWipUnissue = unusedCrates;
+    const targetWipIds = targetSourceLotId ? targetSourceLotId.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const updatedWipLots = (state.wipLots || []).map(lot => {
+      if (lot.jobId === job.id && lot.stage === 'Cutting' && remWipUnissue > 0) {
+        if (targetWipIds.length === 0 || targetWipIds.includes(lot.id)) {
+          const consumed = lot.consumedQty || 0;
+          const restore = Math.min(consumed, remWipUnissue);
+          if (restore > 0) {
+            remWipUnissue -= restore;
+            return {
+              ...lot,
+              consumedQty: Math.max(0, lot.consumedQty - restore),
+              remainingQty: (lot.remainingQty || 0) + restore
+            };
+          }
+        }
+      }
+      return lot;
+    });
+
+    const totalFormedPcs = Math.round(cratesDone * effectiveFormPcs) + looseDone;
+    const finalScrapPcs = Math.max(scrapPcsVal, Math.max(0, finalInputPieces - cumulativeOutputPieces));
+    const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let logAction = `⏹️ Finished Forming Batch ${batch.batchId} (${cratesDone} Crates = ${(totalFormedPcs ?? 0).toLocaleString()} 3D Pieces)`;
+    if (unusedCrates > 0) {
+      logAction += ` | Auto-Returned ${unusedCrates} Unused Cutting Crates back to Stock`;
+    }
+    logAction += ` | Defect/Scrap: ${finalScrapPcs.toLocaleString()} Pieces`;
+
     const newLog = {
       jobId: job.id,
       product: job.product,
       stage: 'Forming',
       machine: selectedMachine,
       shift: batch.shift,
-      action: `⏹️ Finished Forming Batch ${batch.batchId} (${cratesDone} Crates = ${(totalFormedPcs ?? 0).toLocaleString()} 3D Pieces, Auto Rejection/Defect: ${finalScrapPcs.toLocaleString()} Pieces)`,
+      action: logAction,
       worker: batch.worker,
       user: 'form_user',
       startTime: batch.startTime,
@@ -1029,15 +1161,21 @@ export const FormingView: React.FC<FormingViewProps> = ({
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      wipLots: updatedWipLots,
       logs: [...state.logs, newLog]
     });
 
+    let returnMsg = '';
+    if (unusedCrates > 0) {
+      returnMsg = `\n• ↩️ Returned ${unusedCrates} Unused Cutting Crates automatically back to Cutting Stock!`;
+    }
+    alert(`✅ Forming Run Finished!\n• Output: ${cratesDone} Crates (${totalFormedPcs.toLocaleString()} 3D Pieces)${returnMsg}\n• Rejection/Scrap: ${finalScrapPcs.toLocaleString()} Pcs.`);
+    
     setOutputCrates('');
     setLoosePiecesInput('0');
     setPcsPerCrateOverride('');
     setScrapPcs('0');
     setSelectedActiveBatchId('');
-    alert(`✅ Forming Run Finished! Added ${cratesDone} Formed Crates (= ${(totalFormedPcs ?? 0).toLocaleString()} 3D Pieces) to inventory.`);
   };
 
   const handleConfirmCancelRun = () => {
@@ -1050,6 +1188,15 @@ export const FormingView: React.FC<FormingViewProps> = ({
       if (j.id !== job.id) return j;
       const updatedBatches = (j.runningBatches || [])
         .map((b) => {
+          if (b.batchId === batch.batchId) {
+            return {
+              ...b,
+              status: 'Cancelled',
+              issuedQty: 0,
+              inputCrates: 0,
+              inputPieces: 0
+            };
+          }
           if ((b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && remCancelReturn > 0) {
             if (b.slices && b.slices.length > 0) {
               let restoredFromBatch = 0;
@@ -1112,16 +1259,16 @@ export const FormingView: React.FC<FormingViewProps> = ({
           }
           return b;
         })
-        .filter((b) => b.batchId !== batch.batchId);
+        .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0 || (b.consumedQty || 0) > 0 || b.status === 'Cancelled' || b.status === 'Completed');
+      const nextCutCrates = (j.availableCuttingCrates || 0) + cratesToReturn;
+      const jobMetrics = getJobCuttingMetrics(j);
+      const limitCrates = jobMetrics.totalCutCrates || j.totalCutCrates || nextCutCrates;
+      const cappedCutCrates = Math.min(nextCutCrates, limitCrates);
       return {
         ...j,
-        availableCuttingCrates: Math.min((j.availableCuttingCrates || 0) + cratesToReturn, j.totalCutCrates || (j.availableCuttingCrates || 0) + cratesToReturn), // Hard Cap logic
+        availableCuttingCrates: cappedCutCrates,
         runningBatches: updatedBatches
       };
-      // If returning all crates, cancel the batch
-      if (remCancelReturn === 0) {
-        // Additional logic to mark batch as Cancelled if all crates are returned
-      }
     });
 
     // Also restore wipLots
@@ -1211,7 +1358,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {MACHINES['Forming'].map((mName) => {
+          {(state.machinesMaster?.['Forming'] || ['Forming-1', 'Forming-2', 'Forming-3', 'Forming-4', 'Forming-5', 'Forming-6', 'Forming-7']).map((mName) => {
             let mActiveBatch: { job: Job; batch: RunningBatch } | undefined;
             for (const j of jobs) {
               if (j.runningBatches) {
@@ -1681,7 +1828,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
                     }
                   });
 
-                  setUnissueTargetLotId(localConsumedLots[0] || activeBatchObj.batch.sourceLotId || '');
+                  setUnissueTargetLotId('');
                   setUnissueQtyInput(String(activeBatchObj.batch.issuedQty || '1'));
                   setIsUnissueModalOpen(true);
                 }}
@@ -2907,9 +3054,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
         onClose={() => setIsCrewModalOpen(false)}
         machine={selectedMachine}
         stage="Forming"
-        shift={activeBatchObj?.batch.shift || 'DAY'}
-        currentOperator={activeBatchObj?.batch.worker || ''}
-        currentHelpers={activeBatchObj?.batch.helpers || []}
+        shift={activeBatchObj?.batch?.shift || 'DAY'}
+        currentOperator={activeBatchObj?.batch?.worker || ''}
+        currentHelpers={activeBatchObj?.batch?.helpers || []}
         state={state}
         onConfirmCrew={handleConfirmCrew}
       />
