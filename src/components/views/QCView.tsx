@@ -45,6 +45,7 @@ export const QCView: React.FC<QCViewProps> = ({
 
   const [outputApprovedCrates, setOutputApprovedCrates] = useState('');
   const [loosePiecesInput, setLoosePiecesInput] = useState('0');
+  const [rejectedPiecesInput, setRejectedPiecesInput] = useState('0');
   const [scrapKg, setScrapKg] = useState('0');
   const [selectedActiveBatchId, setSelectedActiveBatchId] = useState('');
   const [tableSearch, setTableSearch] = useState('');
@@ -659,6 +660,7 @@ export const QCView: React.FC<QCViewProps> = ({
     const cratesDone = parseInt(outputApprovedCrates, 10) || 0;
     const looseDone = parseInt(loosePiecesInput, 10) || 0;
     const scrap = parseFloat(scrapKg) || 0;
+    const rejectedPcs = parseInt(rejectedPiecesInput, 10) || 0;
 
     const { job, batch } = activeBatchObj;
     const formCrateCapacity = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
@@ -672,7 +674,7 @@ export const QCView: React.FC<QCViewProps> = ({
     const cumulativeOutputCrates = prevProducedCrates + cratesDone;
     const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[job.product] || 450;
     const scrapPcs = Math.round(scrap * pcsPerKg);
-    const totalOutputPieces = cumulativeOutputPieces + scrapPcs;
+    const totalOutputPieces = cumulativeOutputPieces + scrapPcs + rejectedPcs;
 
     // Single crate overload check
     if (cratesDone === 1 && approvedPcs > formCrateCapacity) {
@@ -681,7 +683,7 @@ export const QCView: React.FC<QCViewProps> = ({
         outputCrates: cratesDone,
         inputPcs: formCrateCapacity,
         inputCrates: 1,
-        scrapPcs,
+        scrapPcs: scrapPcs + rejectedPcs,
         details: `Audit Block: Single crate capacity exceeded. Approved quantity (${approvedPcs.toLocaleString()} pcs across ${cratesDone} crate + ${looseDone} loose) exceeds single crate capacity (${formCrateCapacity.toLocaleString()} pcs). Entry blocked.`
       });
       return;
@@ -694,7 +696,7 @@ export const QCView: React.FC<QCViewProps> = ({
         outputCrates: cumulativeOutputCrates,
         inputPcs: totalInputPieces,
         inputCrates,
-        scrapPcs,
+        scrapPcs: scrapPcs + rejectedPcs,
         details: `Audit Block: Output exceeds input pieces. Approved QC quantity (${cumulativeOutputPieces.toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
       });
       return;
@@ -707,8 +709,8 @@ export const QCView: React.FC<QCViewProps> = ({
         outputCrates: cumulativeOutputCrates,
         inputPcs: totalInputPieces,
         inputCrates,
-        scrapPcs,
-        details: `Audit Block: Output exceeds input pieces. Total QC approved (${cumulativeOutputPieces.toLocaleString()} pcs) plus scrap (${scrapPcs.toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+        scrapPcs: scrapPcs + rejectedPcs,
+        details: `Audit Block: Output exceeds input pieces. Total QC approved (${cumulativeOutputPieces.toLocaleString()} pcs) plus scrap & rejects (${(scrapPcs + rejectedPcs).toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
       });
       return;
     }
@@ -735,7 +737,8 @@ export const QCView: React.FC<QCViewProps> = ({
             pcsPerCrate: formCrateCapacity,
             producedPieces: approvedPcs,
             loosePieces: looseDone,
-            scrapKg: scrap
+            scrapKg: scrap,
+            rejectedPieces: rejectedPcs
           };
         })
       };
@@ -747,7 +750,7 @@ export const QCView: React.FC<QCViewProps> = ({
       stage: 'QC',
       machine: 'QC-Desk',
       shift: batch.shift,
-      action: `⏹️ Completed QC Inspection (${cratesDone} Crates = ${approvedPcs.toLocaleString()} Pieces Approved, Scrap: ${scrap} KG)`,
+      action: `⏹️ Completed QC Inspection (${cratesDone} Crates = ${approvedPcs.toLocaleString()} Pieces Approved, Rejects: ${rejectedPcs.toLocaleString()} Pcs, Scrap: ${scrap} KG)`,
       worker: batch.worker,
       user: 'qc_user',
       startTime: batch.startTime,
@@ -764,6 +767,7 @@ export const QCView: React.FC<QCViewProps> = ({
 
     setOutputApprovedCrates('');
     setLoosePiecesInput('0');
+    setRejectedPiecesInput('0');
     setScrapKg('0');
     setSelectedActiveBatchId('');
     alert(`✅ QC Inspection Finished! Approved ${cratesDone} Crates (= ${approvedPcs.toLocaleString()} Pieces) into Finished Stock.`);
@@ -1241,10 +1245,38 @@ export const QCView: React.FC<QCViewProps> = ({
 
           {/* Output and scrap entries */}
           <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-rose-800 uppercase mb-1">
+                  Rejected Pieces (Pcs):
+                </label>
+                <input
+                  type="number"
+                  value={rejectedPiecesInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRejectedPiecesInput(val);
+                    const formCrateCapacity = activeBatchObj.job.pcsPerCrateForming || state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs || 7000;
+                    const inputCrates = activeBatchObj.batch.issuedQty || 0;
+                    const totalInputPieces = inputCrates * formCrateCapacity;
+                    
+                    const rejectedVal = parseInt(val, 10) || 0;
+                    const computedApproved = Math.max(0, totalInputPieces - rejectedVal);
+                    
+                    const autoCrates = Math.floor(computedApproved / formCrateCapacity);
+                    const autoLoose = computedApproved % formCrateCapacity;
+                    
+                    setOutputApprovedCrates(String(autoCrates));
+                    setLoosePiecesInput(String(autoLoose));
+                  }}
+                  placeholder="e.g. 250 Pcs"
+                  className="w-full px-3 py-2 bg-rose-50/50 border border-rose-300 rounded-lg text-xs font-extrabold text-rose-900 outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                />
+                <span className="text-[10px] text-rose-600 block mt-0.5 font-semibold">⚡ Deducts from total crates</span>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-emerald-800 uppercase mb-1">
-                  Passed / Approved QC Crates Output:
+                  Passed / Approved Crates:
                 </label>
                 <input
                   type="number"
@@ -1267,7 +1299,7 @@ export const QCView: React.FC<QCViewProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-rose-700 uppercase mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Rejected Scrap (KG):
                 </label>
                 <input
@@ -1275,8 +1307,24 @@ export const QCView: React.FC<QCViewProps> = ({
                   value={scrapKg}
                   onChange={(e) => setScrapKg(e.target.value)}
                   placeholder="e.g. 1.5 KG"
-                  className="w-full px-3 py-2 bg-white border border-rose-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
                 />
+              </div>
+            </div>
+
+            {/* Live Mass Balance Audit Board */}
+            <div className="bg-blue-50 border border-blue-200/80 p-3 rounded-xl flex items-center justify-between text-xs font-bold text-blue-950 flex-wrap gap-2">
+              <div className="flex items-center gap-1">
+                <span>📊 Live Balance Audit:</span>
+              </div>
+              <div>
+                Input: <span className="text-blue-900">{(activeBatchObj.batch.issuedQty * effectiveQcPcs).toLocaleString()} Pcs</span> ({activeBatchObj.batch.issuedQty} Crates)
+              </div>
+              <div className="text-emerald-700">
+                Approved: {(((parseInt(outputApprovedCrates, 10) || 0) * effectiveQcPcs) + (parseInt(loosePiecesInput, 10) || 0)).toLocaleString()} Pcs
+              </div>
+              <div className="text-rose-700">
+                Rejected: {(parseInt(rejectedPiecesInput, 10) || 0).toLocaleString()} Pcs
               </div>
             </div>
 

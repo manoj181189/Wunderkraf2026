@@ -3079,195 +3079,120 @@ ${formLines.join('\n')}
     { key: 'Audit', label: '📜 Traceability & Batch Reports', desc: 'Box-to-raw trace, customer complaints & audit logs' }
   ];
 
+  const categories = [
+    {
+      title: '🏭 Production & Standards',
+      items: [
+        { id: 'brand_items_paper', label: 'Brand Items & Paper', icon: Tag, badge: `${productsList.length} Items / ${paperBrandsList.length} Mills` },
+        { id: 'crate_master', label: 'Crate Capacity Master', icon: Box, badge: `${Object.keys(crateMaster).length}` },
+        { id: 'scrap_yield', label: 'Scrap & Yield Master', icon: Scale, badge: null },
+        { id: 'opening_stock_inward', label: 'Go-Live Opening WIP', icon: Database, badge: null },
+      ]
+    },
+    {
+      title: '⚙️ Assets & Workforce',
+      items: [
+        { id: 'machines', label: 'Machines Master', icon: Cog, badge: `${Object.values(machinesMaster).flat().length}` },
+        { id: 'employee_master', label: 'Employee Master', icon: Users, badge: null },
+        { id: 'users', label: 'User Accounts & Roles', icon: Users, badge: `${Object.keys(usersRecord).length}` },
+        { id: 'staff_escalation', label: 'Staff & Escalation', icon: Smartphone, badge: null },
+      ]
+    },
+    {
+      title: '📱 System & Comms',
+      items: [
+        { id: 'sequences_shifts', label: 'Shifts & Sequences', icon: Sliders, badge: null },
+        { id: 'whatsapp', label: 'WhatsApp & Reporting', icon: Smartphone, badge: null },
+        { id: 'maintenance_master', label: 'Maintenance Master', icon: Wrench, badge: null },
+      ]
+    },
+    {
+      title: '💾 Data & Recovery',
+      items: [
+        { id: 'master_data', label: 'Master Data Overwrite', icon: Edit, badge: null },
+        { id: 'backup_restore', label: 'Backup & JSON Recovery', icon: Database, badge: null },
+      ]
+    }
+  ] as const;
+
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-xs mb-6 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
-        <button
-          onClick={onBackToHub}
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Main Menu</span>
-        </button>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center font-bold">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-extrabold text-[#1a365d] uppercase tracking-wide m-0">
-              Master Admin Control Center (100% Rights Suite)
-            </h3>
-            <p className="text-[11px] text-slate-500 m-0">
-              User Accounts, Role Permissions, 100% Master Data Overwrite, WhatsApp Backup & Configs
-            </p>
+    <div className="max-w-7xl mx-auto space-y-6 px-4 pb-12">
+      {/* Header Panel */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <button
+            onClick={onBackToHub}
+            className="flex items-center gap-1.5 text-xs font-black text-slate-700 hover:text-blue-900 bg-slate-100 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 px-4 py-2 rounded-xl transition cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Main Menu</span>
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center font-bold shadow-xs">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-[#1a365d] uppercase tracking-wide m-0">
+                Master Admin Control Center (100% Rights Suite)
+              </h3>
+              <p className="text-xs text-slate-500 m-0 font-medium">
+                User Accounts, Role Permissions, 100% Master Data Overwrite, WhatsApp Backup & Configs
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-1.5 border-b border-slate-200 pb-2 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('brand_items_paper')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'brand_items_paper'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Tag className="w-4 h-4" />
-          <span>🏷️ Brand Items & Paper Mill ({productsList.length} Items / {paperBrandsList.length} Mills)</span>
-        </button>
+      {/* Main Split Panel Layout */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Left Sidebar Navigation Panel */}
+        <div className="lg:w-80 w-full flex-shrink-0 bg-slate-50/80 border border-slate-200 rounded-2xl p-4 space-y-5 shadow-xs lg:sticky lg:top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
+          <div className="space-y-4">
+            {categories.map((cat, cIdx) => (
+              <div key={cIdx} className="space-y-1.5">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2.5 block">
+                  {cat.title}
+                </span>
+                <div className="space-y-1">
+                  {cat.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setActiveTab(item.id as AdminTab)}
+                        className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer group ${
+                          isActive
+                            ? 'bg-[#1a365d] text-white shadow-xs font-extrabold'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        {item.badge && (
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full transition-colors ${
+                            isActive
+                              ? 'bg-white/20 text-white'
+                              : 'bg-slate-200/70 text-slate-600 group-hover:bg-slate-300/80'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('crate_master')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'crate_master'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Box className="w-4 h-4" />
-          <span>🧺 Crate Capacity Master ({Object.keys(crateMaster).length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('machines')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'machines'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Cog className="w-4 h-4" />
-          <span>⚙️ Machines Master ({Object.values(machinesMaster).flat().length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('scrap_yield')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'scrap_yield'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Scale className="w-4 h-4" />
-          <span>⚖️ Scrap & Yield Master</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'users'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>👥 User Accounts & Roles ({Object.keys(usersRecord).length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('master_data')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'master_data'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Edit className="w-4 h-4" />
-          <span>🛠️ Master Data Overwrite (Job / Batch / Order / Log)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('whatsapp')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'whatsapp'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Smartphone className="w-4 h-4" />
-          <span>📱 WhatsApp Backup & Live Reporting</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('sequences_shifts')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'sequences_shifts'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Sliders className="w-4 h-4" />
-          <span>🔢 Sequences, Shifts & Master PIN</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('maintenance_master')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'maintenance_master'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Wrench className="w-4 h-4" />
-          <span>🔧 Maintenance Master & Desk Rights</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('staff_escalation')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'staff_escalation'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Smartphone className="w-4 h-4 text-emerald-500" />
-          <span>📱 Staff & Escalation Hierarchy</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('opening_stock_inward')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'opening_stock_inward'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Database className="w-4 h-4 text-emerald-500" />
-          <span>⚡ Go-Live Opening WIP & Stock Inward</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('backup_restore')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'backup_restore'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Database className="w-4 h-4" />
-          <span>💾 Database Backup & JSON Recovery</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('employee_master')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-            activeTab === 'employee_master'
-              ? 'bg-[#1a365d] text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Users className="w-4 h-4 text-emerald-500" />
-          <span>👥 Employee Master</span>
-        </button>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* TAB 0: BRAND ITEMS & PAPER MILL MASTER */}
-      {/* ========================================================================= */}
-      {activeTab === 'brand_items_paper' && (
+        {/* Right Tab Content Panel */}
+        <div className="flex-1 w-full space-y-6">
+          {activeTab === 'brand_items_paper' && (
         <div className="space-y-6">
           {/* Section 1: Paper Mill Brands */}
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
@@ -8580,6 +8505,8 @@ ${formLines.join('\n')}
           />
         </div>
       )}
+        </div>
+      </div>
 
       {/* In-App Toast Notification */}
       {adminToast && (
