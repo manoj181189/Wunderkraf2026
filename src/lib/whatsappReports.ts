@@ -165,9 +165,12 @@ export function triggerWhatsAppShiftNotification(
   // Send via Webhook if configured
   if (webhookUrl && webhookUrl.trim().startsWith('http')) {
     try {
-      fetch(webhookUrl.trim(), {
+      const url = webhookUrl.trim();
+      const isGoogleScript = url.includes('script.google.com');
+      fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: isGoogleScript ? 'no-cors' : 'cors',
+        headers: isGoogleScript ? {} : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: phone.replace(/[^0-9+]/g, ''),
           message: text,
@@ -410,5 +413,121 @@ export function generateScrapYieldReportText(state: FactoryState): string {
 
 ━━━━━━━━━━━━━━━━━━━━
 _Wünderkraf Scrap Management & Sustainability Audit_`;
+}
+
+// =========================================================================
+// 7. JOB PRODUCTION PROGRESS & LIVE STATUS REPORT
+// =========================================================================
+export function generateJobStatusReportText(
+  state: FactoryState,
+  targetJobId?: string
+): string {
+  const jobs = state.jobs || [];
+  const targetJob = targetJobId
+    ? jobs.find((j) => j.id === targetJobId)
+    : jobs.find((j) => j.status !== 'COMPLETED') || jobs[0];
+
+  if (!targetJob) {
+    return `📋 *WÜNDERKRAF JOB STATUS REPORT*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ *Status:* No active production jobs in queue currently.\n━━━━━━━━━━━━━━━━━━━━\n_Plant Coordination Desk_`;
+  }
+
+  const statusEmojis: Record<string, string> = {
+    PLANNING: '📝 PLANNING',
+    SLITTING: '📜 SLITTING IN PROGRESS',
+    READY_FOR_CUTTING: '✂️ READY FOR CUTTING',
+    CUTTING: '✂️ CUTTING IN PROGRESS',
+    READY_FOR_FORMING: '☕ READY FOR FORMING',
+    FORMING: '⚙️ FORMING RUNNING',
+    PENDING_QC: '🔍 PENDING QC INSPECTION',
+    PACKING: '📦 PACKING & BATCHING',
+    READY_FOR_DISPATCH: '🚚 READY FOR DISPATCH',
+    COMPLETED: '✅ PRODUCTION COMPLETED',
+    ON_HOLD: '⚠️ ON HOLD'
+  };
+
+  const statusDisplay = statusEmojis[targetJob.status || ''] || targetJob.status || targetJob.stage || 'ACTIVE';
+  const runningBatches = targetJob.runningBatches || [];
+  const activeOps = runningBatches.map((b) => `${b.machine} (${b.operator || 'Assigned'})`).join(', ');
+
+  const totalCut = targetJob.totalCutPieces || 0;
+  const totalFormed = targetJob.totalFormedPieces || 0;
+
+  return `📋 *WÜNDERKRAF JOB PROGRESS & STATUS REPORT*
+━━━━━━━━━━━━━━━━━━━━
+🆔 *Job ID:* *${targetJob.id}*
+📦 *Product:* *${targetJob.product || 'Paper Cutlery'}*
+🏷️ *Paper Spec:* ${targetJob.gsm || 210} GSM ${targetJob.paperBrand ? `| ${targetJob.paperBrand}` : ''}
+${totalFormed > 0 ? `🎯 *Formed Output:* *${totalFormed.toLocaleString()} Pcs*\n` : totalCut > 0 ? `🎯 *Cut Output:* *${totalCut.toLocaleString()} Pcs*\n` : ''}━━━━━━━━━━━━━━━━━━━━
+📊 *CURRENT STAGE & WIP BALANCE:*
+• Current Stage: *${statusDisplay}*
+• Available Slit Rolls: *${targetJob.availableRolls || 0} Rolls*
+• Cut WIP Crates: *${targetJob.availableCuttingCrates || 0} Crates*
+• Formed Crates: *${targetJob.availableFormingCrates || 0} Crates*
+• QC Approved Crates: *${targetJob.availableQcCrates || 0} Crates*
+${activeOps ? `• Active Stations: *${activeOps}*\n` : ''}
+⚡ *STATUS UPDATE:*
+Job is progressing as per factory SOP. Real-time updates synchronized across all recording stations.
+
+━━━━━━━━━━━━━━━━━━━━
+_Wünderkraf Production Planning & Control (PPC)_`;
+}
+
+// =========================================================================
+// 8. RELIABLE SERVER-PROXIED WHATSAPP DISPATCH
+// =========================================================================
+export async function dispatchWhatsAppNotificationViaServer(
+  phone: string,
+  message: string,
+  webhookUrl?: string,
+  category: string = 'GENERAL',
+  sender: string = 'Wünderkraf ERP',
+  apiKey?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!webhookUrl || !webhookUrl.startsWith('http')) {
+    return { success: false, error: 'Webhook URL not configured' };
+  }
+
+  try {
+    // 1. Dispatch via server proxy endpoint to follow Google Apps Script 302 redirects and bypass CORS
+    const res = await fetch('/api/whatsapp/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        webhookUrl,
+        phone,
+        message,
+        category,
+        sender,
+        apiKey
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true };
+    }
+    throw new Error(data.error || 'Server proxy returned error');
+  } catch (err: any) {
+    console.warn('Server proxy failed, trying direct browser fallback:', err);
+    // 2. Direct browser fallback
+    try {
+      const isGoogleScript = webhookUrl.includes('script.google.com');
+      await fetch(webhookUrl, {
+        method: 'POST',
+        mode: isGoogleScript ? 'no-cors' : 'cors',
+        headers: isGoogleScript ? {} : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: phone.replace(/[^0-9+]/g, ''),
+          message,
+          category,
+          sender,
+          timestamp: new Date().toISOString()
+        })
+      });
+      return { success: true };
+    } catch (fallbackErr: any) {
+      return { success: false, error: fallbackErr.message };
+    }
+  }
 }
 

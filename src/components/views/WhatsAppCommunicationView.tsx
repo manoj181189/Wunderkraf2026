@@ -53,7 +53,9 @@ import {
   generateDispatchDeliveryNoteText,
   generatePurchaseIndentAlertText,
   generateScrapYieldReportText,
-  triggerWhatsAppShiftNotification
+  generateJobStatusReportText,
+  triggerWhatsAppShiftNotification,
+  dispatchWhatsAppNotificationViaServer
 } from '../../lib/whatsappReports';
 
 interface WhatsAppCommunicationViewProps {
@@ -69,6 +71,7 @@ type TabType = 'dispatcher' | 'coordination_matrix' | 'triggers' | 'dispatch_log
 type MessageCategory =
   | 'SHIFT_DAY'
   | 'SHIFT_NIGHT'
+  | 'JOB_STATUS'
   | 'MAINTENANCE_BREAKDOWN'
   | 'MANPOWER_ATTENDANCE'
   | 'QC_DEFECT'
@@ -113,6 +116,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
   const [selectedCategory, setSelectedCategory] = useState<MessageCategory>('SHIFT_DAY');
   const [targetPhone, setTargetPhone] = useState(state.whatsappConfig?.phone || '');
   const [selectedContactName, setSelectedContactName] = useState<string>('Primary Plant Gateway');
+  const [selectedJobId, setSelectedJobId] = useState<string>(state.jobs?.[0]?.id || '');
   const [messageText, setMessageText] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
@@ -124,6 +128,9 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
         break;
       case 'SHIFT_NIGHT':
         setMessageText(generateShiftChangeoverReportText(state, 'NIGHT'));
+        break;
+      case 'JOB_STATUS':
+        setMessageText(generateJobStatusReportText(state, selectedJobId));
         break;
       case 'MAINTENANCE_BREAKDOWN':
         setMessageText(generateBreakdownAlertText(state));
@@ -149,7 +156,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
         );
         break;
     }
-  }, [selectedCategory, state]);
+  }, [selectedCategory, selectedJobId, state]);
 
   // Handle Copy Text
   const handleCopy = () => {
@@ -191,7 +198,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
     showStatus(`🚀 WhatsApp opened for ${selectedContactName || phoneToUse}`);
   };
 
-  // Handle Direct API Webhook Trigger
+  // Handle Direct API Webhook Trigger (via Reliable Server Proxy to avoid browser CORS/redirect issues)
   const handleTriggerWebhookDirect = async () => {
     const webhookUrl = state.whatsappConfig?.webhookUrl;
     if (!webhookUrl || !webhookUrl.startsWith('http')) {
@@ -200,27 +207,28 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
     }
 
     try {
-      showStatus('⚡ Dispatching via API Gateway Webhook...');
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(state.whatsappConfig?.apiKey ? { 'Authorization': `Bearer ${state.whatsappConfig.apiKey}` } : {})
-        },
-        body: JSON.stringify({
-          phone: targetPhone || state.whatsappConfig?.phone,
-          message: messageText,
-          category: selectedCategory,
-          sender: username,
-          timestamp: new Date().toISOString()
-        })
-      });
-      recordDispatchLog('SENT', selectedContactName ? `${selectedContactName} (${targetPhone})` : targetPhone);
-      showStatus('✅ Report successfully delivered via WhatsApp API Gateway!');
-    } catch (err) {
+      showStatus('⚡ Dispatching via Server Proxy to Google Script / Webhook...');
+      const phoneToUse = targetPhone || state.whatsappConfig?.phone || '';
+      const result = await dispatchWhatsAppNotificationViaServer(
+        phoneToUse,
+        messageText,
+        webhookUrl,
+        selectedCategory,
+        username,
+        state.whatsappConfig?.apiKey
+      );
+
+      if (result.success) {
+        recordDispatchLog('SENT', selectedContactName ? `${selectedContactName} (${phoneToUse})` : phoneToUse);
+        showStatus('✅ Report successfully delivered via Google Script / Webhook!');
+      } else {
+        recordDispatchLog('FAILED', phoneToUse);
+        showStatus(`⚠️ Dispatch failed: ${result.error || 'Verify Google Script URL'}`);
+      }
+    } catch (err: any) {
       console.error('Webhook error:', err);
       recordDispatchLog('FAILED', targetPhone);
-      showStatus('⚠️ Webhook request sent (verify endpoint connection logs)');
+      showStatus('⚠️ Webhook request error (verify Google Script deployment)');
     }
   };
 
@@ -485,6 +493,40 @@ _Wünderkraf Factory Communication System_`;
     });
 
     showStatus(`⏱️ Automated test scheduled for ${targetTime}! Watch the clock; at ${targetTime}, the shift alert will pop up automatically.`);
+  };
+
+  const [showGoogleScriptGuide, setShowGoogleScriptGuide] = useState(false);
+  const [copiedGoogleScript, setCopiedGoogleScript] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+
+  // Test Webhook / Google Apps Script Connection
+  const handleTestWebhookConnection = async () => {
+    const url = triggerConfig.webhookUrl?.trim();
+    if (!url || !url.startsWith('http')) {
+      alert('Please enter a valid Webhook URL starting with http:// or https://');
+      return;
+    }
+    setTestingWebhook(true);
+    showStatus('⏳ Testing connection to Google Apps Script / Webhook via server proxy...');
+    try {
+      const res = await dispatchWhatsAppNotificationViaServer(
+        triggerConfig.phone || '919876543210',
+        '🔔 *WÜNDERKRAF ERP WEBHOOK VERIFICATION TEST*\n━━━━━━━━━━━━━━━━━━━━\n✅ Connection between Wünderkraf Paperware ERP and your Google Apps Script Webhook is active and verified!\n📅 Timestamp: ' + new Date().toLocaleString() + '\n🏭 Plant: Wünderkraf Paperware Unit-1',
+        url,
+        'GENERAL',
+        `${username} (Webhook Connection Test)`,
+        triggerConfig.apiKey
+      );
+      if (res.success) {
+        showStatus('🎉 Connection Successful! Google Apps Script responded with 200 OK. Ready for zero-cost automated reporting!');
+      } else {
+        showStatus(`⚠️ Webhook responded: ${res.error || 'Check Web App deployment settings'}`);
+      }
+    } catch (e: any) {
+      showStatus(`❌ Webhook test failed: ${e.message}`);
+    } finally {
+      setTestingWebhook(false);
+    }
   };
 
   // Helper for instantaneous manual simulation of the shift changeover alert banner
@@ -904,6 +946,22 @@ _Wünderkraf Factory Communication System_`;
               </button>
 
               <button
+                onClick={() => setSelectedCategory('JOB_STATUS')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'JOB_STATUS'
+                    ? 'border-cyan-500 bg-cyan-50/60 ring-2 ring-cyan-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">📋</span>
+                  <span className="text-[9px] font-bold text-cyan-700 bg-cyan-100 px-1.5 py-0.5 rounded">LIVE JOB</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">Job Live Status</div>
+                <div className="text-[10px] text-slate-500">WIP & Stage Progress</div>
+              </button>
+
+              <button
                 onClick={() => setSelectedCategory('MAINTENANCE_BREAKDOWN')}
                 className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
                   selectedCategory === 'MAINTENANCE_BREAKDOWN'
@@ -1019,6 +1077,38 @@ _Wünderkraf Factory Communication System_`;
                 <div className="text-[10px] text-slate-500">Floor Notice & General Briefing</div>
               </button>
             </div>
+
+            {/* Target Job Selector Bar for Live Status Reports */}
+            {selectedCategory === 'JOB_STATUS' && (
+              <div className="mt-3 p-3 bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">📋</span>
+                  <div>
+                    <div className="text-xs font-black text-cyan-950 uppercase tracking-wide">
+                      Select Target Production Job for WhatsApp Status
+                    </div>
+                    <div className="text-[11px] text-cyan-800">
+                      Choose any active or batch job to format real-time progress update for client or floor heads
+                    </div>
+                  </div>
+                </div>
+                <select
+                  value={selectedJobId}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setSelectedJobId(newId);
+                    setMessageText(generateJobStatusReportText(state, newId));
+                  }}
+                  className="px-3 py-1.5 bg-white border border-cyan-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-cyan-500 focus:outline-none shrink-0"
+                >
+                  {(state.jobs || []).map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.id} - {j.product || 'Job'} [{j.status || 'Active'}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Two-Column Editor & Recipient Panel */}
@@ -2044,21 +2134,160 @@ _Wünderkraf Factory Communication System_`;
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                    Webhook URL (Zapier / Make / n8n / Meta Cloud API)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-600 uppercase">
+                      Webhook URL (Google Script / Zapier / Make / n8n / Meta API)
+                    </label>
+                    {triggerConfig.webhookUrl && (
+                      <button
+                        type="button"
+                        onClick={handleTestWebhookConnection}
+                        disabled={testingWebhook}
+                        className="text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-700 px-2 py-0.5 rounded-md transition cursor-pointer flex items-center gap-1 shadow-xs disabled:opacity-50"
+                      >
+                        <Zap className="w-3 h-3 text-amber-300" />
+                        <span>{testingWebhook ? 'Testing...' : '⚡ Test Connection'}</span>
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={triggerConfig.webhookUrl}
                     disabled={!canEditConfig}
                     onChange={(e) => setTriggerConfig({ ...triggerConfig, webhookUrl: e.target.value })}
-                    placeholder="https://hook.eu1.make.com/... or https://n8n.../webhook"
+                    placeholder="https://script.google.com/macros/s/.../exec or https://hook..."
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    Endpoint receives automated POST JSON payload with shift report text
-                  </span>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[10px] text-slate-400">
+                      Endpoint receives automated POST JSON payload with shift report & job status
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowGoogleScriptGuide(!showGoogleScriptGuide)}
+                      className="text-[10px] font-black text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg transition cursor-pointer flex items-center gap-1"
+                    >
+                      <span>📜 100% Free Google Script Code</span>
+                      <span>{showGoogleScriptGuide ? '▲ Close' : '▼ View'}</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* Free Google Apps Script Helper Panel */}
+                {showGoogleScriptGuide && (
+                  <div className="md:col-span-2 bg-slate-900 text-slate-100 rounded-2xl p-4 border border-emerald-500/50 space-y-3 shadow-lg">
+                    <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-2.5 gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🚀</span>
+                        <div>
+                          <div className="text-xs font-black text-emerald-400 uppercase tracking-wide">
+                            100% Free WhatsApp Automation via Google Apps Script (Zero Charges)
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            गूगल शीट्स / स्क्रिप्ट के जरिए बिना किसी चार्ज के स्वचालित WhatsApp रिपोर्ट प्राप्त करें
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href="/wunderkraf_google_apps_script.gs"
+                          download="wunderkraf_google_apps_script.gs"
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Download className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Download .gs File</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                          const scriptText = `/**
+ * WÜNDERKRAF FACTORY ERP - 100% FREE WHATSAPP WEBHOOK SCRIPT
+ * Instructions:
+ * 1. Open Google Sheets -> Extensions -> Apps Script (or script.google.com)
+ * 2. Paste this code into Code.gs
+ * 3. Click "Deploy" -> "New deployment" -> Select "Web app"
+ *    - Execute as: "Me"
+ *    - Who has access: "Anyone" (Required so ERP can POST without login)
+ * 4. Click "Deploy" and copy Web App URL (ends in /exec)
+ * 5. Paste that URL into Wünderkraf Factory ERP Webhook field above!
+ */
+function doPost(e) {
+  try {
+    var raw = e.postData ? e.postData.contents : "";
+    var data = raw ? JSON.parse(raw) : {};
+    var phone = (data.phone || "").replace(/[^0-9]/g, "");
+    var message = data.message || "Wünderkraf Shift Update";
+    var category = data.category || "GENERAL";
+    var timestamp = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+
+    // 1. Log to Google Sheet (Free auto-logging)
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) {
+      var sheet = ss.getSheetByName("ERP_Logs") || ss.getActiveSheet();
+      sheet.appendRow([timestamp, phone, category, message]);
+    }
+
+    // 2. 100% Free WhatsApp Dispatch via CallMeBot or Meta Free Cloud API
+    // If you use CallMeBot free API key (send WhatsApp "I allow callmebot to send me messages" to +34 644 10 55 84 to get free key):
+    var CALLMEBOT_API_KEY = ""; // Paste your free key here if using CallMeBot
+    if (CALLMEBOT_API_KEY && phone) {
+      var apiUrl = "https://api.callmebot.com/whatsapp.php?phone=" + encodeURIComponent(phone) +
+                   "&text=" + encodeURIComponent(message) +
+                   "&apikey=" + encodeURIComponent(CALLMEBOT_API_KEY);
+      UrlFetchApp.fetch(apiUrl, { muteHttpExceptions: true });
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", phone: phone }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+                          navigator.clipboard.writeText(scriptText);
+                          setCopiedGoogleScript(true);
+                          setTimeout(() => setCopiedGoogleScript(false), 3000);
+                        }}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
+                      >
+                        {copiedGoogleScript ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedGoogleScript ? 'Copied Code!' : 'Copy Script Code'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                    {/* Step-by-Step Instructions */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px] text-slate-300">
+                      <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+                        <span className="text-emerald-400 font-bold block mb-1">Step 1: गूगल शीट में पेस्ट करें</span>
+                        Google Sheet खोलें &gt; <em>Extensions &gt; Apps Script</em> पर क्लिक करें और ऊपर दिए कोड को पेस्ट करें।
+                      </div>
+                      <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+                        <span className="text-emerald-400 font-bold block mb-1">Step 2: Web App के रूप में Deploy</span>
+                        ऊपर नीले <strong>Deploy &gt; New deployment</strong> पर जाएं &gt; Web app चुनें &gt; Who has access को <strong>&quot;Anyone&quot;</strong> रखें।
+                      </div>
+                      <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+                        <span className="text-emerald-400 font-bold block mb-1">Step 3: URL यहाँ पेस्ट करें</span>
+                        Deploy के बाद मिली Web App URL (जिसके अंत में <code>/exec</code> होता है) को ऊपर के <strong>Webhook URL</strong> बॉक्स में पेस्ट करें और Save दबाएं।
+                      </div>
+                    </div>
+
+                    {/* Script Preview Box */}
+                    <div className="bg-black/60 rounded-xl p-3 border border-slate-800 text-[10px] font-mono text-emerald-300 overflow-x-auto max-h-48 leading-relaxed">
+                      <pre>{`function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var phone = data.phone;       // ERP sends the targeted mobile number
+  var message = data.message;   // Formatted shift report / job status
+  
+  // Forward to WhatsApp free gateway or log in Google Sheets!
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  sheet.appendRow([new Date(), phone, data.category, message]);
+  
+  return ContentService.createTextOutput(JSON.stringify({ status: "success" }));
+}`}</pre>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">

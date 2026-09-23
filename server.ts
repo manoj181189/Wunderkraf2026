@@ -209,6 +209,67 @@ app.post('/api/ai/transcribe', async (req, res) => {
   }
 });
 
+// WhatsApp Server-Side Dispatch Proxy (Supports Google Apps Script, Meta Cloud API, and generic Webhooks)
+app.post('/api/whatsapp/dispatch', async (req, res) => {
+  try {
+    const { webhookUrl, phone, message, category = 'GENERAL', apiKey, sender = 'Wünderkraf ERP' } = req.body;
+
+    if (!webhookUrl || typeof webhookUrl !== 'string' || !webhookUrl.startsWith('http')) {
+      return res.status(400).json({ success: false, error: 'Valid webhookUrl starting with http is required' });
+    }
+
+    const cleanPhone = (phone || '').replace(/[^0-9+]/g, '');
+    const payload = {
+      phone: cleanPhone,
+      message: message || '',
+      category,
+      sender,
+      timestamp: new Date().toISOString()
+    };
+
+    const isGoogleScript = webhookUrl.includes('script.google.com');
+
+    // Make server-side POST request - Node.js follows 302 redirects cleanly without CORS restrictions
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      redirect: 'follow'
+    });
+
+    let responseData: any = null;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        responseData = await response.json();
+      } catch (e) {
+        responseData = await response.text();
+      }
+    } else {
+      responseData = await response.text();
+    }
+
+    res.json({
+      success: response.ok || (isGoogleScript && response.status < 400),
+      status: response.status,
+      data: responseData
+    });
+  } catch (error: any) {
+    console.error('WhatsApp server dispatch error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to dispatch webhook via server proxy'
+    });
+  }
+});
+
 // Search Grounding API Endpoint
 // Uses gemini-3.5-flash with googleSearch tool as requested
 app.post('/api/ai/search-grounding', async (req, res) => {
