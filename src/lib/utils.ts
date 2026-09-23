@@ -1,5 +1,5 @@
 import { FactoryState, Job, JobReelItem, LogEntry, PackJob, PlannedLayer, ProductionPlan, ProductType, ShiftConfig } from '../types';
-import { PRODUCTS } from './constants';
+import { PRODUCTS, DEFAULT_PCS_PER_KG_MAP } from './constants';
 
 export function calculateLiveStock(jobs: Job[], packJobs: PackJob[], customProducts?: string[]) {
   const allProds = customProducts && customProducts.length > 0 ? customProducts : PRODUCTS;
@@ -32,21 +32,50 @@ export function calculateLiveStock(jobs: Job[], packJobs: PackJob[], customProdu
   return stock;
 }
 
-export function calculateAvailableScrapKg(logs: LogEntry[], scrapSales: any[]): number {
+export function calculateAvailableScrapKg(logs: LogEntry[], scrapSales: any[], deletedJobIds?: string[]): number {
+  const deletedSet = new Set(deletedJobIds || []);
   let totalGeneratedKg = 0;
-  logs.forEach((l) => {
-    if (l.action) {
-      // Matches "Scrap: 12.5 KG" or "Extra Paper Scrap: 12.5 KG"
-      const matchScrap = l.action.match(/(?:Scrap|Extra Paper Scrap):\s*(\d+(?:\.\d+)?)\s*KG/i) || l.action.match(/(?:Scrap|Extra Paper Scrap):\s*(\d+(?:\.\d+)?)/i);
-      if (matchScrap && !l.action.includes('Pieces') && !l.action.includes('Pcs')) {
-        totalGeneratedKg += parseFloat(matchScrap[1]) || 0;
-      }
+  (logs || []).forEach((l) => {
+    if (!l.action) return;
+    if (l.jobId && deletedSet.has(l.jobId)) return;
+
+    let scrapKg = 0;
+    let scrapPieces = 0;
+
+    // 1. Matches "Scrap: 12.5 KG", "Extra Paper Scrap: 15 KG" etc.
+    const matchScrapKg = l.action.match(/(?:Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*([0-9.]+)\s*KG/i) || 
+                         l.action.match(/(\d+(?:\.\d+)?)\s*KG\s*(?:Scrap|Paper Scrap|Extra Paper Scrap)/i);
+
+    // If there is no KG keyword but there is Scrap: [number] or Extra Paper Scrap: [number]
+    const matchGenericScrap = l.action.match(/(?:Scrap|Extra Paper Scrap|Paper Scrap):\s*([0-9.]+)/i);
+
+    if (matchScrapKg) {
+      scrapKg = parseFloat(matchScrapKg[1]) || 0;
+    } else if (matchGenericScrap && !l.action.match(/(?:Pieces|Pcs|Defects|Rejected Pcs)/i)) {
+      scrapKg = parseFloat(matchGenericScrap[1]) || 0;
     }
+
+    // 2. Matches "Defect Pieces: 500", "Rejected Pcs: 500", etc.
+    const matchDefects = l.action.match(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*([0-9,]+)/i) || 
+                         l.action.match(/([0-9,]+)\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/i);
+
+    if (matchDefects) {
+      scrapPieces = parseInt(matchDefects[1].replace(/,/g, ''), 10) || 0;
+    }
+
+    // Convert pieces to KG if scrapKg is 0 but scrapPieces > 0
+    if (scrapKg === 0 && scrapPieces > 0) {
+      const prod = l.product || 'Spoon';
+      const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[prod] || 450;
+      scrapKg = parseFloat((scrapPieces / pcsPerKg).toFixed(3));
+    }
+
+    totalGeneratedKg += scrapKg;
   });
 
   let totalSoldKg = 0;
   (scrapSales || []).forEach((s) => (totalSoldKg += s.soldKg || s.weightKg || 0));
-  return Math.max(0, totalGeneratedKg - totalSoldKg);
+  return parseFloat(Math.max(0, totalGeneratedKg - totalSoldKg).toFixed(2));
 }
 
 export function calculateTimeDifference(startStr?: string, endStr?: string): string {

@@ -33,6 +33,7 @@ interface ScrapManagementViewProps {
 
 export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state, onBackToHub, onSaveState }) => {
   const [filterStage, setFilterStage] = useState<string>('ALL');
+  const [filterProduct, setFilterProduct] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -59,25 +60,9 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
     return activeJobs.reduce((sum, j) => sum + (j.scrapKg || 0), 0);
   }, [activeJobs]);
 
-  const cuttingScrap = useMemo(() => {
-    return activeJobs.reduce((sum, j) => sum + (j.cuttingScrapKg || 0), 0);
-  }, [activeJobs]);
-
-  const formingScrap = useMemo(() => {
-    return (state.shiftHandovers || [])
-      .filter((h) => h.department === 'Forming' || h.department === 'QC')
-      .reduce((sum, h) => sum + (h.scrapQty || 0), 0);
-  }, [state.shiftHandovers]);
-
-  const cumulativeScrap = slittingScrap + cuttingScrap + formingScrap;
-
   const totalPaperInput = useMemo(() => {
     return activeJobs.reduce((sum, j) => sum + (j.inputWeightKg || 0), 0);
   }, [activeJobs]);
-
-  const overallWastagePct = useMemo(() => {
-    return Number(((cumulativeScrap / (totalPaperInput + cumulativeScrap)) * 100).toFixed(1));
-  }, [cumulativeScrap, totalPaperInput]);
 
   // Selected scrap event for detail inspection modal
   const [selectedScrapEvent, setSelectedScrapEvent] = useState<NormalizedProductionEvent | null>(null);
@@ -125,13 +110,25 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
   }, [scrapEvents]);
 
   const totalScrapGenerated = totalCuttingScrapKg + totalFormingScrapKg + totalSlittingScrapKg + totalQcScrapKg;
-  const netAvailableScrap = calculateAvailableScrapKg(logs, scrapSales);
+  const netAvailableScrap = calculateAvailableScrapKg(logs, scrapSales, state.deletedJobIds);
+
+  const cuttingScrap = totalCuttingScrapKg;
+  const formingScrap = totalFormingScrapKg;
+  const cumulativeScrap = totalScrapGenerated;
+
+  const overallWastagePct = useMemo(() => {
+    const denom = totalPaperInput + cumulativeScrap;
+    return denom > 0 ? Number(((cumulativeScrap / denom) * 100).toFixed(1)) : 0;
+  }, [cumulativeScrap, totalPaperInput]);
 
   // Filtered scrap list for table
   const filteredScrapEvents = useMemo(() => {
     let list = scrapEvents;
     if (filterStage !== 'ALL') {
       list = list.filter((e) => e.stage.toLowerCase() === filterStage.toLowerCase());
+    }
+    if (filterProduct !== 'ALL') {
+      list = list.filter((e) => e.product.toLowerCase() === filterProduct.toLowerCase());
     }
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
@@ -150,7 +147,7 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
       list = list.filter((e) => e.date <= endDate);
     }
     return list;
-  }, [scrapEvents, filterStage, searchTerm, startDate, endDate]);
+  }, [scrapEvents, filterStage, filterProduct, searchTerm, startDate, endDate]);
 
   const handleRecordScrapSale = (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,7 +274,10 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div 
+            onClick={() => { setFilterStage('ALL'); setFilterProduct('ALL'); }}
+            className={`rounded-2xl p-4 shadow-sm border flex flex-col justify-between hover:scale-[1.02] hover:shadow-md cursor-pointer transition-all duration-200 ${filterStage === 'ALL' && filterProduct === 'ALL' ? 'border-slate-900 bg-slate-50/50' : 'border-slate-200 bg-white'}`}
+          >
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wide">Total Scrap Generated</span>
               <Trash2 className="w-5 h-5 text-amber-600" />
@@ -285,10 +285,13 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
             <div className="text-2xl font-black text-slate-900">
               {totalScrapGenerated.toLocaleString()} <span className="text-xs font-semibold text-slate-500">KG</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 m-0">Combined from all stages</p>
+            <p className="text-[11px] text-slate-400 mt-1 m-0">Combined from all stages (Click to reset)</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div 
+            onClick={() => { setFilterStage('Cutting'); }}
+            className={`rounded-2xl p-4 shadow-sm border flex flex-col justify-between hover:scale-[1.02] hover:shadow-md cursor-pointer transition-all duration-200 ${filterStage === 'Cutting' ? 'border-purple-600 bg-purple-50/20' : 'border-slate-200 bg-white'}`}
+          >
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wide">Cutting Scrap</span>
               <Scissors className="w-5 h-5 text-purple-600" />
@@ -296,10 +299,13 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
             <div className="text-2xl font-black text-purple-700">
               {totalCuttingScrapKg.toLocaleString()} <span className="text-xs font-semibold text-slate-500">KG</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 m-0">Cutting trim & edge waste</p>
+            <p className="text-[11px] text-slate-400 mt-1 m-0">Cutting trim & edge waste (Click to filter)</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div 
+            onClick={() => { setFilterStage('Forming'); }}
+            className={`rounded-2xl p-4 shadow-sm border flex flex-col justify-between hover:scale-[1.02] hover:shadow-md cursor-pointer transition-all duration-200 ${filterStage === 'Forming' ? 'border-amber-600 bg-amber-50/20' : 'border-slate-200 bg-white'}`}
+          >
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wide">Forming Scrap</span>
               <Cog className="w-5 h-5 text-amber-600" />
@@ -307,10 +313,13 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
             <div className="text-2xl font-black text-amber-700">
               {totalFormingScrapKg.toLocaleString()} <span className="text-xs font-semibold text-slate-500">KG</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 m-0">Forming rejection & setup waste</p>
+            <p className="text-[11px] text-slate-400 mt-1 m-0">Forming rejection & setup waste (Click to filter)</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div 
+            onClick={() => { setFilterStage('QC'); }}
+            className={`rounded-2xl p-4 shadow-sm border flex flex-col justify-between hover:scale-[1.02] hover:shadow-md cursor-pointer transition-all duration-200 ${filterStage === 'QC' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-200 bg-white'}`}
+          >
             <div className="flex items-center justify-between text-slate-500 mb-2">
               <span className="text-xs font-bold uppercase tracking-wide">Slitting & QC Scrap</span>
               <Scroll className="w-5 h-5 text-indigo-600" />
@@ -318,7 +327,7 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
             <div className="text-2xl font-black text-indigo-700">
               {(totalSlittingScrapKg + totalQcScrapKg).toLocaleString()} <span className="text-xs font-semibold text-slate-500">KG</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 m-0">Jumbo core & QC rejects</p>
+            <p className="text-[11px] text-slate-400 mt-1 m-0">Jumbo core & QC rejects (Click to filter)</p>
           </div>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-emerald-200 bg-emerald-50/40 flex flex-col justify-between">
@@ -576,6 +585,17 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                 <option value="QC">QC / Packing</option>
               </select>
 
+              <select
+                value={filterProduct}
+                onChange={(e) => setFilterProduct(e.target.value)}
+                className="p-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none"
+              >
+                <option value="ALL">All Products</option>
+                <option value="Spoon">Spoons</option>
+                <option value="Fork">Forks</option>
+                <option value="Knife">Knives</option>
+              </select>
+
               <input
                 type="text"
                 value={searchTerm}
@@ -654,8 +674,11 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                         <div className="text-[10px] text-slate-500">{ev.product}</div>
                       </td>
                       <td className="p-3 font-semibold text-slate-700">{ev.operator}</td>
-                      <td className="p-3 text-right font-black text-rose-600 text-sm">
-                        {ev.scrapKg.toLocaleString()} KG
+                      <td className="p-3 text-right">
+                        <div className="font-black text-rose-600 text-sm">{ev.scrapKg.toLocaleString()} KG</div>
+                        {ev.scrapPieces > 0 && (
+                          <div className="text-[10px] text-slate-400 font-bold">({ev.scrapPieces.toLocaleString()} Pcs)</div>
+                        )}
                       </td>
                       <td className="p-3 text-slate-600 italic text-[11px] truncate max-w-xs">{ev.action}</td>
                       <td className="p-3 text-center">

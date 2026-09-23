@@ -1,4 +1,5 @@
 import { FactoryState, LogEntry } from '../types';
+import { DEFAULT_PCS_PER_KG_MAP } from './constants';
 
 export interface NormalizedProductionEvent {
   id: string;
@@ -32,6 +33,7 @@ export type TimeRangeOption =
 export function parseAllProductionEvents(state: FactoryState): NormalizedProductionEvent[] {
   const events: NormalizedProductionEvent[] = [];
   const seenEventKeys = new Set<string>();
+  const deletedJobIds = new Set(state.deletedJobIds || []);
 
   const logs: LogEntry[] = state.logs || [];
 
@@ -39,6 +41,7 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
   logs.forEach((log, index) => {
     if (!log.action) return;
     if (log.machine === 'ADMIN' || log.machine === 'MKT-ENTRY' || log.machine === 'RECYCLING-BAY') return;
+    if (log.jobId && deletedJobIds.has(log.jobId)) return;
 
     // Determine stage
     const stage = log.stage || 'General';
@@ -82,16 +85,32 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
       else if (stage === 'Slitting' && crates > 0) pieces = Math.round(crates * 15); // rolls
     }
 
-    // Parse scrap kg
-    const matchScrapKg = action.match(/Scrap:\s*([0-9.]+)\s*KG/i) || action.match(/(\d+(?:\.\d+)?)\s*KG\s*Scrap/i);
+    // Parse scrap kg (including Extra Paper Scrap, cutting scrap KG, etc.)
+    const matchScrapKg = action.match(/(?:Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*([0-9.]+)\s*KG/i) || 
+                         action.match(/(\d+(?:\.\d+)?)\s*KG\s*(?:Scrap|Paper Scrap|Extra Paper Scrap)/i);
+
+    // If there is no KG keyword but there is Scrap: [number] or Extra Paper Scrap: [number]
+    const matchGenericScrap = action.match(/(?:Scrap|Extra Paper Scrap|Paper Scrap):\s*([0-9.]+)/i);
+
     if (matchScrapKg) {
       scrapKg = parseFloat(matchScrapKg[1]) || 0;
+    } else if (matchGenericScrap && !action.match(/(?:Pieces|Pcs|Defects|Rejected Pcs)/i)) {
+      scrapKg = parseFloat(matchGenericScrap[1]) || 0;
     }
 
     // Parse scrap pieces / defects
-    const matchDefects = action.match(/(?:Defect Pieces|Defects|Scrap Pcs|Defect):\s*([0-9]+)/i);
+    const matchDefects = action.match(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*([0-9,]+)/i) || 
+                         action.match(/([0-9,]+)\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/i);
+
     if (matchDefects) {
-      scrapPieces = parseInt(matchDefects[1], 10) || 0;
+      scrapPieces = parseInt(matchDefects[1].replace(/,/g, ''), 10) || 0;
+    }
+
+    // Convert pieces to KG if scrapKg is 0 but scrapPieces is greater than 0
+    if (scrapKg === 0 && scrapPieces > 0) {
+      const prod = product || 'Spoon';
+      const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[prod] || 450;
+      scrapKg = parseFloat((scrapPieces / pcsPerKg).toFixed(3));
     }
 
     const key = `${date}_${machine}_${operator}_${stage}_${pieces}_${crates}_${index}`;
@@ -118,6 +137,7 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
 
   // 2. Also check slices from running batches in jobs to capture realtime split runs
   (state.jobs || []).forEach((job) => {
+    if (deletedJobIds.has(job.id)) return;
     (job.runningBatches || []).forEach((batch) => {
       (batch.slices || []).forEach((slice, sIdx) => {
         if (!slice.producedQty && !slice.producedPieces) return;
@@ -128,8 +148,18 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
         const shift = slice.shift || batch.shift || 'DAY';
         const crates = slice.producedQty || 0;
         const pieces = slice.producedPieces || (stage === 'Cutting' ? crates * 10000 : crates * 5000);
-        const scrapKg = stage === 'Cutting' ? (slice.scrapQty || 0) : 0;
-        const scrapPieces = stage === 'Forming' ? (slice.scrapQty || 0) : 0;
+        
+        let finalSliceScrapKg = 0;
+        let finalSliceScrapPieces = 0;
+
+        if (stage === 'Cutting') {
+          finalSliceScrapKg = slice.scrapQty || 0;
+        } else if (stage === 'Forming' || stage === 'QC') {
+          finalSliceScrapPieces = slice.scrapQty || 0;
+          const prod = job.product || 'Spoon';
+          const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[prod] || 450;
+          finalSliceScrapKg = parseFloat((finalSliceScrapPieces / pcsPerKg).toFixed(3));
+        }
 
         const key = `slice_${batch.batchId}_${slice.sliceId || sIdx}_${operator}_${date}`;
         if (!seenEventKeys.has(key)) {
@@ -145,9 +175,9 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
             shift,
             crates,
             pieces,
-            scrapKg,
-            scrapPieces,
-            action: `Shift Slice Handover: ${crates} Crates (${pieces.toLocaleString()} Pcs), Scrap: ${slice.scrapQty || 0}`,
+            scrapKg: finalSliceScrapKg,
+            scrapPieces: finalSliceScrapPieces,
+            action: `Shift Slice Handover: ${crates} Crates (${pieces.toLocaleString()} Pcs), Scrap: ${slice.scrapQty || 0} ${stage === 'Cutting' ? 'KG' : 'Pieces'}`,
             jobId: job.id
           });
         }
