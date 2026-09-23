@@ -531,10 +531,22 @@ export const FormingView: React.FC<FormingViewProps> = ({
     }
     const { job, batch } = activeBatchObj;
     const curIssued = batch.issuedQty || 0;
-    if (qty > curIssued) {
-      alert(`Cannot un-issue more than issued crates count (${curIssued})!`);
+
+    // Safety check based on actual unused remaining crates to prevent stock doubling
+    const jobMetrics = getJobCuttingMetrics(job);
+    const stdCutPcs = jobMetrics.netPcsPerCrate || 10000;
+    const totalInputPieces = batch.inputPieces || (curIssued * stdCutPcs);
+    const producedPieces = batch.producedPieces || 0;
+    const scrapPieces = batch.scrapPcs || 0;
+    const usedPieces = producedPieces + scrapPieces;
+    const remainingPieces = Math.max(0, totalInputPieces - usedPieces);
+    const remainingCrates = Math.max(0, Math.floor(remainingPieces / stdCutPcs));
+
+    if (qty > remainingCrates) {
+      alert(`Cannot un-issue more than the actual unused crates (${remainingCrates}) remaining at the machine! (Used/Produced: ${producedPieces.toLocaleString()} Pcs)`);
       return;
     }
+
     const remaining = curIssued - qty;
     const targetSourceLotId = unissueTargetLotId || batch.sourceLotId || batch.parentBatchId;
     let remAddUnissue = qty;
@@ -543,8 +555,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
       const updatedBatches = (j.runningBatches || [])
         .map((b) => {
           if (b.batchId === batch.batchId) {
-            const originalInputPieces = b.inputPieces || (curIssued * standardCutPcs);
-            const nextInputPieces = Math.max(0, originalInputPieces - (qty * standardCutPcs));
+            const originalInputPieces = b.inputPieces || (curIssued * stdCutPcs);
+            const nextInputPieces = Math.max(0, originalInputPieces - (qty * stdCutPcs));
             return { 
               ...b, 
               issuedQty: remaining, 
@@ -2813,9 +2825,17 @@ export const FormingView: React.FC<FormingViewProps> = ({
         });
 
         const chosenLotObj = cuttingLotsForJob.find(l => l.id === unissueTargetLotId);
+        const stdCutPcs = standardCutPcs || 10000;
+        const totalInputPieces = activeBatchObj.batch.inputPieces || ((activeBatchObj.batch.issuedQty || 0) * stdCutPcs);
+        const producedPieces = activeBatchObj.batch.producedPieces || 0;
+        const scrapPieces = activeBatchObj.batch.scrapPcs || 0;
+        const usedPieces = producedPieces + scrapPieces;
+        const remainingPieces = Math.max(0, totalInputPieces - usedPieces);
+        const remainingCrates = Math.max(0, Math.floor(remainingPieces / stdCutPcs));
+
         const maxReturnable = chosenLotObj
-          ? Math.min(activeBatchObj.batch.issuedQty || 0, chosenLotObj.consumedQty || 0)
-          : (activeBatchObj.batch.issuedQty || 0);
+          ? Math.min(remainingCrates, chosenLotObj.consumedQty || 0)
+          : remainingCrates;
 
         return (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
