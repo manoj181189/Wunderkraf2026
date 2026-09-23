@@ -43,7 +43,8 @@ import {
   TrendingUp,
   Undo2,
   History,
-  Coffee
+  Coffee,
+  MessageSquare
 } from 'lucide-react';
 import {
   FactoryState,
@@ -57,7 +58,8 @@ import {
   CoordinationMatrixItem,
   MaintenanceContact,
   ProductionPlan,
-  NumberingSeriesMaster
+  NumberingSeriesMaster,
+  CurrentView
 } from '../../types';
 import {
   PRODUCTS,
@@ -87,6 +89,7 @@ interface AdminSettingsViewProps {
   onBackToHub: () => void;
   onSaveState: (state: FactoryState) => void;
   currentUser?: { username: string; perms: string[] } | null;
+  onNavigateToView?: (view: CurrentView) => void;
 }
 
 type AdminTab = 'brand_items_paper' | 'crate_master' | 'machines' | 'scrap_yield' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward' | 'employee_master';
@@ -96,7 +99,8 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   state,
   onBackToHub,
   onSaveState,
-  currentUser
+  currentUser,
+  onNavigateToView
 }) => {
   const currentUserRole = currentUser ? (state.users[currentUser.username.toLowerCase()]?.role || '') : '';
   const isAdmin = currentUser && (
@@ -779,6 +783,12 @@ _If you received this message, your contact number and routing configuration are
   const [waNightReportTime, setWaNightReportTime] = useState(state.whatsappConfig?.nightShiftReportTime || '08:00');
   const [waAutoDay, setWaAutoDay] = useState(state.whatsappConfig?.autoSendShiftReportDay !== false);
   const [waAutoNight, setWaAutoNight] = useState(state.whatsappConfig?.autoSendShiftReportNight !== false);
+  const [waAutoBreakdown, setWaAutoBreakdown] = useState(state.whatsappConfig?.autoNotifyMaintenanceBreakdown !== false);
+  const [waAutoQc, setWaAutoQc] = useState(state.whatsappConfig?.autoNotifyCriticalQcDefect !== false);
+  const [waAutoDispatch, setWaAutoDispatch] = useState(state.whatsappConfig?.autoNotifyDispatchCompletion !== false);
+  const [waAutoManpower, setWaAutoManpower] = useState(state.whatsappConfig?.autoNotifyDailyManpower !== false);
+  const [waAutoPurchase, setWaAutoPurchase] = useState(state.whatsappConfig?.autoNotifyLowStockRequisition !== false);
+  const [waAutoScrap, setWaAutoScrap] = useState(state.whatsappConfig?.autoNotifyScrapSpike || false);
   const [waPreviewShift, setWaPreviewShift] = useState<'DAY' | 'NIGHT'>('DAY');
   const [waWebhookUrl, setWaWebhookUrl] = useState(state.whatsappConfig?.webhookUrl || '');
   const [waCustomMessage, setWaCustomMessage] = useState(
@@ -1074,9 +1084,23 @@ _If you received this message, your contact number and routing configuration are
       [dept]: updatedList
     };
     setDeptWorkersState(updated);
+
+    // Also remove from floorWorkers and record in deletedWorkerIds to ensure permanent consistency
+    const matchingWorker = (state.floorWorkers || []).find(
+      (w) => w.name.toUpperCase() === workerName.toUpperCase() && w.department.toUpperCase() === dept.toUpperCase()
+    );
+    const updatedFloorWorkers = (state.floorWorkers || []).filter(
+      (w) => !(w.name.toUpperCase() === workerName.toUpperCase() && w.department.toUpperCase() === dept.toUpperCase())
+    );
+    const updatedDeletedIds = matchingWorker 
+      ? Array.from(new Set([...(state.deletedWorkerIds || []), matchingWorker.id]))
+      : (state.deletedWorkerIds || []);
+
     onSaveState({
       ...state,
-      deptWorkers: updated
+      deptWorkers: updated,
+      floorWorkers: updatedFloorWorkers,
+      deletedWorkerIds: updatedDeletedIds
     });
   };
 
@@ -1798,6 +1822,7 @@ _If you received this message, your contact number and routing configuration are
   const executeZeroAllData = () => {
     const zeroState: FactoryState = {
       ...state,
+      lastResetTimestamp: Date.now(),
       jobs: [],
       packJobs: [],
       logs: [
@@ -2407,6 +2432,7 @@ _If you received this message, your contact number and routing configuration are
     onSaveState({
       ...state,
       whatsappConfig: {
+        ...state.whatsappConfig,
         phone: waPhone.trim(),
         apiKey: waApiKey.trim(),
         autoSend: waAutoSend,
@@ -2415,10 +2441,16 @@ _If you received this message, your contact number and routing configuration are
         dayShiftReportTime: waDayReportTime,
         nightShiftReportTime: waNightReportTime,
         autoSendShiftReportDay: waAutoDay,
-        autoSendShiftReportNight: waAutoNight
+        autoSendShiftReportNight: waAutoNight,
+        autoNotifyMaintenanceBreakdown: waAutoBreakdown,
+        autoNotifyCriticalQcDefect: waAutoQc,
+        autoNotifyDispatchCompletion: waAutoDispatch,
+        autoNotifyDailyManpower: waAutoManpower,
+        autoNotifyLowStockRequisition: waAutoPurchase,
+        autoNotifyScrapSpike: waAutoScrap
       }
     });
-    showToast('✅ WhatsApp Shift Reporting & Changeover Settings Saved Successfully!');
+    showToast('✅ WhatsApp Shift Reporting & Multi-Module Communication Settings Saved!');
   };
 
   const generateShiftChangeoverReportText = (targetShift: 'DAY' | 'NIGHT') => {
@@ -2791,6 +2823,89 @@ ${formLines.join('\n')}
   };
 
   // ==========================================
+  // WHATSAPP RIGHTS MANAGEMENT (User Rights Master)
+  // ==========================================
+  const WA_RIGHTS = [
+    'WhatsApp',
+    'WA_ShiftReports',
+    'WA_BreakdownAlerts',
+    'WA_QcAlerts',
+    'WA_DispatchNotes',
+    'WA_ManpowerReports',
+    'WA_ConfigEdit'
+  ];
+
+  const handleGrantAllWhatsAppRightsToUser = (userKey: string) => {
+    const u = usersRecord[userKey];
+    if (!u) return;
+    const existing = u.perms || [];
+    const combined = Array.from(new Set([...existing, ...WA_RIGHTS]));
+    const updatedUsers = {
+      ...usersRecord,
+      [userKey]: {
+        ...u,
+        perms: combined
+      }
+    };
+    onSaveState({
+      ...state,
+      users: updatedUsers
+    });
+    if (selectedUserKey === userKey) {
+      setEditingUser({ ...editingUser, perms: combined });
+    }
+    showToast(`✅ Granted All WhatsApp & Communication Rights to [${userKey}]!`);
+  };
+
+  const handleRevokeWhatsAppRightsFromUser = (userKey: string) => {
+    const u = usersRecord[userKey];
+    if (!u) return;
+    const existing = u.perms || [];
+    const filtered = existing.filter(p => !WA_RIGHTS.includes(p));
+    const updatedUsers = {
+      ...usersRecord,
+      [userKey]: {
+        ...u,
+        perms: filtered
+      }
+    };
+    onSaveState({
+      ...state,
+      users: updatedUsers
+    });
+    if (selectedUserKey === userKey) {
+      setEditingUser({ ...editingUser, perms: filtered });
+    }
+    showToast(`⛔ Revoked WhatsApp Rights from [${userKey}]!`);
+  };
+
+  const handleToggleSpecificWhatsAppRight = (userKey: string, rightKey: string) => {
+    const u = usersRecord[userKey];
+    if (!u) return;
+    const existing = u.perms || [];
+    let updatedPerms: string[];
+    if (existing.includes(rightKey)) {
+      updatedPerms = existing.filter(p => p !== rightKey);
+    } else {
+      updatedPerms = [...existing, rightKey];
+    }
+    const updatedUsers = {
+      ...usersRecord,
+      [userKey]: {
+        ...u,
+        perms: updatedPerms
+      }
+    };
+    onSaveState({
+      ...state,
+      users: updatedUsers
+    });
+    if (selectedUserKey === userKey) {
+      setEditingUser({ ...editingUser, perms: updatedPerms });
+    }
+  };
+
+  // ==========================================
   // SEQUENCES, SHIFTS & ADMIN PIN
   // ==========================================
   const handleSaveSequencesAndShifts = (e: React.FormEvent) => {
@@ -3071,6 +3186,13 @@ ${formLines.join('\n')}
     { key: 'Mnt_SpareParts', label: '⚙️ Spare Parts Consumption & Stock', desc: 'Can record replacement parts and adjust inventory' },
     { key: 'Mnt_Preventative', label: '📋 Preventative Maintenance Schedules', desc: 'Can manage routine PM checklists and machine health' },
     { key: 'Mnt_RCA', label: '📊 Root Cause Analysis (RCA) & Audit', desc: 'Can edit failure root cause and CAPA preventive actions' },
+    { key: 'WhatsApp', label: '💬 WhatsApp & Communication Desk (Full Control)', desc: 'Full access to send shift reports, broadcast alerts, and manage contacts' },
+    { key: 'WA_ShiftReports', label: '☀️ WhatsApp: Send Shift Changeover Reports', desc: 'Authorized to broadcast Day & Night shift reports' },
+    { key: 'WA_BreakdownAlerts', label: '🚨 WhatsApp: Send Machine Breakdown Alerts', desc: 'Authorized to broadcast emergency machine stoppage alerts' },
+    { key: 'WA_QcAlerts', label: '🔍 WhatsApp: Send QC Defect & Quality Alerts', desc: 'Authorized to broadcast quality rejection and scrap notices' },
+    { key: 'WA_DispatchNotes', label: '🚚 WhatsApp: Send Dispatch Delivery Notes', desc: 'Authorized to send customer delivery notes and gate pass' },
+    { key: 'WA_ManpowerReports', label: '👥 WhatsApp: Send Manpower Roster', desc: 'Authorized to broadcast daily workforce attendance' },
+    { key: 'WA_ConfigEdit', label: '⚙️ WhatsApp: Edit Gateway & API Config', desc: 'Authorized to modify WhatsApp API keys, webhook URLs, and numbers' },
     { key: 'Purchase', label: '🛒 Purchase & Indent Desk', desc: 'Material Indents, Vendor POs & Incoming Goods' },
     { key: 'Stock', label: '📊 Raw & WIP Stock Matrix', desc: 'Real-time inventory levels' },
     { key: 'Orders', label: '📋 Orders Book & Customer Specs', desc: 'View customer orders list' },
@@ -4320,9 +4442,19 @@ ${formLines.join('\n')}
 
           {/* Department Workers Master List */}
           <div className="border-t border-slate-200 pt-4 space-y-3">
-            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide m-0">
-              Department Operators & Workers Master (Machine Operators List)
-            </h4>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide m-0">
+                Department Operators & Workers Master (Machine Operators List)
+              </h4>
+              <button
+                type="button"
+                onClick={() => setActiveTab('employee_master')}
+                className="text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+              >
+                <Users className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Open Full Employee Master (विस्तृत मास्टर व परमानेंट डिलीट)</span>
+              </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Department:</label>
@@ -6659,78 +6791,406 @@ ${formLines.join('\n')}
       )}
 
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* TAB: WHATSAPP MASTER, MULTI-MODULE REPORTING & RIGHTS SUITE */}
+      {/* ========================================================================= */}
       {activeTab === 'whatsapp' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center justify-between flex-wrap gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
             <div>
-              <h4 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide m-0">
-                WhatsApp Live Shift Changeover & Machine Reports (WhatsApp Shift Changeover Reports)
-              </h4>
-              <p className="text-xs text-slate-500 m-0">
-                Daily Shift Changeover hone ke baad all machines ke short reports with Operator names WhatsApp par auto/manual bhejein.
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-extrabold text-slate-900 uppercase tracking-wide m-0">
+                  📱 WhatsApp Reporting & Multi-Module Communication Master
+                </h4>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-300">
+                  ADMIN MASTER
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 m-0 mt-0.5">
+                Manage WhatsApp Gateway, user access rights, cross-module automated alert triggers, and dispatch schedules.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {onNavigateToView && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToView('WHATSAPP')}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Open Communication Desk</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => handleSendShiftWhatsApp('DAY')}
-                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>☀️ Send Day Shift Report</span>
+                <span>☀️ Day Shift Report</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSendShiftWhatsApp('NIGHT')}
-                className="px-3.5 py-2 bg-indigo-700 hover:bg-indigo-800 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                className="px-3 py-2 bg-indigo-700 hover:bg-indigo-800 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>🌙 Send Night Shift Report</span>
+                <span>🌙 Night Shift Report</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveWhatsAppConfig}
+                className="px-4 py-2 bg-[#1a365d] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save WhatsApp Masters</span>
               </button>
             </div>
           </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* 1. WhatsApp Rights Quick-Grant Suite */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h5 className="text-xs font-black text-slate-900 uppercase m-0 flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 text-emerald-600" />
+                  WhatsApp Rights Quick-Grant
+                </h5>
+                <span className="text-[10px] font-bold text-slate-400">User Rights Master</span>
+              </div>
+              <p className="text-[11px] text-slate-600 m-0">
+                Grant or revoke WhatsApp Desk access & broadcast permissions for non-admin operators:
+              </p>
+              <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                {Object.keys(usersRecord).map((userKey) => {
+                  const u = usersRecord[userKey];
+                  if (u.role === 'ADMIN') return null;
+                  const hasFullWa = u.perms.includes('*') || (u.perms.includes('WhatsApp') && u.perms.includes('WA_ShiftReports'));
+                  const hasAnyWa = u.perms.includes('*') || u.perms.some(p => p.startsWith('WA_') || p === 'WhatsApp');
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-6 space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                  return (
+                    <div key={userKey} className="flex flex-col gap-2 p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">{u.name}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">{userKey} • {u.role}</span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                          hasFullWa
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : hasAnyWa
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {hasFullWa ? 'FULL RIGHTS' : hasAnyWa ? 'PARTIAL' : 'NO ACCESS'}
+                        </span>
+                      </div>
+
+                      {/* Quick Action Buttons */}
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          disabled={hasFullWa}
+                          onClick={() => handleGrantAllWhatsAppRightsToUser(userKey)}
+                          className={`flex-1 py-1 rounded text-[10px] font-bold transition ${
+                            hasFullWa
+                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer'
+                          }`}
+                        >
+                          Grant All Rights
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!hasAnyWa}
+                          onClick={() => handleRevokeWhatsAppRightsFromUser(userKey)}
+                          className={`flex-1 py-1 rounded text-[10px] font-bold transition ${
+                            !hasAnyWa
+                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer'
+                          }`}
+                        >
+                          Revoke Access
+                        </button>
+                      </div>
+
+                      {/* Granular Sub-Rights Toggles */}
+                      <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px]">
+                        <label className="flex items-center gap-1 cursor-pointer text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={u.perms.includes('*') || u.perms.includes('WA_ShiftReports')}
+                            disabled={u.perms.includes('*')}
+                            onChange={() => handleToggleSpecificWhatsAppRight(userKey, 'WA_ShiftReports')}
+                            className="w-3 h-3 text-emerald-600 rounded"
+                          />
+                          <span>Shift Reports</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={u.perms.includes('*') || u.perms.includes('WA_BreakdownAlerts')}
+                            disabled={u.perms.includes('*')}
+                            onChange={() => handleToggleSpecificWhatsAppRight(userKey, 'WA_BreakdownAlerts')}
+                            className="w-3 h-3 text-emerald-600 rounded"
+                          />
+                          <span>Breakdown Alert</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={u.perms.includes('*') || u.perms.includes('WA_QcAlerts')}
+                            disabled={u.perms.includes('*')}
+                            onChange={() => handleToggleSpecificWhatsAppRight(userKey, 'WA_QcAlerts')}
+                            className="w-3 h-3 text-emerald-600 rounded"
+                          />
+                          <span>QC Defect Alert</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={u.perms.includes('*') || u.perms.includes('WA_DispatchNotes')}
+                            disabled={u.perms.includes('*')}
+                            onChange={() => handleToggleSpecificWhatsAppRight(userKey, 'WA_DispatchNotes')}
+                            className="w-3 h-3 text-emerald-600 rounded"
+                          />
+                          <span>Dispatch Notes</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={u.perms.includes('*') || u.perms.includes('WA_ManpowerReports')}
+                            disabled={u.perms.includes('*')}
+                            onChange={() => handleToggleSpecificWhatsAppRight(userKey, 'WA_ManpowerReports')}
+                            className="w-3 h-3 text-emerald-600 rounded"
+                          />
+                          <span>Manpower Alert</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={u.perms.includes('*') || u.perms.includes('WA_ConfigEdit')}
+                            disabled={u.perms.includes('*')}
+                            onChange={() => handleToggleSpecificWhatsAppRight(userKey, 'WA_ConfigEdit')}
+                            className="w-3 h-3 text-emerald-600 rounded"
+                          />
+                          <span>Config Rights</span>
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. Automated Reporting Triggers & Schedules */}
+            <div className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-indigo-200 pb-2">
+                <h5 className="text-xs font-black text-indigo-950 uppercase m-0 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-indigo-600" />
+                  Cross-Module Automated Triggers
+                </h5>
+                <span className="text-[10px] font-bold text-indigo-600">Auto-Dispatch</span>
+              </div>
+              <p className="text-[11px] text-indigo-900/80 m-0">
+                Configure background WhatsApp alerts triggered by factory events and scheduled times:
+              </p>
+
+              <div className="space-y-3 bg-white p-3.5 rounded-xl border border-indigo-100 shadow-xs">
+                {/* Day Shift Report */}
+                <div className="space-y-1.5 pb-2 border-b border-slate-100">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-bold text-slate-800">☀️ Day Shift Auto-Report</span>
+                    <input
+                      type="checkbox"
+                      checked={waAutoDay}
+                      onChange={e => setWaAutoDay(e.target.checked)}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Scheduled Time:</span>
+                    <input
+                      type="time"
+                      value={waDayReportTime}
+                      onChange={e => setWaDayReportTime(e.target.value)}
+                      className="px-2 py-1 border border-slate-300 rounded text-xs font-mono font-bold outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Night Shift Report */}
+                <div className="space-y-1.5 pb-2 border-b border-slate-100">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-bold text-slate-800">🌙 Night Shift Auto-Report</span>
+                    <input
+                      type="checkbox"
+                      checked={waAutoNight}
+                      onChange={e => setWaAutoNight(e.target.checked)}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Scheduled Time:</span>
+                    <input
+                      type="time"
+                      value={waNightReportTime}
+                      onChange={e => setWaNightReportTime(e.target.value)}
+                      className="px-2 py-1 border border-slate-300 rounded text-xs font-mono font-bold outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Maintenance Breakdown Alert */}
+                <div className="flex items-center justify-between cursor-pointer pb-2 border-b border-slate-100">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">🚨 Machine Breakdown Instant Alert</div>
+                    <div className="text-[10px] text-slate-500">Alert technician & plant head on stoppage</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={waAutoBreakdown}
+                    onChange={e => setWaAutoBreakdown(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                </div>
+
+                {/* QC Defect Alert */}
+                <div className="flex items-center justify-between cursor-pointer pb-2 border-b border-slate-100">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">🔍 QC Critical Defect & Scrap Alert</div>
+                    <div className="text-[10px] text-slate-500">Alert on crate quality rejections</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={waAutoQc}
+                    onChange={e => setWaAutoQc(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                </div>
+
+                {/* Dispatch Note */}
+                <div className="flex items-center justify-between cursor-pointer pb-2 border-b border-slate-100">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">🚚 Dispatch Shipment Completion</div>
+                    <div className="text-[10px] text-slate-500">Send gate pass & invoice delivery note</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={waAutoDispatch}
+                    onChange={e => setWaAutoDispatch(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                </div>
+
+                {/* Manpower Roll Call */}
+                <div className="flex items-center justify-between cursor-pointer pb-2 border-b border-slate-100">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">👥 Daily Manpower 8 AM Attendance</div>
+                    <div className="text-[10px] text-slate-500">Shift workforce roll call summary</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={waAutoManpower}
+                    onChange={e => setWaAutoManpower(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                </div>
+
+                {/* Material Requisition */}
+                <div className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">🛒 Critical Spare Requisition Alert</div>
+                    <div className="text-[10px] text-slate-500">Notify purchase on urgent indents</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={waAutoPurchase}
+                    onChange={e => setWaAutoPurchase(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. API Gateway & Webhook Credentials */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <h5 className="text-xs font-black text-slate-900 uppercase m-0 flex items-center gap-1.5">
                   <Phone className="w-4 h-4 text-emerald-600" />
-                  WhatsApp API Configuration
+                  API Gateway & Webhook Config
                 </h5>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Target WhatsApp Number (With Country Code)</label>
-                    <input type="text" value={waPhone} onChange={e => setWaPhone(e.target.value)} placeholder="+919876543210" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">API Key / Token</label>
-                    <input type="password" value={waApiKey} onChange={e => setWaApiKey(e.target.value)} placeholder="Enter API Key" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono outline-none" />
-                  </div>
+                <span className="text-[10px] font-bold text-emerald-700">Live Channel</span>
+              </div>
+
+              <div className="space-y-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                    Target WhatsApp Number (With Country Code)
+                  </label>
+                  <input
+                    type="text"
+                    value={waPhone}
+                    onChange={e => setWaPhone(e.target.value)}
+                    placeholder="+919876543210"
+                    className="w-full px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <span className="text-[10px] text-slate-400">Primary phone for auto-reports & manual dispatch</span>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                    Webhook URL (Zapier, Make, n8n, Meta Cloud API)
+                  </label>
+                  <input
+                    type="url"
+                    value={waWebhookUrl}
+                    onChange={e => setWaWebhookUrl(e.target.value)}
+                    placeholder="https://api.ultramsg.com/... or https://hooks.zapier.com/..."
+                    className="w-full px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <span className="text-[10px] text-slate-400">Optional: Sends HTTP POST payload automatically</span>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                    API Key / Access Token
+                  </label>
+                  <input
+                    type="password"
+                    value={waApiKey}
+                    onChange={e => setWaApiKey(e.target.value)}
+                    placeholder="Bearer Token / API Key"
+                    className="w-full px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                    Custom Message Header / Footer
+                  </label>
+                  <input
+                    type="text"
+                    value={waCustomMessage}
+                    onChange={e => setWaCustomMessage(e.target.value)}
+                    placeholder="Wünderkraf Paperware Factory Live Shift Report"
+                    className="w-full px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveWhatsAppConfig}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                  >
+                    Save All WhatsApp Master Settings
+                  </button>
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-6 space-y-4">
-              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
-                <h5 className="text-xs font-black text-indigo-900 uppercase m-0 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600" />
-                  Automated Reporting Triggers
-                </h5>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={waAutoDay} onChange={e => setWaAutoDay(e.target.checked)} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                    <span className="text-xs font-bold text-indigo-900">Auto-Send Day Shift Report</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={waAutoNight} onChange={e => setWaAutoNight(e.target.checked)} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
-                    <span className="text-xs font-bold text-indigo-900">Auto-Send Night Shift Report</span>
-                  </label>
-                </div>
-                <div className="pt-2 border-t border-indigo-200">
-                  <button type="button" onClick={handleSaveWhatsAppConfig} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow transition">Save WhatsApp Configuration</button>
-                </div>
-              </div>
-            </div>
+
           </div>
         </div>
       )}
@@ -7881,7 +8341,18 @@ ${formLines.join('\n')}
               </p>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {onNavigateToView && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToView('WHATSAPP')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95"
+                  title="Open Dedicated WhatsApp Communication Desk"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Open in WhatsApp Desk</span>
+                </button>
+              )}
               <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${
                 isAdmin 
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 

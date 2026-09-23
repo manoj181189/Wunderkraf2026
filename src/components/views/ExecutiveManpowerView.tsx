@@ -43,9 +43,9 @@ export const ExecutiveManpowerView: React.FC<ExecutiveManpowerViewProps> = ({
   onNavigateToView
 }) => {
   const workers: FloorWorker[] =
-    state.floorWorkers !== undefined
+    (state.floorWorkers !== undefined
       ? state.floorWorkers
-      : DEFAULT_FLOOR_WORKERS;
+      : DEFAULT_FLOOR_WORKERS).filter(w => w.status !== 'INACTIVE');
 
   const totalWorkers = workers.length;
   const presentWorkers = workers.filter((w) => w.shiftStatus === 'PRESENT').length;

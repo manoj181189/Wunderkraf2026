@@ -108,6 +108,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
   // Handover checklist notes
   const [handoverNotes, setHandoverNotes] = useState<string>('');
   const [handoverConfirmed, setHandoverConfirmed] = useState<boolean>(true);
+  const [piecesPerStroke, setPiecesPerStroke] = useState<string>('12');
 
   // Current time
   const nowTime = new Date().toLocaleTimeString('en-IN', {
@@ -124,6 +125,20 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
     : (parsedLoose > 0 ? Math.max(0, parsedLoose - parsedRejectedPcs) : undefined);
   const parsedScrap = parseFloat(sliceScrapQtyInput) || 0;
   const parsedMeter = parseFloat(meterReadingInput) || 0;
+
+  const startMeterReading = React.useMemo(() => {
+    if (batch.slices && batch.slices.length > 0) {
+      const lastSlice = batch.slices[batch.slices.length - 1];
+      return lastSlice.endMeterReading || lastSlice.strokeCount || batch.meterReading || 0;
+    }
+    return batch.meterReading || 0;
+  }, [batch]);
+
+  const netStrokesRun = Math.max(0, parsedMeter - startMeterReading);
+  const parsedPiecesPerStroke = parseInt(piecesPerStroke, 10) || 0;
+  const strokeCalculatedPieces = netStrokesRun * parsedPiecesPerStroke;
+  const discrepancy = calculatedPieces !== undefined ? (calculatedPieces - strokeCalculatedPieces) : 0;
+  const pctDiscrepancy = strokeCalculatedPieces > 0 ? (Math.abs(discrepancy) / strokeCalculatedPieces) * 100 : 0;
 
   const finalRelievingOperator = (customWorkerInput.trim() || relievingOperator || '').toUpperCase();
 
@@ -150,6 +165,16 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
 
     if (finalRelievingOperator.toLowerCase() === batch.worker.trim().toLowerCase()) {
       alert('Incoming relieving operator must be different from the current operator.');
+      return;
+    }
+
+    if (!meterReadingInput || isNaN(parsedMeter) || parsedMeter <= 0) {
+      alert('⚠️ Mandatory (अनिवार्य):\nPlease enter a valid ending Machine Display Counter reading to proceed.');
+      return;
+    }
+
+    if (parsedMeter < startMeterReading) {
+      alert(`⚠️ Validation Error (डेटा प्रविष्टि त्रुटि):\nThe ending display counter reading (${parsedMeter}) cannot be less than the starting display reading (${startMeterReading}) of this shift run! Please correct.`);
       return;
     }
 
@@ -624,21 +649,42 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                   </div>
                 </div>
 
-                {/* Optional Stroke / Meter Counter & Remarks */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Mandatory Machine Display Stroke Counter, Pieces Per Stroke & Remarks */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                      <Gauge className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Machine Stroke / Meter Counter (Stroke Count):</span>
+                    <label className="block text-[11px] font-extrabold text-blue-950 uppercase mb-1 flex items-center gap-1">
+                      <Gauge className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                      <span>Machine Display Counter * (अनिवार्य):</span>
                     </label>
                     <input
                       type="number"
+                      required
                       value={meterReadingInput}
                       onChange={(e) => setMeterReadingInput(e.target.value)}
                       placeholder="e.g. 50500"
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-white border-2 border-blue-300 rounded-lg text-xs font-black text-slate-900 outline-none focus:border-blue-600"
                     />
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Machine stroke counter at handover time</span>
+                    <span className="text-[10px] text-blue-700 font-bold mt-0.5 block">
+                      मशीन डिस्प्ले का आखिरी काउंटर रीडिंग
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold text-indigo-950 uppercase mb-1 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Pcs Per Stroke (एक स्ट्रोक में पीस):</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={piecesPerStroke}
+                      onChange={(e) => setPiecesPerStroke(e.target.value)}
+                      placeholder="e.g. 12"
+                      className="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                    />
+                    <span className="text-[10px] text-indigo-600 font-medium mt-0.5 block">
+                      मशीन के प्रति स्ट्रोक स्पून/उत्पाद की संख्या
+                    </span>
                   </div>
 
                   <div>
@@ -650,12 +696,48 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                       type="text"
                       value={handoverNotes}
                       onChange={(e) => setHandoverNotes(e.target.value)}
-                      placeholder="e.g. 5 Crates + 500 loose pieces ready, 1 kg scrap, blade edge is fine."
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 outline-none focus:border-indigo-500"
+                      placeholder="e.g. blade fine, raw roll loaded"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 outline-none focus:border-slate-500"
                     />
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Blade condition, raw material or special note</span>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">
+                      ब्लेड की स्थिति, रोल नंबर या कोई विशेष नोट
+                    </span>
                   </div>
                 </div>
+
+                {/* Live Real-time Stroke Counter Cross-Check Verification Card */}
+                {parsedMeter > startMeterReading && (
+                  <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                    pctDiscrepancy <= 5 
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-950' 
+                      : 'bg-amber-50 border-amber-200 text-amber-950'
+                  }`}>
+                    <div className="space-y-1">
+                      <div className="font-extrabold flex items-center gap-1.5 uppercase tracking-wide text-[11px]">
+                        <span>🔢 Stroke Counter Verification & Cross-Check</span>
+                        {pctDiscrepancy <= 5 ? (
+                          <span className="bg-emerald-600 text-white px-1.5 py-0.2 rounded font-black text-[9px]">🟢 ALIGNED (सत्यापित)</span>
+                        ) : (
+                          <span className="bg-amber-600 text-white px-1.5 py-0.2 rounded font-black text-[9px]">⚠️ DISCREPANCY (अंतर है)</span>
+                        )}
+                      </div>
+                      <div className="leading-relaxed text-[11px]">
+                        • Shifts Strokes Run: <b>{netStrokesRun.toLocaleString()} Strokes</b> (from {startMeterReading.toLocaleString()} to {parsedMeter.toLocaleString()})<br />
+                        • Expected Output based on Strokes ({netStrokesRun.toLocaleString()} × {parsedPiecesPerStroke}): <b>{strokeCalculatedPieces.toLocaleString()} Pcs</b><br />
+                        • Actually Reported Output (Crates & Loose): <b>{(calculatedPieces ?? 0).toLocaleString()} Pcs</b>
+                      </div>
+                    </div>
+                    <div className="text-right sm:border-l sm:border-slate-300 sm:pl-4">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block">Difference (अंतर)</span>
+                      <div className={`text-sm font-black ${pctDiscrepancy <= 5 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {discrepancy >= 0 ? '+' : ''}{discrepancy.toLocaleString()} Pieces
+                      </div>
+                      <span className="text-[9px] font-semibold text-slate-500">
+                        ({pctDiscrepancy.toFixed(1)}% variance)
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Locked Data Card Notice */}
                 <div className="bg-amber-100/90 border border-amber-300 text-amber-950 p-2.5 rounded-lg text-xs flex items-center gap-2">

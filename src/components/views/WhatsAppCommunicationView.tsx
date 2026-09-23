@@ -1,0 +1,2345 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  ArrowLeft,
+  MessageSquare,
+  Send,
+  Copy,
+  Check,
+  Phone,
+  RotateCcw,
+  Users,
+  Wrench,
+  SearchCheck,
+  Truck,
+  ShoppingCart,
+  Trash2,
+  Calendar,
+  AlertTriangle,
+  Clock,
+  Settings,
+  CheckCircle2,
+  UserCheck,
+  Layers,
+  Sparkles,
+  ExternalLink,
+  Plus,
+  X,
+  Building2,
+  BellRing,
+  Shield,
+  Eye,
+  Lock,
+  Filter,
+  Search,
+  Download,
+  RefreshCw,
+  Zap,
+  Edit,
+  Save,
+  CheckSquare,
+  Square,
+  ChevronRight,
+  Radio,
+  Play,
+  Timer
+} from 'lucide-react';
+import { FactoryState, CurrentView, CoordinationMatrixItem } from '../../types';
+import { DEFAULT_COORDINATION_MATRIX } from '../../lib/constants';
+import {
+  generateShiftChangeoverReportText,
+  generateBreakdownAlertText,
+  generateManpowerAttendanceReportText,
+  generateQcDefectAlertText,
+  generateDispatchDeliveryNoteText,
+  generatePurchaseIndentAlertText,
+  generateScrapYieldReportText,
+  triggerWhatsAppShiftNotification
+} from '../../lib/whatsappReports';
+
+interface WhatsAppCommunicationViewProps {
+  state: FactoryState;
+  onBackToHub: () => void;
+  onSaveState: (newState: FactoryState) => void;
+  onNavigateToView?: (view: CurrentView) => void;
+  currentUser?: { username: string; perms: string[] } | null;
+}
+
+type TabType = 'dispatcher' | 'coordination_matrix' | 'triggers' | 'dispatch_logs';
+
+type MessageCategory =
+  | 'SHIFT_DAY'
+  | 'SHIFT_NIGHT'
+  | 'MAINTENANCE_BREAKDOWN'
+  | 'MANPOWER_ATTENDANCE'
+  | 'QC_DEFECT'
+  | 'DISPATCH_NOTE'
+  | 'PURCHASE_INDENT'
+  | 'SCRAP_YIELD'
+  | 'CUSTOM_BROADCAST';
+
+export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps> = ({
+  state,
+  onBackToHub,
+  onSaveState,
+  onNavigateToView,
+  currentUser
+}) => {
+  const [activeTab, setActiveTab] = useState<TabType>('dispatcher');
+
+  // Permission & Role Checks
+  const username = currentUser?.username || 'admin';
+  const perms = currentUser?.perms || ['*'];
+  const userRole = (state.users && state.users[username.toLowerCase()]?.role) || '';
+  const isAdmin =
+    perms.includes('*') ||
+    perms.includes('Admin') ||
+    username.toLowerCase() === 'admin' ||
+    userRole.toLowerCase() === 'administrator' ||
+    userRole.toLowerCase() === 'admin';
+
+  const canEditConfig = isAdmin || perms.includes('WA_ConfigEdit') || perms.includes('WhatsApp');
+  const canEditMatrix = isAdmin || perms.includes('WA_ConfigEdit');
+
+  // Status Toast notification
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const showStatus = (msg: string) => {
+    setStatusMessage(msg);
+    setTimeout(() => setStatusMessage(null), 4000);
+  };
+
+  // =========================================================================
+  // 1. BROADCAST & REPORT DISPATCHER STATE
+  // =========================================================================
+  const [selectedCategory, setSelectedCategory] = useState<MessageCategory>('SHIFT_DAY');
+  const [targetPhone, setTargetPhone] = useState(state.whatsappConfig?.phone || '');
+  const [selectedContactName, setSelectedContactName] = useState<string>('Primary Plant Gateway');
+  const [messageText, setMessageText] = useState<string>('');
+  const [copied, setCopied] = useState(false);
+
+  // Generate dynamic report template on category change
+  useEffect(() => {
+    switch (selectedCategory) {
+      case 'SHIFT_DAY':
+        setMessageText(generateShiftChangeoverReportText(state, 'DAY'));
+        break;
+      case 'SHIFT_NIGHT':
+        setMessageText(generateShiftChangeoverReportText(state, 'NIGHT'));
+        break;
+      case 'MAINTENANCE_BREAKDOWN':
+        setMessageText(generateBreakdownAlertText(state));
+        break;
+      case 'MANPOWER_ATTENDANCE':
+        setMessageText(generateManpowerAttendanceReportText(state));
+        break;
+      case 'QC_DEFECT':
+        setMessageText(generateQcDefectAlertText(state));
+        break;
+      case 'DISPATCH_NOTE':
+        setMessageText(generateDispatchDeliveryNoteText(state));
+        break;
+      case 'PURCHASE_INDENT':
+        setMessageText(generatePurchaseIndentAlertText(state));
+        break;
+      case 'SCRAP_YIELD':
+        setMessageText(generateScrapYieldReportText(state));
+        break;
+      case 'CUSTOM_BROADCAST':
+        setMessageText(
+          `📢 *WÜNDERKRAF FACTORY ANNOUNCEMENT*\n━━━━━━━━━━━━━━━━━━━━\n📅 *Date:* ${new Date().toLocaleDateString()}\n\n⚠️ *SUBJECT:* Floor Operational Briefing\n\nAll Operators and Supervisors please note that...\n\n━━━━━━━━━━━━━━━━━━━━\n_Plant Management Office_`
+        );
+        break;
+    }
+  }, [selectedCategory, state]);
+
+  // Handle Copy Text
+  const handleCopy = () => {
+    navigator.clipboard.writeText(messageText);
+    setCopied(true);
+    showStatus('📋 Message copied to clipboard!');
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  // Record dispatch log entry
+  const recordDispatchLog = (status: 'SENT' | 'OPENED' | 'FAILED', targetRecipient: string) => {
+    const newLog = {
+      id: `WA-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      category: selectedCategory,
+      recipient: targetRecipient || targetPhone || 'Direct WhatsApp',
+      sender: username,
+      preview: messageText.slice(0, 85) + '...',
+      status
+    };
+
+    const existingLogs = state.whatsappConfig?.dispatchLogs || [];
+    const updatedConfig = {
+      ...state.whatsappConfig,
+      dispatchLogs: [newLog, ...existingLogs.slice(0, 49)]
+    };
+
+    onSaveState({
+      ...state,
+      whatsappConfig: updatedConfig
+    });
+  };
+
+  // Handle Direct WhatsApp Web / Mobile App Launch
+  const handleSendWhatsApp = () => {
+    const phoneToUse = targetPhone || state.whatsappConfig?.phone || '';
+    triggerWhatsAppShiftNotification(phoneToUse, messageText, state.whatsappConfig?.webhookUrl);
+    recordDispatchLog('OPENED', selectedContactName ? `${selectedContactName} (${phoneToUse})` : phoneToUse);
+    showStatus(`🚀 WhatsApp opened for ${selectedContactName || phoneToUse}`);
+  };
+
+  // Handle Direct API Webhook Trigger
+  const handleTriggerWebhookDirect = async () => {
+    const webhookUrl = state.whatsappConfig?.webhookUrl;
+    if (!webhookUrl || !webhookUrl.startsWith('http')) {
+      alert('⚠️ WhatsApp Webhook URL is not configured. Go to "Notification Triggers & Gateway" tab to configure your webhook endpoint, or use "Open in WhatsApp" for direct dispatch.');
+      return;
+    }
+
+    try {
+      showStatus('⚡ Dispatching via API Gateway Webhook...');
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(state.whatsappConfig?.apiKey ? { 'Authorization': `Bearer ${state.whatsappConfig.apiKey}` } : {})
+        },
+        body: JSON.stringify({
+          phone: targetPhone || state.whatsappConfig?.phone,
+          message: messageText,
+          category: selectedCategory,
+          sender: username,
+          timestamp: new Date().toISOString()
+        })
+      });
+      recordDispatchLog('SENT', selectedContactName ? `${selectedContactName} (${targetPhone})` : targetPhone);
+      showStatus('✅ Report successfully delivered via WhatsApp API Gateway!');
+    } catch (err) {
+      console.error('Webhook error:', err);
+      recordDispatchLog('FAILED', targetPhone);
+      showStatus('⚠️ Webhook request sent (verify endpoint connection logs)');
+    }
+  };
+
+  // =========================================================================
+  // 2. STAFF & ESCALATION CONTACT MATRIX STATE & LOGIC
+  // =========================================================================
+  const coordinationMatrixList: CoordinationMatrixItem[] = useMemo(() => {
+    return state.coordinationMatrix && state.coordinationMatrix.length > 0
+      ? state.coordinationMatrix
+      : DEFAULT_COORDINATION_MATRIX;
+  }, [state.coordinationMatrix]);
+
+  const [matrixSearch, setMatrixSearch] = useState('');
+  const [matrixFilterCategory, setMatrixFilterCategory] = useState<string>('ALL');
+
+  // Form state for adding new escalation contact
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newContactName, setNewContactName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newMachineBreakdown, setNewMachineBreakdown] = useState(true);
+  const [newElectricalAlert, setNewElectricalAlert] = useState(false);
+  const [newProductionHandover, setNewProductionHandover] = useState(true);
+  const [newMaterialIndent, setNewMaterialIndent] = useState(false);
+  const [newQcFailure, setNewQcFailure] = useState(false);
+  const [newIsActive, setNewIsActive] = useState(true);
+
+  // Inline editing state
+  const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
+  const [editingItem, setEditingItem] = useState<CoordinationMatrixItem | null>(null);
+
+  const validateMatrixItem = (role: string, name: string, phone: string): boolean => {
+    if (!role.trim()) {
+      alert('⚠️ Role / Department Name is required!');
+      return false;
+    }
+    if (!name.trim()) {
+      alert('⚠️ Contact Person Name is required!');
+      return false;
+    }
+    if (!phone.trim()) {
+      alert('⚠️ Phone Number is required!');
+      return false;
+    }
+    if (!phone.trim().startsWith('+')) {
+      alert('⚠️ Phone Number must include country code starting with "+" (e.g., +91 98250 12345).');
+      return false;
+    }
+    return true;
+  };
+
+  const handleAddMatrixItem = () => {
+    if (!canEditMatrix) {
+      alert('⛔ Access Restricted: Only Administrators are allowed to edit the Coordination Matrix.');
+      return;
+    }
+    if (!validateMatrixItem(newRoleName, newContactName, newPhone)) return;
+
+    const newItem: CoordinationMatrixItem = {
+      id: `CM-${Date.now()}`,
+      roleName: newRoleName.trim(),
+      contactName: newContactName.trim(),
+      phone: newPhone.trim(),
+      alertCategories: {
+        machineBreakdown: newMachineBreakdown,
+        electricalAlert: newElectricalAlert,
+        productionHandover: newProductionHandover,
+        materialIndent: newMaterialIndent,
+        qcFailure: newQcFailure
+      },
+      isActive: newIsActive
+    };
+
+    const nextList = [...coordinationMatrixList, newItem];
+    onSaveState({
+      ...state,
+      coordinationMatrix: nextList
+    });
+
+    // Reset inputs
+    setNewRoleName('');
+    setNewContactName('');
+    setNewPhone('');
+    setNewMachineBreakdown(true);
+    setNewElectricalAlert(false);
+    setNewProductionHandover(true);
+    setNewMaterialIndent(false);
+    setNewQcFailure(false);
+    setNewIsActive(true);
+
+    showStatus(`✅ ${newItem.contactName} (${newItem.roleName}) added to Escalation Matrix!`);
+  };
+
+  const handleStartEditMatrixItem = (idx: number) => {
+    if (!canEditMatrix) {
+      alert('⛔ Access Restricted: Only Administrators are allowed to edit the Coordination Matrix.');
+      return;
+    }
+    setEditingItemIdx(idx);
+    setEditingItem({ ...coordinationMatrixList[idx] });
+  };
+
+  const handleSaveMatrixItem = () => {
+    if (!canEditMatrix || editingItemIdx === null || !editingItem) return;
+    if (!validateMatrixItem(editingItem.roleName, editingItem.contactName, editingItem.phone)) return;
+
+    const nextList = [...coordinationMatrixList];
+    nextList[editingItemIdx] = { ...editingItem };
+    onSaveState({
+      ...state,
+      coordinationMatrix: nextList
+    });
+
+    setEditingItemIdx(null);
+    setEditingItem(null);
+    showStatus('✅ Escalation contact updated successfully!');
+  };
+
+  const handleDeleteMatrixItem = (idx: number) => {
+    if (!canEditMatrix) {
+      alert('⛔ Access Restricted: Only Administrators are allowed to edit the Coordination Matrix.');
+      return;
+    }
+    const item = coordinationMatrixList[idx];
+    if (!window.confirm(`Are you sure you want to remove "${item.contactName} (${item.roleName})" from WhatsApp alert routing?`)) return;
+
+    const nextList = coordinationMatrixList.filter((_, i) => i !== idx);
+    onSaveState({
+      ...state,
+      coordinationMatrix: nextList
+    });
+    showStatus('🗑️ Escalation contact removed.');
+  };
+
+  const handleToggleMatrixItemActive = (idx: number) => {
+    if (!canEditMatrix) {
+      alert('⛔ Access Restricted: Only Administrators are allowed to modify contact status.');
+      return;
+    }
+    const nextList = [...coordinationMatrixList];
+    nextList[idx] = {
+      ...nextList[idx],
+      isActive: !nextList[idx].isActive
+    };
+    onSaveState({
+      ...state,
+      coordinationMatrix: nextList
+    });
+  };
+
+  const handleTestWhatsAppAlert = (item: CoordinationMatrixItem) => {
+    const categories: string[] = [];
+    if (item.alertCategories.machineBreakdown) categories.push('Machine Breakdown');
+    if (item.alertCategories.electricalAlert) categories.push('Electrical Breakdown');
+    if (item.alertCategories.productionHandover) categories.push('Shift Handover');
+    if (item.alertCategories.materialIndent) categories.push('Material Indent');
+    if (item.alertCategories.qcFailure) categories.push('QC Failure');
+
+    const message = `🔔 *WÜNDERKRAF ESCALATION TEST PING*
+━━━━━━━━━━━━━━━━━━━━
+👤 *Recipient:* ${item.contactName} (${item.roleName})
+📱 *Routing:* ${item.phone}
+🕒 *Time:* ${new Date().toLocaleTimeString()}
+━━━━━━━━━━━━━━━━━━━━
+✅ Your WhatsApp channel is verified and registered for:
+${categories.length > 0 ? categories.map((c) => `• ${c}`).join('\n') : '• General Operational Alerts'}
+
+_Wünderkraf Factory Communication System_`;
+
+    triggerWhatsAppShiftNotification(item.phone, message, state.whatsappConfig?.webhookUrl);
+    showStatus(`🚀 Test alert sent to ${item.contactName} (${item.phone})`);
+  };
+
+  const filteredCoordinationMatrix = useMemo(() => {
+    return coordinationMatrixList.filter((item) => {
+      const matchesSearch =
+        item.roleName.toLowerCase().includes(matrixSearch.toLowerCase()) ||
+        item.contactName.toLowerCase().includes(matrixSearch.toLowerCase()) ||
+        item.phone.includes(matrixSearch);
+
+      if (!matchesSearch) return false;
+      if (matrixFilterCategory === 'ALL') return true;
+      if (matrixFilterCategory === 'BREAKDOWN') return item.alertCategories.machineBreakdown;
+      if (matrixFilterCategory === 'ELECTRICAL') return item.alertCategories.electricalAlert;
+      if (matrixFilterCategory === 'HANDOVER') return item.alertCategories.productionHandover;
+      if (matrixFilterCategory === 'INDENT') return item.alertCategories.materialIndent;
+      if (matrixFilterCategory === 'QC') return item.alertCategories.qcFailure;
+      return true;
+    });
+  }, [coordinationMatrixList, matrixSearch, matrixFilterCategory]);
+
+  // =========================================================================
+  // 3. NOTIFICATION TRIGGERS & GATEWAY CONFIGURATION STATE
+  // =========================================================================
+  const [triggerConfig, setTriggerConfig] = useState(() => ({
+    phone: state.whatsappConfig?.phone || '+91 90339 12511',
+    webhookUrl: state.whatsappConfig?.webhookUrl || '',
+    apiKey: state.whatsappConfig?.apiKey || '',
+    customFooter: state.whatsappConfig?.customMessage || 'Wünderkraf Factory Production Hub',
+    dayShiftReportTime: state.whatsappConfig?.dayShiftReportTime || '20:00',
+    nightShiftReportTime: state.whatsappConfig?.nightShiftReportTime || '08:00',
+    autoSendShiftReportDay: state.whatsappConfig?.autoSendShiftReportDay ?? state.whatsappConfig?.autoSend ?? true,
+    autoSendShiftReportNight: state.whatsappConfig?.autoSendShiftReportNight ?? state.whatsappConfig?.autoSend ?? true,
+    autoNotifyMaintenanceBreakdown: state.whatsappConfig?.autoNotifyMaintenanceBreakdown ?? true,
+    autoNotifyCriticalQcDefect: state.whatsappConfig?.autoNotifyCriticalQcDefect ?? true,
+    autoNotifyDispatchCompletion: state.whatsappConfig?.autoNotifyDispatchCompletion ?? true,
+    autoNotifyDailyManpower: state.whatsappConfig?.autoNotifyDailyManpower ?? true,
+    autoNotifyLowStockRequisition: state.whatsappConfig?.autoNotifyLowStockRequisition ?? true,
+    autoNotifyScrapSpike: state.whatsappConfig?.autoNotifyScrapSpike ?? false
+  }));
+
+  // Live system clock for real-time automation monitoring & testing
+  const [liveSystemTime, setLiveSystemTime] = useState<Date>(new Date());
+  useEffect(() => {
+    const clockInterval = setInterval(() => {
+      setLiveSystemTime(new Date());
+    }, 1000);
+    return () => clearInterval(clockInterval);
+  }, []);
+
+  const currentHours = String(liveSystemTime.getHours()).padStart(2, '0');
+  const currentMinutes = String(liveSystemTime.getMinutes()).padStart(2, '0');
+  const currentSeconds = String(liveSystemTime.getSeconds()).padStart(2, '0');
+  const currentLiveTimeStr = `${currentHours}:${currentMinutes}:${currentSeconds}`;
+  const todayStr = liveSystemTime.toISOString().split('T')[0];
+
+  // Helper to schedule an automated test trigger 1 minute from current time
+  const handleScheduleTestTriggerNextMinute = (targetShift: 'DAY' | 'NIGHT') => {
+    if (!canEditConfig) {
+      alert('⛔ Access Restricted: Only Administrators are authorized to update notification triggers.');
+      return;
+    }
+    const nextMinDate = new Date(Date.now() + 65 * 1000);
+    const hh = String(nextMinDate.getHours()).padStart(2, '0');
+    const mm = String(nextMinDate.getMinutes()).padStart(2, '0');
+    const targetTime = `${hh}:${mm}`;
+
+    const updatedConfig = {
+      ...state.whatsappConfig,
+      ...(targetShift === 'DAY'
+        ? {
+            dayShiftReportTime: targetTime,
+            autoSendShiftReportDay: true,
+            lastSentDayDate: '' // Unlock so it will trigger
+          }
+        : {
+            nightShiftReportTime: targetTime,
+            autoSendShiftReportNight: true,
+            lastSentNightDate: '' // Unlock so it will trigger
+          })
+    };
+
+    setTriggerConfig((prev) => ({
+      ...prev,
+      ...(targetShift === 'DAY'
+        ? { dayShiftReportTime: targetTime, autoSendShiftReportDay: true }
+        : { nightShiftReportTime: targetTime, autoSendShiftReportNight: true })
+    }));
+
+    onSaveState({
+      ...state,
+      whatsappConfig: updatedConfig
+    });
+
+    showStatus(`⏱️ Automated test scheduled for ${targetTime}! Watch the clock; at ${targetTime}, the shift alert will pop up automatically.`);
+  };
+
+  // Helper for instantaneous manual simulation of the shift changeover alert banner
+  const handleInstantSimulateTrigger = (targetShift: 'DAY' | 'NIGHT') => {
+    // 1. Dispatch custom event to trigger the prominent top banner in App.tsx
+    window.dispatchEvent(
+      new CustomEvent('wunderkraf_force_shift_alert', {
+        detail: { shift: targetShift }
+      })
+    );
+
+    // 2. Generate report text and record into dispatch logs
+    const reportText = generateShiftChangeoverReportText(state, targetShift);
+    const newLog = {
+      id: `DEMO-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      category: (targetShift === 'DAY' ? 'SHIFT_DAY' : 'SHIFT_NIGHT') as MessageCategory,
+      recipient: `Floor Coordination Matrix (${targetShift} Shift Alert)`,
+      sender: `${username} (Live Demo Test)`,
+      preview: reportText.slice(0, 85) + '...',
+      status: 'SENT' as const
+    };
+
+    const updatedConfig = {
+      ...state.whatsappConfig,
+      dispatchLogs: [newLog, ...(state.whatsappConfig?.dispatchLogs || []).slice(0, 49)]
+    };
+
+    onSaveState({
+      ...state,
+      whatsappConfig: updatedConfig
+    });
+
+    showStatus(`⚡ Instant ${targetShift} shift changeover alert triggered! Check top notification banner & dispatch logs.`);
+  };
+
+  // Helper to reset today's sent lock
+  const handleResetTodaySentFlags = () => {
+    if (!canEditConfig) {
+      alert('⛔ Access Restricted: Only Administrators are authorized.');
+      return;
+    }
+    const updatedConfig = {
+      ...state.whatsappConfig,
+      lastSentDayDate: '',
+      lastSentNightDate: ''
+    };
+    onSaveState({
+      ...state,
+      whatsappConfig: updatedConfig
+    });
+    showStatus("🔄 Today's shift dispatch locks reset! You can now trigger automated reports again today.");
+  };
+
+  const handleSaveTriggers = () => {
+    if (!canEditConfig) {
+      alert('⛔ Access Restricted: Only Administrators are authorized to update notification triggers.');
+      return;
+    }
+    const updated = {
+      ...state.whatsappConfig,
+      phone: triggerConfig.phone.trim(),
+      webhookUrl: triggerConfig.webhookUrl.trim(),
+      apiKey: triggerConfig.apiKey.trim(),
+      customMessage: triggerConfig.customFooter.trim(),
+      dayShiftReportTime: triggerConfig.dayShiftReportTime,
+      nightShiftReportTime: triggerConfig.nightShiftReportTime,
+      autoSendShiftReportDay: triggerConfig.autoSendShiftReportDay,
+      autoSendShiftReportNight: triggerConfig.autoSendShiftReportNight,
+      autoNotifyMaintenanceBreakdown: triggerConfig.autoNotifyMaintenanceBreakdown,
+      autoNotifyCriticalQcDefect: triggerConfig.autoNotifyCriticalQcDefect,
+      autoNotifyDispatchCompletion: triggerConfig.autoNotifyDispatchCompletion,
+      autoNotifyDailyManpower: triggerConfig.autoNotifyDailyManpower,
+      autoNotifyLowStockRequisition: triggerConfig.autoNotifyLowStockRequisition,
+      autoNotifyScrapSpike: triggerConfig.autoNotifyScrapSpike
+    };
+
+    onSaveState({
+      ...state,
+      whatsappConfig: updated
+    });
+    showStatus('💾 WhatsApp Notification Triggers & Gateway Configuration Saved!');
+  };
+
+  // =========================================================================
+  // 4. AUTOMATED SHIFT REPORTS & DISPATCH AUDIT LOGS
+  // =========================================================================
+  const dispatchLogs = useMemo(() => {
+    return state.whatsappConfig?.dispatchLogs || [];
+  }, [state.whatsappConfig?.dispatchLogs]);
+
+  const [logSearch, setLogSearch] = useState('');
+  const [logFilterCategory, setLogFilterCategory] = useState<string>('ALL');
+  const [inspectingLog, setInspectingLog] = useState<any | null>(null);
+
+  const filteredLogs = useMemo(() => {
+    return dispatchLogs.filter((log) => {
+      const matchesSearch =
+        log.recipient.toLowerCase().includes(logSearch.toLowerCase()) ||
+        log.sender.toLowerCase().includes(logSearch.toLowerCase()) ||
+        log.preview.toLowerCase().includes(logSearch.toLowerCase());
+
+      if (!matchesSearch) return false;
+      if (logFilterCategory === 'ALL') return true;
+      if (logFilterCategory === 'SHIFTS') return log.category === 'SHIFT_DAY' || log.category === 'SHIFT_NIGHT';
+      if (logFilterCategory === 'BREAKDOWN') return log.category === 'MAINTENANCE_BREAKDOWN';
+      if (logFilterCategory === 'MANPOWER') return log.category === 'MANPOWER_ATTENDANCE';
+      if (logFilterCategory === 'QC') return log.category === 'QC_DEFECT';
+      if (logFilterCategory === 'DISPATCH') return log.category === 'DISPATCH_NOTE';
+      return log.category === logFilterCategory;
+    });
+  }, [dispatchLogs, logSearch, logFilterCategory]);
+
+  const handleClearLogs = () => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can clear the dispatch history.');
+      return;
+    }
+    if (!window.confirm('Clear all WhatsApp dispatch logs? This action cannot be undone.')) return;
+
+    onSaveState({
+      ...state,
+      whatsappConfig: {
+        ...state.whatsappConfig,
+        dispatchLogs: []
+      }
+    });
+    showStatus('🗑️ Dispatch logs cleared.');
+  };
+
+  const handleExportLogsCsv = () => {
+    if (dispatchLogs.length === 0) {
+      alert('No dispatch logs available to export.');
+      return;
+    }
+    const headers = ['Log ID', 'Timestamp', 'Category', 'Recipient', 'Sender', 'Status', 'Message Preview'];
+    const rows = dispatchLogs.map((l) => [
+      l.id,
+      l.timestamp,
+      l.category,
+      `"${l.recipient.replace(/"/g, '""')}"`,
+      l.sender,
+      l.status,
+      `"${l.preview.replace(/"/g, '""')}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Wunderkraf_WhatsApp_Dispatch_Log_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Preset recipients for dispatcher
+  const recipientOptions = useMemo(() => {
+    const list = [
+      {
+        id: 'primary',
+        label: `Primary Gateway (${state.whatsappConfig?.phone || '+91 90339 12511'})`,
+        phone: state.whatsappConfig?.phone || '+91 90339 12511'
+      }
+    ];
+
+    coordinationMatrixList.forEach((m) => {
+      list.push({
+        id: m.id,
+        label: `${m.contactName} — ${m.roleName} (${m.phone})`,
+        phone: m.phone
+      });
+    });
+
+    (state.whatsappConfig?.managementContacts || []).forEach((c) => {
+      list.push({
+        id: c.id,
+        label: `${c.name} — ${c.role} (${c.phone})`,
+        phone: c.phone
+      });
+    });
+
+    return list;
+  }, [state.whatsappConfig, coordinationMatrixList]);
+
+  // Overall KPI statistics
+  const totalMatrixContacts = coordinationMatrixList.length;
+  const activeMatrixContacts = coordinationMatrixList.filter((c) => c.isActive).length;
+  const activeBreakdownsCount = (state.maintenanceIncidents || []).filter(
+    (i) => i.status === 'OPEN' || i.status === 'IN_PROGRESS'
+  ).length;
+
+  return (
+    <div className="space-y-5">
+      {/* 1. TOP HEADER & NAVIGATION BAR */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBackToHub}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to Home
+            </button>
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-emerald-200 shadow-md">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-black text-slate-900 m-0">
+                  WhatsApp Communication Desk
+                </h2>
+                <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full border border-emerald-300 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  LIVE GATEWAY
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                  isAdmin ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}>
+                  {isAdmin ? '🛡️ MASTER ADMIN ACCESS' : `👤 ${username.toUpperCase()} (OPERATOR)`}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium m-0 mt-0.5">
+                Multi-Module WhatsApp Reporting, Department Heads Escalation Matrix & Notification Automation
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Action Toolbar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {isAdmin && (
+              <button
+                onClick={() => onNavigateToView ? onNavigateToView('ADMIN') : null}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-2 rounded-xl transition cursor-pointer shadow-2xs active:scale-95"
+                title="Go to Master Admin Settings"
+              >
+                <Settings className="w-4 h-4 text-slate-600" />
+                <span>Admin Master</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setActiveTab('dispatcher')}
+              className="flex items-center gap-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition shadow-xs cursor-pointer active:scale-95"
+            >
+              <Send className="w-4 h-4" />
+              <span>Compose Message</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Status Toast Alert */}
+        {statusMessage && (
+          <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 flex items-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{statusMessage}</span>
+          </div>
+        )}
+      </div>
+
+      {/* 2. TOP KPI RAIL */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-emerald-800 uppercase">Gateway Channel</span>
+            <Phone className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-base font-black text-emerald-950 mt-1 font-mono truncate">
+            {state.whatsappConfig?.phone || '+91 90339 12511'}
+          </div>
+          <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+            {state.whatsappConfig?.webhookUrl ? '⚡ Webhook Connected' : '📱 Direct wa.me Mode'}
+          </div>
+        </div>
+
+        <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-blue-800 uppercase">Escalation Matrix</span>
+            <Users className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="text-xl font-black text-blue-950 mt-1">
+            {activeMatrixContacts} / {totalMatrixContacts} Active
+          </div>
+          <div className="text-[10px] text-blue-700 font-semibold mt-0.5">
+            Department Heads & Emergency Routing
+          </div>
+        </div>
+
+        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-amber-800 uppercase">Shift Triggers</span>
+            <Clock className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-base font-black text-amber-950 mt-1 font-mono">
+            ☀️ {triggerConfig.dayShiftReportTime} | 🌙 {triggerConfig.nightShiftReportTime}
+          </div>
+          <div className="text-[10px] text-amber-700 font-semibold mt-0.5">
+            Auto-Dispatched Daily to Matrix
+          </div>
+        </div>
+
+        <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-purple-800 uppercase">Dispatch History</span>
+            <BellRing className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="text-xl font-black text-purple-950 mt-1">
+            {dispatchLogs.length} Dispatches
+          </div>
+          <div className="text-[10px] text-purple-700 font-semibold mt-0.5">
+            Automated & Manual Shift Logs
+          </div>
+        </div>
+      </div>
+
+      {/* 3. DESK NAVIGATION TABS */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-1.5 shadow-xs flex flex-wrap gap-1">
+        <button
+          onClick={() => setActiveTab('dispatcher')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeTab === 'dispatcher'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Send className="w-4 h-4" />
+          <span>Broadcast & Shift Dispatcher</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('coordination_matrix')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeTab === 'coordination_matrix'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Staff & Escalation Contact Matrix</span>
+          <span className={`px-2 py-0.2 rounded-full text-[10px] font-extrabold ${
+            activeTab === 'coordination_matrix' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
+          }`}>
+            {totalMatrixContacts}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('triggers')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeTab === 'triggers'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          <span>Notification Triggers & Gateway</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('dispatch_logs')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeTab === 'dispatch_logs'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Automated Shift Reports & Audit Log</span>
+          <span className={`px-2 py-0.2 rounded-full text-[10px] font-extrabold ${
+            activeTab === 'dispatch_logs' ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-700'
+          }`}>
+            {dispatchLogs.length}
+          </span>
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 1: BROADCAST & SHIFT DISPATCHER                                       */}
+      {/* ========================================================================= */}
+      {activeTab === 'dispatcher' && (
+        <div className="space-y-5">
+          {/* Module Category Selector Pills */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-3">
+              Select Factory Report / Broadcast Template
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              <button
+                onClick={() => setSelectedCategory('SHIFT_DAY')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'SHIFT_DAY'
+                    ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">☀️</span>
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">20:00</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">Day Shift Report</div>
+                <div className="text-[10px] text-slate-500">Output, Slit & Operators</div>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('SHIFT_NIGHT')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'SHIFT_NIGHT'
+                    ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">🌙</span>
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">08:00</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">Night Shift Report</div>
+                <div className="text-[10px] text-slate-500">Overnight Production</div>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('MAINTENANCE_BREAKDOWN')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'MAINTENANCE_BREAKDOWN'
+                    ? 'border-rose-500 bg-rose-50/60 ring-2 ring-rose-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <Wrench className="w-4 h-4 text-rose-600" />
+                  {activeBreakdownsCount > 0 && (
+                    <span className="text-[9px] font-black text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded animate-pulse">
+                      {activeBreakdownsCount} DOWN
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs font-black text-slate-800">Breakdown Alert</div>
+                <div className="text-[10px] text-slate-500">Stoppage & Technician</div>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('MANPOWER_ATTENDANCE')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'MANPOWER_ATTENDANCE'
+                    ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <span className="text-[9px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">8 AM</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">Manpower Roster</div>
+                <div className="text-[10px] text-slate-500">Attendance Roll Call</div>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('QC_DEFECT')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'QC_DEFECT'
+                    ? 'border-orange-500 bg-orange-50/60 ring-2 ring-orange-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <SearchCheck className="w-4 h-4 text-orange-600" />
+                  <span className="text-[9px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded">QC</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">QC Defect Alert</div>
+                <div className="text-[10px] text-slate-500">Critical Quality Alert</div>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('DISPATCH_NOTE')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'DISPATCH_NOTE'
+                    ? 'border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <Truck className="w-4 h-4 text-emerald-600" />
+                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">LOGISTICS</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">Dispatch Delivery</div>
+                <div className="text-[10px] text-slate-500">Gate Pass & Boxes</div>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('PURCHASE_INDENT')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'PURCHASE_INDENT'
+                    ? 'border-teal-500 bg-teal-50/60 ring-2 ring-teal-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <ShoppingCart className="w-4 h-4 text-teal-600" />
+                  <span className="text-[9px] font-bold text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded">STORES</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">Purchase Indent</div>
+                <div className="text-[10px] text-slate-500">Critical Spares Indent</div>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('SCRAP_YIELD')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                  selectedCategory === 'SCRAP_YIELD'
+                    ? 'border-lime-500 bg-lime-50/60 ring-2 ring-lime-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <Trash2 className="w-4 h-4 text-lime-600" />
+                  <span className="text-[9px] font-bold text-lime-700 bg-lime-100 px-1.5 py-0.5 rounded">YIELD</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">Scrap & Yield</div>
+                <div className="text-[10px] text-slate-500">Floor Efficiency Summary</div>
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('CUSTOM_BROADCAST')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 col-span-2 sm:col-span-1 lg:col-span-2 ${
+                  selectedCategory === 'CUSTOM_BROADCAST'
+                    ? 'border-purple-500 bg-purple-50/60 ring-2 ring-purple-300'
+                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">BROADCAST</span>
+                </div>
+                <div className="text-xs font-black text-slate-800">Custom Announcement</div>
+                <div className="text-[10px] text-slate-500">Floor Notice & General Briefing</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Two-Column Editor & Recipient Panel */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Left: Message Editor & Live Preview */}
+            <div className="lg:col-span-8 space-y-3">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
+                      Message Content & Formatting
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        // Reset to dynamic template
+                        setSelectedCategory((prev) => {
+                          const temp = prev;
+                          return temp;
+                        });
+                        showStatus('🔄 Message reloaded from live floor data');
+                      }}
+                      className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
+                      title="Reload fresh factory data"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reload Data
+                    </button>
+                    <button
+                      onClick={handleCopy}
+                      className="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1 cursor-pointer transition active:scale-95"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copied ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <textarea
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  rows={14}
+                  className="w-full p-3.5 border border-slate-300 rounded-xl font-mono text-xs text-slate-900 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition leading-relaxed resize-y"
+                  placeholder="Type WhatsApp message..."
+                />
+
+                <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500">
+                  <span>Characters: {messageText.length} | Lines: {messageText.split('\n').length}</span>
+                  <span className="text-emerald-700 font-bold">WhatsApp Markdown formatting active (*bold*, _italic_)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Target Recipient & Direct Dispatch Bar */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-4">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
+                  Target Recipient & Routing
+                </h4>
+
+                {/* Quick Recipient Selector */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Select Contact from Matrix
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      const selected = recipientOptions.find((r) => r.phone === e.target.value);
+                      if (selected) {
+                        setTargetPhone(selected.phone);
+                        setSelectedContactName(selected.label.split('(')[0].trim());
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  >
+                    {recipientOptions.map((opt) => (
+                      <option key={opt.id} value={opt.phone}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Custom Phone Number Input */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Target WhatsApp Phone Number
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={targetPhone}
+                      onChange={(e) => setTargetPhone(e.target.value)}
+                      placeholder="+91 90339 12511"
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Must include country code (e.g., +91 for India)
+                  </span>
+                </div>
+
+                {/* Dispatch Trigger Buttons */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={handleSendWhatsApp}
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-3 px-4 rounded-xl shadow-xs transition active:scale-98 cursor-pointer"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Open in WhatsApp Web / App</span>
+                  </button>
+
+                  <button
+                    onClick={handleTriggerWebhookDirect}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition active:scale-98 cursor-pointer"
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>Send via API Gateway Webhook</span>
+                  </button>
+
+                  <button
+                    onClick={handleCopy}
+                    className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span>Copy Text to Clipboard</span>
+                  </button>
+                </div>
+
+                {/* Quick Info Box */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 leading-relaxed">
+                  💡 <strong>Direct Dispatch:</strong> Clicking &quot;Open in WhatsApp&quot; launches WhatsApp with the pre-formatted report. &quot;API Gateway Webhook&quot; dispatches via your configured automated webhook.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: STAFF & ESCALATION CONTACT MATRIX (MIGRATED & INTEGRATED)          */}
+      {/* ========================================================================= */}
+      {activeTab === 'coordination_matrix' && (
+        <div className="space-y-5">
+          {/* Header & Mode Bar */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide m-0">
+                  Department Heads & Escalation Contact Matrix
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 m-0 mt-0.5">
+                Manage mobile numbers and subscribed automated WhatsApp alert categories for factory leaders.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${
+                canEditMatrix
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                  : 'bg-amber-50 text-amber-700 border-amber-300'
+              }`}>
+                {canEditMatrix ? '🛡️ ADMIN EDIT MODE' : '👁️ VIEW-ONLY OPERATOR MODE'}
+              </span>
+            </div>
+          </div>
+
+          {!canEditMatrix && (
+            <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h5 className="text-xs font-bold text-amber-900 m-0">Read-Only View Active</h5>
+                <p className="text-[11px] text-amber-700 mt-0.5 m-0">
+                  Editing or deleting contacts in the escalation matrix is restricted to authorized Administrators. Operators and supervisors can view the directory and trigger test alerts during emergencies.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Search & Category Filter */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={matrixSearch}
+                onChange={(e) => setMatrixSearch(e.target.value)}
+                placeholder="Search name, role, or phone..."
+                className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Filter:</span>
+              {[
+                { id: 'ALL', label: 'All Contacts' },
+                { id: 'BREAKDOWN', label: 'Breakdown' },
+                { id: 'ELECTRICAL', label: 'Electrical' },
+                { id: 'HANDOVER', label: 'Handover' },
+                { id: 'INDENT', label: 'Indent' },
+                { id: 'QC', label: 'QC Failure' }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setMatrixFilterCategory(f.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer whitespace-nowrap ${
+                    matrixFilterCategory === f.id
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Table Card */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h5 className="text-xs font-black text-slate-700 uppercase m-0">
+                Registered Department Heads Directory
+              </h5>
+              <span className="text-[10px] text-slate-500 font-bold">
+                {filteredCoordinationMatrix.length} Contacts Listed
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100/75 border-b border-slate-200 text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">
+                    <th className="py-3 px-4">Role / Department</th>
+                    <th className="py-3 px-4">Contact Name</th>
+                    <th className="py-3 px-4">WhatsApp Phone</th>
+                    <th className="py-3 px-4">Subscribed Alert Categories</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-xs">
+                  {filteredCoordinationMatrix.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
+                        No contacts found matching the filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredCoordinationMatrix.map((item, idx) => {
+                      const isEditing = editingItemIdx === idx;
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/50 transition">
+                          {isEditing && editingItem ? (
+                            <>
+                              {/* Inline Editing Mode */}
+                              <td className="py-3 px-4">
+                                <input
+                                  type="text"
+                                  value={editingItem.roleName}
+                                  onChange={(e) => setEditingItem({ ...editingItem, roleName: e.target.value })}
+                                  placeholder="e.g. Electrical Breakdown Head"
+                                  className="px-2 py-1.5 border border-blue-300 bg-white text-xs font-bold rounded-lg w-full text-blue-950"
+                                />
+                              </td>
+                              <td className="py-3 px-4">
+                                <input
+                                  type="text"
+                                  value={editingItem.contactName}
+                                  onChange={(e) => setEditingItem({ ...editingItem, contactName: e.target.value })}
+                                  placeholder="e.g. Gohel manoj"
+                                  className="px-2 py-1.5 border border-blue-300 bg-white text-xs font-bold rounded-lg w-full text-blue-950"
+                                />
+                              </td>
+                              <td className="py-3 px-4">
+                                <input
+                                  type="text"
+                                  value={editingItem.phone}
+                                  onChange={(e) => setEditingItem({ ...editingItem, phone: e.target.value })}
+                                  placeholder="e.g. +91 90339 12511"
+                                  className="px-2 py-1.5 border border-blue-300 bg-white text-xs font-mono font-bold rounded-lg w-full text-blue-950"
+                                />
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-50 rounded-lg border border-slate-200 max-w-xs">
+                                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={editingItem.alertCategories.machineBreakdown}
+                                      onChange={(e) =>
+                                        setEditingItem({
+                                          ...editingItem,
+                                          alertCategories: {
+                                            ...editingItem.alertCategories,
+                                            machineBreakdown: e.target.checked
+                                          }
+                                        })
+                                      }
+                                      className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                    />
+                                    <span>Breakdown</span>
+                                  </label>
+                                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={editingItem.alertCategories.electricalAlert}
+                                      onChange={(e) =>
+                                        setEditingItem({
+                                          ...editingItem,
+                                          alertCategories: {
+                                            ...editingItem.alertCategories,
+                                            electricalAlert: e.target.checked
+                                          }
+                                        })
+                                      }
+                                      className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                    />
+                                    <span>Electrical</span>
+                                  </label>
+                                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={editingItem.alertCategories.productionHandover}
+                                      onChange={(e) =>
+                                        setEditingItem({
+                                          ...editingItem,
+                                          alertCategories: {
+                                            ...editingItem.alertCategories,
+                                            productionHandover: e.target.checked
+                                          }
+                                        })
+                                      }
+                                      className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                    />
+                                    <span>Handover</span>
+                                  </label>
+                                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={editingItem.alertCategories.materialIndent}
+                                      onChange={(e) =>
+                                        setEditingItem({
+                                          ...editingItem,
+                                          alertCategories: {
+                                            ...editingItem.alertCategories,
+                                            materialIndent: e.target.checked
+                                          }
+                                        })
+                                      }
+                                      className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                    />
+                                    <span>Indent</span>
+                                  </label>
+                                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700 cursor-pointer col-span-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={editingItem.alertCategories.qcFailure}
+                                      onChange={(e) =>
+                                        setEditingItem({
+                                          ...editingItem,
+                                          alertCategories: {
+                                            ...editingItem.alertCategories,
+                                            qcFailure: e.target.checked
+                                          }
+                                        })
+                                      }
+                                      className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                    />
+                                    <span>QC Failure</span>
+                                  </label>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingItem({ ...editingItem, isActive: !editingItem.isActive })}
+                                  className={`px-2.5 py-1 rounded-full text-[10px] font-black border uppercase transition ${
+                                    editingItem.isActive
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                      : 'bg-slate-100 text-slate-500 border-slate-300'
+                                  }`}
+                                >
+                                  {editingItem.isActive ? 'Active' : 'Inactive'}
+                                </button>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveMatrixItem}
+                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition cursor-pointer"
+                                    title="Save changes"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingItemIdx(null);
+                                      setEditingItem(null);
+                                    }}
+                                    className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition cursor-pointer"
+                                    title="Cancel"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              {/* Display Mode */}
+                              <td className="py-3 px-4 font-black text-slate-800">
+                                {item.roleName}
+                              </td>
+                              <td className="py-3 px-4 font-bold text-slate-600">
+                                {item.contactName}
+                              </td>
+                              <td className="py-3 px-4 font-mono font-bold text-blue-800">
+                                {item.phone}
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex flex-wrap gap-1">
+                                  {item.alertCategories.machineBreakdown && (
+                                    <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-black uppercase">
+                                      Breakdown
+                                    </span>
+                                  )}
+                                  {item.alertCategories.electricalAlert && (
+                                    <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200 text-[9px] font-black uppercase">
+                                      Electrical
+                                    </span>
+                                  )}
+                                  {item.alertCategories.productionHandover && (
+                                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-black uppercase">
+                                      Handover
+                                    </span>
+                                  )}
+                                  {item.alertCategories.materialIndent && (
+                                    <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-black uppercase">
+                                      Indent
+                                    </span>
+                                  )}
+                                  {item.alertCategories.qcFailure && (
+                                    <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[9px] font-black uppercase">
+                                      QC
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {canEditMatrix ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleMatrixItemActive(idx)}
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black border uppercase transition cursor-pointer ${
+                                      item.isActive
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                        : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    {item.isActive ? 'Active' : 'Inactive'}
+                                  </button>
+                                ) : (
+                                  <span
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black border uppercase ${
+                                      item.isActive
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                        : 'bg-slate-100 text-slate-500 border-slate-300'
+                                    }`}
+                                  >
+                                    {item.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Test WhatsApp Alert */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTestWhatsAppAlert(item)}
+                                    className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg transition cursor-pointer"
+                                    title="Send WhatsApp Test Alert"
+                                  >
+                                    <Send className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {canEditMatrix && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEditMatrixItem(idx)}
+                                        className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 rounded-lg transition cursor-pointer"
+                                        title="Edit Contact"
+                                      >
+                                        <Edit className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteMatrixItem(idx)}
+                                        className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg transition cursor-pointer"
+                                        title="Delete Contact"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Add New Contact Form (Admin Only) */}
+          {canEditMatrix && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                <Plus className="w-4 h-4 text-blue-600" />
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
+                  Add New Department Head / Escalation Contact
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Role / Department
+                  </label>
+                  <input
+                    type="text"
+                    value={newRoleName}
+                    onChange={(e) => setNewRoleName(e.target.value)}
+                    placeholder="e.g. Slitting Machine Head"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Contact Person Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    placeholder="e.g. Rajesh Kumar"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    WhatsApp Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    placeholder="e.g. +91 98765 43210"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1.5">
+                  Subscribed Automated WhatsApp Alert Categories
+                </label>
+                <div className="flex flex-wrap gap-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newMachineBreakdown}
+                      onChange={(e) => setNewMachineBreakdown(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span>Machine Breakdown</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newElectricalAlert}
+                      onChange={(e) => setNewElectricalAlert(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span>Electrical Alert</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newProductionHandover}
+                      onChange={(e) => setNewProductionHandover(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span>Shift Handover Report</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newMaterialIndent}
+                      onChange={(e) => setNewMaterialIndent(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span>Material Indent</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newQcFailure}
+                      onChange={(e) => setNewQcFailure(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span>QC Failure</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={handleAddMatrixItem}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs py-2.5 px-5 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Save Contact to Escalation Matrix</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: NOTIFICATION TRIGGERS & GATEWAY CONFIGURATION                      */}
+      {/* ========================================================================= */}
+      {activeTab === 'triggers' && (
+        <div className="space-y-5">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 flex-wrap gap-2">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide m-0">
+                  Notification Triggers & Automation Settings
+                </h3>
+                <p className="text-xs text-slate-500 m-0 mt-0.5">
+                  Configure scheduled shift report dispatches, real-time breakdown alerts, and API Webhook parameters.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${
+                  canEditConfig
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                    : 'bg-amber-50 text-amber-700 border-amber-300'
+                }`}>
+                  {canEditConfig ? '🛡️ CONFIG EDITABLE' : '🔒 ADMIN LOCKED'}
+                </span>
+              </div>
+            </div>
+
+            {/* 🧪 LIVE AUTOMATION DEMO & TESTING SANDBOX */}
+            <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white border border-emerald-500/40 rounded-2xl p-5 shadow-md space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shrink-0">
+                    <Timer className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-black uppercase tracking-wide text-white m-0">
+                        Live Automation Demo & Testing Sandbox
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        REAL-TIME CLOCK ACTIVE
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 m-0 mt-0.5">
+                      घड़ी के तय समय के अनुसार ऑटोमैटिक WhatsApp शिफ्ट रिपोर्ट टेस्ट करें या तुरंत 1-क्लिक में लाइव डेमो देखें।
+                    </p>
+                  </div>
+                </div>
+
+                {/* Live Clock Display */}
+                <div className="flex items-center gap-3 bg-black/40 border border-white/10 px-3.5 py-2 rounded-xl shrink-0">
+                  <Clock className="w-4 h-4 text-emerald-400" />
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">System Live Clock</div>
+                    <div className="text-base font-black font-mono text-emerald-300 leading-none mt-0.5">
+                      {currentLiveTimeStr}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                  <div className="text-[10px] uppercase font-bold text-amber-300">☀️ Day Shift Schedule</div>
+                  <div className="text-sm font-black font-mono mt-1 text-white">{triggerConfig.dayShiftReportTime} (24H)</div>
+                  <div className="text-[10px] mt-1 text-slate-300">
+                    Status Today: {state.whatsappConfig?.lastSentDayDate === todayStr ? (
+                      <span className="text-amber-400 font-bold">✅ Already Dispatched Today</span>
+                    ) : (
+                      <span className="text-emerald-400 font-bold">🟢 Armed & Waiting for Time</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                  <div className="text-[10px] uppercase font-bold text-indigo-300">🌙 Night Shift Schedule</div>
+                  <div className="text-sm font-black font-mono mt-1 text-white">{triggerConfig.nightShiftReportTime} (24H)</div>
+                  <div className="text-[10px] mt-1 text-slate-300">
+                    Status Today: {state.whatsappConfig?.lastSentNightDate === todayStr ? (
+                      <span className="text-indigo-400 font-bold">✅ Already Dispatched Today</span>
+                    ) : (
+                      <span className="text-emerald-400 font-bold">🟢 Armed & Waiting for Time</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                  <div className="text-[10px] uppercase font-bold text-emerald-300">📡 Active Matrix Recipients</div>
+                  <div className="text-sm font-black font-mono mt-1 text-white">
+                    {coordinationMatrixList.filter((c) => c.isActive && c.alertCategories.productionHandover).length} Contacts
+                  </div>
+                  <div className="text-[10px] mt-1 text-slate-300">
+                    Subscribed to Shift Handover
+                  </div>
+                </div>
+              </div>
+
+              {/* Demo Test Action Buttons */}
+              <div className="bg-black/30 border border-white/10 rounded-xl p-3.5 space-y-3">
+                <div className="text-[11px] font-black uppercase text-emerald-400 tracking-wider">
+                  ⚡ Interactive Demo Controls (डेमो टेस्टिंग विकल्प):
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                  {/* Test Option 1: Schedule 1 Minute From Now */}
+                  <button
+                    type="button"
+                    onClick={() => handleScheduleTestTriggerNextMinute('DAY')}
+                    className="flex items-center gap-2 p-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition cursor-pointer text-left shadow-xs active:scale-95"
+                  >
+                    <Timer className="w-4 h-4 shrink-0 text-emerald-200" />
+                    <div>
+                      <div className="font-black leading-tight">⏱️ Set Day Auto-Trigger to +1 Min</div>
+                      <div className="text-[10px] text-emerald-100 font-medium">Auto-fires when clock reaches next min</div>
+                    </div>
+                  </button>
+
+                  {/* Test Option 2: Instant Simulate Now */}
+                  <button
+                    type="button"
+                    onClick={() => handleInstantSimulateTrigger('DAY')}
+                    className="flex items-center gap-2 p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition cursor-pointer text-left shadow-xs active:scale-95"
+                  >
+                    <Zap className="w-4 h-4 shrink-0 text-blue-200" />
+                    <div>
+                      <div className="font-black leading-tight">⚡ Fire Instant Demo Alert Now</div>
+                      <div className="text-[10px] text-blue-100 font-medium">Bypasses clock; shows top banner & logs</div>
+                    </div>
+                  </button>
+
+                  {/* Test Option 3: Reset Sent Lock */}
+                  <button
+                    type="button"
+                    onClick={handleResetTodaySentFlags}
+                    className="flex items-center gap-2 p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-bold transition cursor-pointer text-left active:scale-95"
+                  >
+                    <RotateCcw className="w-4 h-4 shrink-0 text-slate-400" />
+                    <div>
+                      <div className="font-black leading-tight">🔄 Reset Today&apos;s Sent Lock</div>
+                      <div className="text-[10px] text-slate-400 font-medium">Allows retesting scheduled time today</div>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="text-[11px] text-slate-300 bg-white/5 p-2.5 rounded-lg border border-white/5 flex items-start gap-2">
+                  <span className="text-emerald-400 font-bold">💡 टेस्टिंग गाइड:</span>
+                  <span>
+                    <strong>1. टाइमर टेस्ट:</strong> <em>&quot;Set Day Auto-Trigger to +1 Min&quot;</em> बटन दबाएं। ऊपर सिस्टम क्लॉक देखें। जैसे ही अगला मिनट होगा, स्क्रीन पर तुरंत ब्लू <strong>Shift Changeover Alert Banner</strong> प्रकट होगा और रिपोर्ट WhatsApp लॉग में दर्ज हो जाएगी!<br />
+                    <strong>2. इंस्टेंट टेस्ट:</strong> <em>&quot;Fire Instant Demo Alert Now&quot;</em> दबाकर तुरंत लाइव अलर्ट और रिपोर्ट का पूर्वावलोकन देखें।
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Shift Automation Timers */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider m-0">
+                1. Automated Shift Changeover Timers
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                      <span>☀️</span> Day Shift Changeover Report
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={triggerConfig.autoSendShiftReportDay}
+                        disabled={!canEditConfig}
+                        onChange={(e) =>
+                          setTriggerConfig({ ...triggerConfig, autoSendShiftReportDay: e.target.checked })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-amber-800 mb-1">
+                      Scheduled Trigger Time (24-Hour format)
+                    </label>
+                    <input
+                      type="time"
+                      value={triggerConfig.dayShiftReportTime}
+                      disabled={!canEditConfig}
+                      onChange={(e) =>
+                        setTriggerConfig({ ...triggerConfig, dayShiftReportTime: e.target.value })
+                      }
+                      className="px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-950 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-amber-700 mt-1 block">
+                      Dispatched automatically every evening to subscribers with Handover rights.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-indigo-50/50 border border-indigo-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                      <span>🌙</span> Night Shift Changeover Report
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={triggerConfig.autoSendShiftReportNight}
+                        disabled={!canEditConfig}
+                        onChange={(e) =>
+                          setTriggerConfig({ ...triggerConfig, autoSendShiftReportNight: e.target.checked })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-indigo-800 mb-1">
+                      Scheduled Trigger Time (24-Hour format)
+                    </label>
+                    <input
+                      type="time"
+                      value={triggerConfig.nightShiftReportTime}
+                      disabled={!canEditConfig}
+                      onChange={(e) =>
+                        setTriggerConfig({ ...triggerConfig, nightShiftReportTime: e.target.value })
+                      }
+                      className="px-3 py-1.5 bg-white border border-indigo-300 rounded-lg text-xs font-mono font-bold text-indigo-950 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-indigo-700 mt-1 block">
+                      Dispatched automatically every morning to subscribers with Handover rights.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Real-time Cross-Module Event Alerts */}
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider m-0">
+                2. Real-Time Operational Event Triggers
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <label className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between cursor-pointer hover:bg-slate-100/70 transition">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-rose-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Machine Breakdown</div>
+                      <div className="text-[10px] text-slate-500">Alert on incident open</div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={triggerConfig.autoNotifyMaintenanceBreakdown}
+                    disabled={!canEditConfig}
+                    onChange={(e) =>
+                      setTriggerConfig({ ...triggerConfig, autoNotifyMaintenanceBreakdown: e.target.checked })
+                    }
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                  />
+                </label>
+
+                <label className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between cursor-pointer hover:bg-slate-100/70 transition">
+                  <div className="flex items-center gap-2">
+                    <SearchCheck className="w-4 h-4 text-orange-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Critical QC Defect</div>
+                      <div className="text-[10px] text-slate-500">Alert on crate rejection</div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={triggerConfig.autoNotifyCriticalQcDefect}
+                    disabled={!canEditConfig}
+                    onChange={(e) =>
+                      setTriggerConfig({ ...triggerConfig, autoNotifyCriticalQcDefect: e.target.checked })
+                    }
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                  />
+                </label>
+
+                <label className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between cursor-pointer hover:bg-slate-100/70 transition">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Dispatch Completion</div>
+                      <div className="text-[10px] text-slate-500">Alert on gate pass issued</div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={triggerConfig.autoNotifyDispatchCompletion}
+                    disabled={!canEditConfig}
+                    onChange={(e) =>
+                      setTriggerConfig({ ...triggerConfig, autoNotifyDispatchCompletion: e.target.checked })
+                    }
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                  />
+                </label>
+
+                <label className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between cursor-pointer hover:bg-slate-100/70 transition">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">8 AM Daily Manpower</div>
+                      <div className="text-[10px] text-slate-500">Alert on morning roll call</div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={triggerConfig.autoNotifyDailyManpower}
+                    disabled={!canEditConfig}
+                    onChange={(e) =>
+                      setTriggerConfig({ ...triggerConfig, autoNotifyDailyManpower: e.target.checked })
+                    }
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                  />
+                </label>
+
+                <label className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between cursor-pointer hover:bg-slate-100/70 transition">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-teal-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Critical Material Indent</div>
+                      <div className="text-[10px] text-slate-500">Alert on low spare part</div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={triggerConfig.autoNotifyLowStockRequisition}
+                    disabled={!canEditConfig}
+                    onChange={(e) =>
+                      setTriggerConfig({ ...triggerConfig, autoNotifyLowStockRequisition: e.target.checked })
+                    }
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                  />
+                </label>
+
+                <label className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between cursor-pointer hover:bg-slate-100/70 transition">
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="w-4 h-4 text-lime-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Scrap Limit Spike</div>
+                      <div className="text-[10px] text-slate-500">Alert if daily scrap exceeds</div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={triggerConfig.autoNotifyScrapSpike}
+                    disabled={!canEditConfig}
+                    onChange={(e) =>
+                      setTriggerConfig({ ...triggerConfig, autoNotifyScrapSpike: e.target.checked })
+                    }
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* API Gateway & Credentials Setup */}
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider m-0">
+                3. WhatsApp Gateway & Webhook Credentials
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Primary Plant WhatsApp Number
+                  </label>
+                  <input
+                    type="text"
+                    value={triggerConfig.phone}
+                    disabled={!canEditConfig}
+                    onChange={(e) => setTriggerConfig({ ...triggerConfig, phone: e.target.value })}
+                    placeholder="+91 90339 12511"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Default receiver if matrix recipient is not selected
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Webhook URL (Zapier / Make / n8n / Meta Cloud API)
+                  </label>
+                  <input
+                    type="text"
+                    value={triggerConfig.webhookUrl}
+                    disabled={!canEditConfig}
+                    onChange={(e) => setTriggerConfig({ ...triggerConfig, webhookUrl: e.target.value })}
+                    placeholder="https://hook.eu1.make.com/... or https://n8n.../webhook"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Endpoint receives automated POST JSON payload with shift report text
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Bearer Token / API Key (Optional)
+                  </label>
+                  <input
+                    type="password"
+                    value={triggerConfig.apiKey}
+                    disabled={!canEditConfig}
+                    onChange={(e) => setTriggerConfig({ ...triggerConfig, apiKey: e.target.value })}
+                    placeholder="••••••••••••••••"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Custom Footer Brand / Signature
+                  </label>
+                  <input
+                    type="text"
+                    value={triggerConfig.customFooter}
+                    disabled={!canEditConfig}
+                    onChange={(e) => setTriggerConfig({ ...triggerConfig, customFooter: e.target.value })}
+                    placeholder="Wünderkraf Factory Floor Desk"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            {canEditConfig && (
+              <div className="flex justify-end pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleSaveTriggers}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2.5 px-6 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Notification Triggers & Configuration</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 4: AUTOMATED SHIFT REPORTS & DISPATCH AUDIT LOG                      */}
+      {/* ========================================================================= */}
+      {activeTab === 'dispatch_logs' && (
+        <div className="space-y-5">
+          {/* Header & Log Controls */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-purple-600" />
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide m-0">
+                  Automated Shift Reports & Dispatch Audit Log
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 m-0 mt-0.5">
+                Complete traceability of all scheduled shift changeovers, breakdown alerts, and messages sent via WhatsApp.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleExportLogsCsv}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-2 rounded-xl transition cursor-pointer"
+                title="Export logs as CSV spreadsheet"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV</span>
+              </button>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={handleClearLogs}
+                  className="flex items-center gap-1.5 text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-xl transition cursor-pointer"
+                  title="Clear dispatch history"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear Log</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Search & Filter Rail */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                placeholder="Search recipient, sender, preview..."
+                className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Filter:</span>
+              {[
+                { id: 'ALL', label: 'All Logs' },
+                { id: 'SHIFTS', label: 'Shift Reports' },
+                { id: 'BREAKDOWN', label: 'Breakdowns' },
+                { id: 'MANPOWER', label: 'Manpower' },
+                { id: 'QC', label: 'QC Alerts' },
+                { id: 'DISPATCH', label: 'Dispatch' }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setLogFilterCategory(f.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer whitespace-nowrap ${
+                    logFilterCategory === f.id
+                      ? 'bg-purple-600 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Log Table */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100/75 border-b border-slate-200 text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">
+                    <th className="py-3 px-4">Time</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Recipient</th>
+                    <th className="py-3 px-4">Dispatched By</th>
+                    <th className="py-3 px-4">Message Snippet</th>
+                    <th className="py-3 px-4 text-center">Delivery Status</th>
+                    <th className="py-3 px-4 text-right">Inspect</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-xs">
+                  {filteredLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
+                        No dispatch logs recorded yet. Automated shift changeover reports and manual broadcasts will appear here.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-50/50 transition">
+                        <td className="py-3 px-4 font-mono font-bold text-slate-700 whitespace-nowrap">
+                          {log.timestamp}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase border ${
+                            log.category.includes('DAY')
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : log.category.includes('NIGHT')
+                              ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                              : log.category.includes('BREAKDOWN')
+                              ? 'bg-rose-50 text-rose-800 border-rose-200'
+                              : log.category.includes('MANPOWER')
+                              ? 'bg-blue-50 text-blue-800 border-blue-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
+                            {log.category.replace('SHIFT_', '').replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-bold text-slate-800 max-w-[180px] truncate">
+                          {log.recipient}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-slate-600 whitespace-nowrap">
+                          {log.sender}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-slate-500 max-w-xs truncate">
+                          {log.preview}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border uppercase ${
+                            log.status === 'SENT'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : log.status === 'OPENED'
+                              ? 'bg-blue-50 text-blue-700 border-blue-300'
+                              : 'bg-rose-50 text-rose-700 border-rose-300'
+                          }`}>
+                            {log.status === 'SENT' ? 'Delivered' : log.status === 'OPENED' ? 'Opened' : 'Failed'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setInspectingLog(log)}
+                            className="text-xs font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. LOG INSPECTION MODAL */}
+      {inspectingLog && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-purple-600" />
+                <h4 className="text-sm font-black text-slate-900 m-0">
+                  Dispatch Detail — {inspectingLog.id}
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectingLog(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-2.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Dispatched At</span>
+                <span className="font-bold text-slate-800">{inspectingLog.timestamp}</span>
+              </div>
+              <div className="p-2.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Category</span>
+                <span className="font-bold text-slate-800">{inspectingLog.category}</span>
+              </div>
+              <div className="p-2.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Recipient</span>
+                <span className="font-bold text-slate-800">{inspectingLog.recipient}</span>
+              </div>
+              <div className="p-2.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Sender</span>
+                <span className="font-bold text-slate-800">{inspectingLog.sender}</span>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[10px] text-slate-400 font-bold block uppercase mb-1">Message Content</span>
+              <pre className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 whitespace-pre-wrap max-h-56 overflow-y-auto">
+                {inspectingLog.preview}
+              </pre>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(inspectingLog.preview);
+                  showStatus('📋 Text copied to clipboard');
+                }}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectingLog(null)}
+                className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

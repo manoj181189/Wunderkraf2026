@@ -35,9 +35,9 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   onSaveState,
   compact = false
 }) => {
-  const workers: FloorWorker[] = state.floorWorkers !== undefined
+  const workers: FloorWorker[] = (state.floorWorkers !== undefined
     ? state.floorWorkers
-    : DEFAULT_FLOOR_WORKERS;
+    : DEFAULT_FLOOR_WORKERS).filter(w => w.status !== 'INACTIVE');
 
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('ALL');
@@ -307,6 +307,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
 
   // Filtered workers list
   const filteredWorkers = workers.filter((w) => {
+    if (w.status === 'INACTIVE') return false; // Hide inactive / left-company employees from the daily floor list
     if (selectedDeptFilter !== 'ALL' && w.department !== selectedDeptFilter) return false;
     if (selectedRoleFilter !== 'ALL' && w.role !== selectedRoleFilter) return false;
     if (searchQuery.trim()) {
@@ -572,6 +573,14 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
           </div>
         </div>
 
+        {/* Professional ERP Notice Banner */}
+        <div className="bg-blue-50/60 border border-blue-200 text-blue-950 px-3.5 py-2.5 rounded-xl text-[11px] flex items-center gap-2">
+          <span className="text-base">ℹ️</span>
+          <span>
+            <b>Daily Operational Sheet (दैनिक कार्यपत्रक):</b> This panel is for daily attendance & machine assignment. Permanent additions, detail edits, or company de-listing can only be performed in the <span className="font-extrabold text-indigo-700">Employee Master (Settings)</span>.
+          </span>
+        </div>
+
         {/* Table */}
         <div className="overflow-x-auto border border-slate-200 rounded-xl">
           <table className="w-full text-xs text-left">
@@ -698,20 +707,31 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
 
                     <td className="p-3 text-slate-500 font-mono text-[11px]">{w.inTime || '08:00 AM'}</td>
 
-                    <td className="p-3 text-right flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          if (confirm(`Are you sure you want to remove ${w.name} from the roster?`)) {
-                            onSaveState({
-                              ...state,
-                              floorWorkers: workers.filter((worker) => worker.id !== w.id),
-                            });
-                          }
-                        }}
-                        className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-[10px] font-bold cursor-pointer"
-                      >
-                        Delete
-                      </button>
+                    <td className="p-3 text-right flex items-center justify-end gap-1.5">
+                      {/* Unassign Machine Button - Safe operational control without deleting employee */}
+                      {w.assignedMachine && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Unassign (मशीन से हटाएँ):\nAre you sure you want to unassign "${w.name}" from machine ${w.assignedMachine}? This keeps them in the company roster.`)) {
+                              const updatedWorkers = workers.map((worker) => {
+                                if (worker.id === w.id) {
+                                  return { ...worker, assignedMachine: undefined, pairedWithOperator: undefined };
+                                }
+                                return worker;
+                              });
+                              onSaveState({
+                                ...state,
+                                floorWorkers: updatedWorkers
+                              });
+                            }
+                          }}
+                          className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                          title="Unassign from active machine/role"
+                        >
+                          Unassign
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleToggleAttendance(w.id)}
                         className={`px-3 py-1 rounded-full text-xs font-extrabold transition cursor-pointer active:scale-95 ${

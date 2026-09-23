@@ -26,7 +26,8 @@ import {
   Calendar,
   Users,
   Database,
-  Trash2
+  Trash2,
+  MessageSquare
 } from 'lucide-react';
 import { CurrentView, FactoryState } from '../types';
 import { calculateAvailableScrapKg } from '../lib/utils';
@@ -282,6 +283,15 @@ export const NavigationHub: React.FC<NavigationHubProps> = ({
       badge: 'Go-Live Module'
     },
     {
+      id: 'WHATSAPP',
+      title: 'WhatsApp Communication Desk',
+      subtitle: 'Multi-Module Dispatch, Shift Changeovers, Breakdown Alerts & Contact Directory',
+      icon: <MessageSquare className="w-8 h-8 text-emerald-600" />,
+      perm: 'WhatsApp',
+      borderColor: 'border-emerald-600',
+      badge: 'Live Comms'
+    },
+    {
       id: 'ADMIN',
       title: 'Master Settings',
       subtitle: 'Admin PIN, Numbering Sequences & Shift Timings',
@@ -292,10 +302,15 @@ export const NavigationHub: React.FC<NavigationHubProps> = ({
   ];
 
   // Exact permission matching:
-  // 1. Master admin or '*' or 'Admin' role has full access to all 16 desks
+  // 1. Master admin or '*' or 'Admin' role has full access to all 17 desks
   // 2. Operators have access to their explicitly granted permissions (case-insensitive)
   const visibleItems = navItems.filter((item) => {
     if (isMasterAdmin) return true;
+    if (item.id === 'WHATSAPP') {
+      return perms.some(
+        (p) => p === '*' || p.toLowerCase() === 'whatsapp' || p.toLowerCase().startsWith('wa_')
+      );
+    }
     return perms.some(
       (p) =>
         p === '*' ||

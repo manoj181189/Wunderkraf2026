@@ -32,6 +32,8 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
   let totalPackedBoxes = 0;
 
   logs.forEach((l) => {
+    if (l.jobId && deletedJobIdsSet.has(l.jobId)) return;
+
     if (l.action && l.action.includes('Finished') && l.stage === 'Slitting') {
       const matchKg = l.action.match(/(\d+)\s*KG/i);
       if (matchKg) totalSlitPaperKg += parseInt(matchKg[1], 10) || 0;
@@ -42,7 +44,7 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
     }
   });
 
-  const availableScrap = calculateAvailableScrapKg(logs, scrapSales);
+  const availableScrap = calculateAvailableScrapKg(logs, scrapSales, state.deletedJobIds);
 
   // Real-time QC Pipeline & Inspector Status
   const activeQcBatches: Array<{ job: any; batch: any }> = [];

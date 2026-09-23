@@ -40,6 +40,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   const deletedOrderIds = Array.from(new Set([...(base.deletedOrderIds || []), ...(incoming.deletedOrderIds || [])]));
   const deletedLogIds = Array.from(new Set([...(base.deletedLogIds || []), ...(incoming.deletedLogIds || [])]));
   const deletedPlanIds = Array.from(new Set([...(base.deletedPlanIds || []), ...(incoming.deletedPlanIds || [])]));
+  const deletedWorkerIds = Array.from(new Set([...(base.deletedWorkerIds || []), ...(incoming.deletedWorkerIds || [])]));
 
   // 1. Merge Production Jobs
   const jobMap = new Map<string, Job>();
@@ -303,7 +304,21 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     autoSendShiftReportDay: incoming.whatsappConfig?.autoSendShiftReportDay ?? base.whatsappConfig?.autoSendShiftReportDay,
     autoSendShiftReportNight: incoming.whatsappConfig?.autoSendShiftReportNight ?? base.whatsappConfig?.autoSendShiftReportNight,
     lastSentDayDate: incoming.whatsappConfig?.lastSentDayDate || base.whatsappConfig?.lastSentDayDate,
-    lastSentNightDate: incoming.whatsappConfig?.lastSentNightDate || base.whatsappConfig?.lastSentNightDate
+    lastSentNightDate: incoming.whatsappConfig?.lastSentNightDate || base.whatsappConfig?.lastSentNightDate,
+    autoNotifyMaintenanceBreakdown: incoming.whatsappConfig?.autoNotifyMaintenanceBreakdown ?? base.whatsappConfig?.autoNotifyMaintenanceBreakdown ?? true,
+    autoNotifyCriticalQcDefect: incoming.whatsappConfig?.autoNotifyCriticalQcDefect ?? base.whatsappConfig?.autoNotifyCriticalQcDefect ?? true,
+    autoNotifyDispatchCompletion: incoming.whatsappConfig?.autoNotifyDispatchCompletion ?? base.whatsappConfig?.autoNotifyDispatchCompletion ?? true,
+    autoNotifyDailyManpower: incoming.whatsappConfig?.autoNotifyDailyManpower ?? base.whatsappConfig?.autoNotifyDailyManpower ?? true,
+    autoNotifyLowStockRequisition: incoming.whatsappConfig?.autoNotifyLowStockRequisition ?? base.whatsappConfig?.autoNotifyLowStockRequisition ?? true,
+    autoNotifyScrapSpike: incoming.whatsappConfig?.autoNotifyScrapSpike ?? base.whatsappConfig?.autoNotifyScrapSpike ?? false,
+    managementContacts: incoming.whatsappConfig?.managementContacts || base.whatsappConfig?.managementContacts || [],
+    userRights: { ...(base.whatsappConfig?.userRights || {}), ...(incoming.whatsappConfig?.userRights || {}) },
+    dispatchLogs: [
+      ...(incoming.whatsappConfig?.dispatchLogs || []),
+      ...(base.whatsappConfig?.dispatchLogs || []).filter(
+        b => !(incoming.whatsappConfig?.dispatchLogs || []).some(inc => inc.id === b.id)
+      )
+    ].slice(0, 50)
   };
 
   const mergedShiftConfig: ShiftConfig = {
@@ -340,22 +355,42 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       combinedUsers.admin.perms = ['*'];
       return combinedUsers;
     })(),
+    deletedWorkerIds,
     floorWorkers: (() => {
       const map = new Map();
-      (base.floorWorkers || []).forEach(w => map.set(w.id || w.name, w));
+      (base.floorWorkers || []).forEach(w => {
+        if (w && !deletedWorkerIds.includes(w.id)) map.set(w.id || w.name, w);
+      });
       (incoming.floorWorkers || []).forEach(w => {
+        if (!w) return;
         const key = w.id || w.name;
-        if (!map.has(key)) map.set(key, w);
+        if (!deletedWorkerIds.includes(w.id) && !map.has(key)) map.set(key, w);
       });
       return Array.from(map.values());
     })(),
     deptWorkers: (() => {
-      const mergedDepts = { ...(base.deptWorkers || {}) };
-      for (const [dept, workers] of Object.entries(incoming.deptWorkers || {})) {
-        const existing = mergedDepts[dept] || [];
-        mergedDepts[dept] = Array.from(new Set([...existing, ...(workers as string[])]));
-      }
-      return mergedDepts;
+      const updatedDeptWorkers: Record<string, string[]> = {};
+      const mergedFloorWorkers = (() => {
+        const map = new Map();
+        (base.floorWorkers || []).forEach(w => {
+          if (w && !deletedWorkerIds.includes(w.id)) map.set(w.id || w.name, w);
+        });
+        (incoming.floorWorkers || []).forEach(w => {
+          if (!w) return;
+          const key = w.id || w.name;
+          if (!deletedWorkerIds.includes(w.id) && !map.has(key)) map.set(key, w);
+        });
+        return Array.from(map.values());
+      })();
+
+      mergedFloorWorkers.forEach(w => {
+        if (!w || !w.department) return;
+        if (!updatedDeptWorkers[w.department]) updatedDeptWorkers[w.department] = [];
+        if (!updatedDeptWorkers[w.department].includes(w.name)) {
+          updatedDeptWorkers[w.department].push(w.name);
+        }
+      });
+      return updatedDeptWorkers;
     })(),
     maintenanceContacts: incoming.maintenanceContacts !== undefined ? incoming.maintenanceContacts : base.maintenanceContacts,
     coordinationMatrix: incoming.coordinationMatrix?.length ? incoming.coordinationMatrix : base.coordinationMatrix,

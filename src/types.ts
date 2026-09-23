@@ -21,7 +21,8 @@ export type CurrentView =
   | 'ADMIN'
   | 'MAINTENANCE'
   | 'PURCHASE'
-  | 'OPENING_STOCK';
+  | 'OPENING_STOCK'
+  | 'WHATSAPP';
 
 export type MaterialUrgency = 'CRITICAL_BREAKDOWN' | 'URGENT' | 'NORMAL' | 'LOW';
 
@@ -447,6 +448,27 @@ export interface WhatsAppConfig {
   autoSendShiftReportNight?: boolean;
   lastSentDayDate?: string;
   lastSentNightDate?: string;
+  // Multi-module automated triggers
+  autoNotifyMaintenanceBreakdown?: boolean;
+  autoNotifyCriticalQcDefect?: boolean;
+  autoNotifyDispatchCompletion?: boolean;
+  autoNotifyDailyManpower?: boolean;
+  autoNotifyLowStockRequisition?: boolean;
+  autoNotifyScrapSpike?: boolean;
+  // Contact groups & recipients
+  managementContacts?: Array<{ id: string; name: string; phone: string; role: string; dept?: string }>;
+  // Module rights master: permissions for non-admin users (e.g. ['WA_SHIFT', 'WA_MAINTENANCE', 'WA_QC', 'WA_DISPATCH', 'WA_MANPOWER', 'WA_CONFIG'])
+  userRights?: Record<string, string[]>;
+  // Broadcast log history
+  dispatchLogs?: Array<{
+    id: string;
+    timestamp: string;
+    category: string;
+    recipient: string;
+    sender: string;
+    preview: string;
+    status: 'SENT' | 'FAILED' | 'OPENED';
+  }>;
 }
 
 export interface SparePartItem {
@@ -576,6 +598,7 @@ export interface FactoryState {
   deletedOrderIds?: string[];
   deletedLogIds?: string[];
   deletedPlanIds?: string[];
+  deletedWorkerIds?: string[];
   deletedVaultItems?: DeletedVaultItem[];
   jobs: Job[];
   wipLots?: WipLot[]; // New ERP Lot Ledger
@@ -743,6 +766,7 @@ export interface FloorWorker {
   shiftStatus?: 'PRESENT' | 'ON_LEAVE' | 'ABSENT';
   inTime?: string;
   notes?: string;
+  status?: 'ACTIVE' | 'INACTIVE' | 'PRODUCING' | string;
 }
 
 export interface GroundingSource {

@@ -30,6 +30,7 @@ import { MaintenanceView } from './components/views/MaintenanceView';
 import { PurchaseView } from './components/views/PurchaseView';
 import { PlanningDeskView } from './components/views/PlanningDeskView';
 import { ExecutiveManpowerView } from './components/views/ExecutiveManpowerView';
+import { WhatsAppCommunicationView } from './components/views/WhatsAppCommunicationView';
 
 // Modals
 import { VoiceTranscriberModal } from './components/VoiceTranscriberModal';
@@ -249,9 +250,10 @@ export const App: React.FC = () => {
         });
 
         // Trigger webhook if configured
+        const handoverContacts = (state.coordinationMatrix || [])
+          .filter((item) => item.isActive && item.alertCategories.productionHandover);
+
         if (waConfig.webhookUrl) {
-          const handoverContacts = (state.coordinationMatrix || [])
-            .filter((item) => item.isActive && item.alertCategories.productionHandover);
           if (handoverContacts.length > 0) {
             handoverContacts.forEach((contact) => {
               triggerWhatsAppShiftNotification(contact.phone, reportText, waConfig.webhookUrl);
@@ -261,10 +263,22 @@ export const App: React.FC = () => {
           }
         }
 
+        // Record into dispatch history log
+        const autoLogDay = {
+          id: `AUTO-DAY-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          category: 'SHIFT_DAY',
+          recipient: handoverContacts.length > 0 ? `Coordination Matrix (${handoverContacts.length} Contacts)` : (waConfig.phone || 'Primary Gateway'),
+          sender: 'SYSTEM (Auto-Trigger)',
+          preview: reportText.slice(0, 85) + '...',
+          status: 'SENT' as const
+        };
+
         // Update lastSentDayDate
         const updatedConfig = {
           ...waConfig,
-          lastSentDayDate: todayStr
+          lastSentDayDate: todayStr,
+          dispatchLogs: [autoLogDay, ...(waConfig.dispatchLogs || []).slice(0, 49)]
         };
         handleSaveState({ ...state, whatsappConfig: updatedConfig });
       }
@@ -281,9 +295,10 @@ export const App: React.FC = () => {
         });
 
         // Trigger webhook if configured
+        const handoverContacts = (state.coordinationMatrix || [])
+          .filter((item) => item.isActive && item.alertCategories.productionHandover);
+
         if (waConfig.webhookUrl) {
-          const handoverContacts = (state.coordinationMatrix || [])
-            .filter((item) => item.isActive && item.alertCategories.productionHandover);
           if (handoverContacts.length > 0) {
             handoverContacts.forEach((contact) => {
               triggerWhatsAppShiftNotification(contact.phone, reportText, waConfig.webhookUrl);
@@ -293,17 +308,47 @@ export const App: React.FC = () => {
           }
         }
 
+        // Record into dispatch history log
+        const autoLogNight = {
+          id: `AUTO-NIGHT-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          category: 'SHIFT_NIGHT',
+          recipient: handoverContacts.length > 0 ? `Coordination Matrix (${handoverContacts.length} Contacts)` : (waConfig.phone || 'Primary Gateway'),
+          sender: 'SYSTEM (Auto-Trigger)',
+          preview: reportText.slice(0, 85) + '...',
+          status: 'SENT' as const
+        };
+
         // Update lastSentNightDate
         const updatedConfig = {
           ...waConfig,
-          lastSentNightDate: todayStr
+          lastSentNightDate: todayStr,
+          dispatchLogs: [autoLogNight, ...(waConfig.dispatchLogs || []).slice(0, 49)]
         };
         handleSaveState({ ...state, whatsappConfig: updatedConfig });
       }
     };
 
-    const intervalId = setInterval(checkShiftTimer, 30000);
-    return () => clearInterval(intervalId);
+    // Check timer every 10 seconds for responsive automated reporting
+    checkShiftTimer();
+    const intervalId = setInterval(checkShiftTimer, 10000);
+
+    // Event listener for instantaneous manual / demo test triggers
+    const handleForceAlert = (e: any) => {
+      const shift = e.detail?.shift || 'DAY';
+      const reportText = generateShiftChangeoverReportText(state, shift);
+      setShiftChangeoverAlert({
+        shift,
+        text: reportText,
+        triggerTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+    };
+    window.addEventListener('wunderkraf_force_shift_alert', handleForceAlert);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('wunderkraf_force_shift_alert', handleForceAlert);
+    };
   }, [state]);
 
   // Persistence effect: Writes to high-capacity IndexedDB and mirrors safely with auto-pruning to localStorage
@@ -833,6 +878,17 @@ export const App: React.FC = () => {
             onBackToHub={() => setCurrentView('HUB')}
             onSaveState={handleSaveState}
             currentUser={currentUser}
+            onNavigateToView={(view) => setCurrentView(view)}
+          />
+        )}
+
+        {currentView === 'WHATSAPP' && (
+          <WhatsAppCommunicationView
+            state={state}
+            onBackToHub={() => setCurrentView('HUB')}
+            onSaveState={handleSaveState}
+            currentUser={currentUser}
+            onNavigateToView={(view) => setCurrentView(view)}
           />
         )}
 

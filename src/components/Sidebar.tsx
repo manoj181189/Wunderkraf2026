@@ -24,7 +24,8 @@ import {
   ChevronRight,
   Menu,
   X,
-  Sparkles
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
 import { CurrentView, FactoryState } from '../types';
 
@@ -281,6 +282,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       perm: 'Scrap',
       category: 'operations'
     },
+    {
+      id: 'WHATSAPP',
+      title: 'WhatsApp Communication Desk',
+      shortTitle: 'Communication',
+      icon: <MessageSquare className="w-5 h-5" />,
+      perm: 'WhatsApp',
+      category: 'operations',
+      badge: 'Live',
+      badgeColor: 'bg-emerald-600 text-white font-black shadow-xs'
+    },
     // Analysis & Admin
     {
       id: 'ANALYTICS',
@@ -320,6 +331,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const authorizedNavItems = allNavItems.filter((item) => {
     if (isMasterAdmin) return true;
     if (item.id === 'HUB') return true;
+    if (item.id === 'WHATSAPP') {
+      return currentUser?.perms.some(
+        (p) => p === '*' || p.toLowerCase() === 'whatsapp' || p.toLowerCase().startsWith('wa_')
+      );
+    }
     return currentUser?.perms.some(
       (p) =>
         p === '*' ||

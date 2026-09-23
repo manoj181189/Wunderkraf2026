@@ -147,6 +147,53 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
               As soon as the cutting/machine starts, these helpers will be visible live with the operator in the Manpower Tracker below.
             </p>
 
+            {/* Type New Helper Name Input with Datalist */}
+            <div className="flex gap-2 items-end bg-indigo-50/50 border border-indigo-200 rounded-2xl p-3">
+              <div className="flex-1 space-y-1.5">
+                <label className="font-extrabold text-indigo-950 flex items-center gap-1 uppercase tracking-wider text-[10px]">
+                  <span>Type to Search / Add Helper Name</span>
+                </label>
+                <input
+                  list="helper-pool"
+                  value={customHelperName}
+                  onChange={(e) => setCustomHelperName(e.target.value)}
+                  placeholder="Type Helper name..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const clean = customHelperName.trim().toUpperCase();
+                      if (clean) {
+                        if (!selectedHelpers.includes(clean)) {
+                          setSelectedHelpers([...selectedHelpers, clean]);
+                        }
+                        setCustomHelperName('');
+                      }
+                    }
+                  }}
+                  className="w-full p-2.5 bg-white border-2 border-indigo-300 rounded-xl font-bold text-slate-900 outline-none focus:border-indigo-600 uppercase text-xs"
+                />
+                <datalist id="helper-pool">
+                  {helperPool.map(hp => <option key={hp} value={hp} />)}
+                </datalist>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const clean = customHelperName.trim().toUpperCase();
+                  if (clean) {
+                    if (!selectedHelpers.includes(clean)) {
+                      setSelectedHelpers([...selectedHelpers, clean]);
+                    }
+                    setCustomHelperName('');
+                  }
+                }}
+                className="p-3 bg-indigo-600 text-white font-extrabold text-xs rounded-xl hover:bg-indigo-700 transition flex items-center gap-1 cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Helper</span>
+              </button>
+            </div>
+
             {/* Helper Pool Chips */}
             <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl min-h-[50px] items-center">
               {Array.from(new Set([...helperPool, ...selectedHelpers])).map((hName) => {
@@ -169,8 +216,8 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
               })}
             </div>
 
-            <div className="text-[10px] text-amber-700 bg-amber-50 p-2 border border-amber-200 rounded-lg mt-2 flex items-center gap-2 font-semibold">
-              <span>⚠️ Need to add a new person? Add them to the Master Directory first to maintain a single source of truth.</span>
+            <div className="text-[10px] text-indigo-700 bg-indigo-50 p-2 border border-indigo-200 rounded-lg mt-2 flex items-center gap-2 font-semibold">
+              <span>💡 Tip: You can type a new Helper's name in the search box above to instantly deploy them on this machine.</span>
             </div>
           </div>
 

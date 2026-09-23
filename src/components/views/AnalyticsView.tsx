@@ -83,6 +83,18 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
   const scrapSales = state.scrapSales || [];
   const availableScrap = calculateAvailableScrapKg(logs, scrapSales);
 
+  const totalScrapWeightSold = useMemo(() => {
+    return (scrapSales || []).reduce((acc, s) => acc + (s.weightKg ?? s.soldKg ?? 0), 0);
+  }, [scrapSales]);
+
+  const totalScrapRevenue = useMemo(() => {
+    return (scrapSales || []).reduce((acc, s) => acc + (s.totalAmount ?? ((s.weightKg ?? s.soldKg ?? 0) * (s.ratePerKg ?? 18))), 0);
+  }, [scrapSales]);
+
+  const averageSellingRate = useMemo(() => {
+    return totalScrapWeightSold > 0 ? (totalScrapRevenue / totalScrapWeightSold).toFixed(2) : '18.00';
+  }, [totalScrapWeightSold, totalScrapRevenue]);
+
   // 1. Normalized Raw Production Events
   const allEvents = useMemo(() => parseAllProductionEvents(state), [state]);
 
@@ -1300,77 +1312,50 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Record Scrap Sale Form */}
-            <form
-              onSubmit={handleRecordScrapSale}
-              className="p-4 bg-rose-50/40 border border-rose-200 rounded-xl space-y-3"
-            >
-              <span className="text-xs font-bold text-rose-950 uppercase block">
-                Record Scrap Dispatch / Sale to Recycling Mill:
-              </span>
-
+            {/* Read-Only Analytical Scrap Performance Dashboard */}
+            <div className="p-5 bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 rounded-2xl space-y-4 shadow-2xs flex flex-col justify-between">
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Recycling Mill / Party Name:
-                </label>
-                <input
-                  type="text"
-                  value={buyerName}
-                  onChange={(e) => setBuyerName(e.target.value)}
-                  placeholder="e.g. SHREE PAPER RECYCLERS LTD"
-                  className="w-full px-3 py-1.5 bg-white border border-rose-300 rounded-lg text-xs font-bold uppercase text-slate-800 outline-none"
-                  required
-                />
-              </div>
+                <span className="text-xs font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                  <TrendingUp className="w-4 h-4 text-rose-700 animate-pulse" />
+                  <span>Paper Scrap Recycling Analytics Dashboard (रीड-ओनली विश्लेषण)</span>
+                </span>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Weight (KG):
-                  </label>
-                  <input
-                    type="number"
-                    value={scrapSoldKg}
-                    onChange={(e) => setScrapSoldKg(e.target.value)}
-                    placeholder={`Max: ${availableScrap || 0}`}
-                    className="w-full px-3 py-1.5 bg-white border border-rose-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Rate per KG (₹):
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={ratePerKg}
-                    onChange={(e) => setRatePerKg(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-rose-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                    required
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white border border-rose-100 p-3.5 rounded-xl shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Weight Recycled</span>
+                    <div className="text-lg font-black text-slate-900 mt-0.5">
+                      {totalScrapWeightSold.toLocaleString()} <span className="text-xs font-bold text-rose-700">KG</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-emerald-100 p-3.5 rounded-xl shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Revenue Earned</span>
+                    <div className="text-lg font-black text-emerald-800 mt-0.5">
+                      ₹{totalScrapRevenue.toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-blue-100 p-3.5 rounded-xl shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Avg. Selling Rate</span>
+                    <div className="text-lg font-black text-blue-900 mt-0.5">
+                      ₹{averageSellingRate}/KG
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-amber-100 p-3.5 rounded-xl shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Current Stock Available</span>
+                    <div className="text-lg font-black text-amber-800 mt-0.5">
+                      {(availableScrap ?? 0).toLocaleString()} <span className="text-xs font-bold text-amber-950">KG</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Sale Date:</label>
-                <input
-                  type="date"
-                  value={saleDate}
-                  onChange={(e) => setSaleDate(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-white border border-rose-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                  required
-                />
+              {/* Redirection Notice to Scrap Management */}
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-[11px] text-amber-950 font-semibold leading-relaxed mt-4">
+                ⚠️ <strong>सुरक्षात्मक निर्देश:</strong> स्क्रैप बिक्री (Scrap Dispatch / Sales) की नई प्रविष्टि केवल **स्क्रैप मैनेजमेंट (Scrap Management)** मॉड्यूल से की जानी चाहिए। यहाँ केवल विश्लेषण आंकड़े उपलब्ध हैं।
               </div>
-
-              <button
-                type="submit"
-                className="w-full py-2 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <DollarSign className="w-4 h-4" />
-                <span>Record Scrap Sale Transaction</span>
-              </button>
-            </form>
+            </div>
 
             {/* Past Scrap Sales History Table */}
             <div className="border border-slate-200 rounded-xl overflow-hidden">

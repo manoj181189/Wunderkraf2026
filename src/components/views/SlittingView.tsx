@@ -1,4 +1,4 @@
-import { autoRegisterWorker } from '../../lib/workerUtils';
+import { autoRegisterWorker, autoRegisterCrew } from '../../lib/workerUtils';
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, RefreshCw, Play, Pause, Lock, Square, XCircle, Plus, AlertCircle, Check, Search, Tag, ShieldCheck, Layers, Eye, AlertTriangle, RotateCcw, Calendar, Clock, CheckCircle2, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, Cog } from 'lucide-react';
 import { FactoryState, Job, JobReelItem, ProductType, RunningBatch, OperatorRunSlice, LogEntry, PlannedLayer, ShiftHandoverRecord } from '../../types';
@@ -239,9 +239,22 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     setAssignedHelpers(helpers);
     setIsCrewModalOpen(false);
 
+    // Auto-register crew on the fly if any name is new
+    const { floorWorkers: registeredWorkers, deptWorkers: registeredDepts } = autoRegisterCrew(
+      state,
+      operator,
+      helpers,
+      'Slitting',
+      selectedMachine,
+      shift
+    );
+
+    let updatedJobs = jobs;
+    let crewLog: LogEntry | null = null;
+
     if (activeBatchObj) {
       const { job, batch } = activeBatchObj;
-      const updatedJobs = jobs.map((j) => {
+      updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
         return {
           ...j,
@@ -257,40 +270,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
         };
       });
 
-      const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const updatedWorkers = (state.floorWorkers || []).map((w) => {
-        if (w.name.toUpperCase() === operator.trim().toUpperCase()) {
-          return {
-            ...w,
-            assignedMachine: selectedMachine,
-            isPresent: true,
-            status: 'PRODUCING' as const,
-            inTime: w.inTime || nowTime
-          };
-        }
-        if (helpers.some((h) => h.toUpperCase() === w.name.toUpperCase())) {
-          return {
-            ...w,
-            assignedMachine: selectedMachine,
-            pairedWithOperator: operator.trim().toUpperCase(),
-            isPresent: true,
-            status: 'PRODUCING' as const,
-            inTime: w.inTime || nowTime
-          };
-        }
-        // Unpair previously assigned helpers for this machine or operator
-        if (w.role === 'HELPER' && (w.assignedMachine === selectedMachine || w.pairedWithOperator === operator.trim().toUpperCase())) {
-          return {
-            ...w,
-            assignedMachine: undefined,
-            pairedWithOperator: undefined,
-            status: undefined
-          };
-        }
-        return w;
-      });
-
-      const newLog: LogEntry = {
+      crewLog = {
         jobId: job.id,
         product: job.product,
         stage: 'Slitting',
@@ -301,14 +281,48 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
         rawDate: new Date().toISOString().split('T')[0],
         timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
       };
-
-      onSaveState({
-        ...state,
-        jobs: updatedJobs,
-        floorWorkers: updatedWorkers,
-        logs: [newLog, ...(state.logs || [])]
-      });
     }
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const finalWorkers = registeredWorkers.map((w) => {
+      if (w.name.toUpperCase() === operator.trim().toUpperCase()) {
+        return {
+          ...w,
+          assignedMachine: selectedMachine,
+          isPresent: true,
+          status: 'PRODUCING' as const,
+          inTime: w.inTime || nowTime
+        };
+      }
+      if (helpers.some((h) => h.toUpperCase() === w.name.toUpperCase())) {
+        return {
+          ...w,
+          assignedMachine: selectedMachine,
+          pairedWithOperator: operator.trim().toUpperCase(),
+          isPresent: true,
+          status: 'PRODUCING' as const,
+          inTime: w.inTime || nowTime
+        };
+      }
+      // Unpair previously assigned helpers for this machine or operator
+      if (w.role === 'HELPER' && (w.assignedMachine === selectedMachine || w.pairedWithOperator === operator.trim().toUpperCase())) {
+        return {
+          ...w,
+          assignedMachine: undefined,
+          pairedWithOperator: undefined,
+          status: undefined
+        };
+      }
+      return w;
+    });
+
+    onSaveState({
+      ...state,
+      jobs: updatedJobs,
+      floorWorkers: finalWorkers,
+      deptWorkers: registeredDepts,
+      logs: crewLog ? [crewLog, ...(state.logs || [])] : (state.logs || [])
+    });
   };
 
   const handleStartNewReel = (e: React.FormEvent) => {

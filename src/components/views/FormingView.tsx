@@ -11,7 +11,7 @@ import { ShiftHandoverModal } from '../ShiftHandoverModal';
 import { StationCrewModal } from '../StationCrewModal';
 import { Users } from 'lucide-react';
 
-import { autoRegisterWorker } from '../../lib/workerUtils';
+import { autoRegisterWorker, autoRegisterCrew } from '../../lib/workerUtils';
 interface FormingViewProps {
   state: FactoryState;
   onBackToHub: () => void;
@@ -815,29 +815,53 @@ export const FormingView: React.FC<FormingViewProps> = ({
     setAssignedHelpers(helpers);
     setIsCrewModalOpen(false);
 
-    // If there is an active batch on this machine, update it immediately
-    if (!activeBatchObj) return;
-    
-    const { job, batch } = activeBatchObj;
+    // Auto-register crew on the fly if any name is new
+    const { floorWorkers: registeredWorkers, deptWorkers: registeredDepts } = autoRegisterCrew(
+      state,
+      operator,
+      helpers,
+      'Forming',
+      selectedMachine,
+      shift
+    );
 
-    const updatedJobs = state.jobs.map((j) => {
-      if (j.id !== job.id) return j;
-      return {
-        ...j,
-        runningBatches: (j.runningBatches || []).map((b) => {
-          if (b.batchId !== batch.batchId) return b;
-          return {
-            ...b,
-            worker: operator.trim().toUpperCase(),
-            helpers: helpers,
-            helperCount: helpers.length
-          };
-        })
+    let updatedJobs = state.jobs;
+    let crewLog: LogEntry | null = null;
+
+    if (activeBatchObj) {
+      const { job, batch } = activeBatchObj;
+      updatedJobs = state.jobs.map((j) => {
+        if (j.id !== job.id) return j;
+        return {
+          ...j,
+          runningBatches: (j.runningBatches || []).map((b) => {
+            if (b.batchId !== batch.batchId) return b;
+            return {
+              ...b,
+              worker: operator.trim().toUpperCase(),
+              helpers: helpers,
+              helperCount: helpers.length
+            };
+          })
+        };
+      });
+
+      crewLog = {
+        jobId: job.id,
+        product: job.product,
+        stage: 'Forming',
+        machine: selectedMachine,
+        shift: batch.shift,
+        action: `👥 Station Crew Assigned: Operator [${operator}] with ${helpers.length} Helpers (${helpers.join(', ')}) on ${selectedMachine} for Batch [${batch.batchId}]`,
+        worker: operator,
+        user: 'form_supervisor',
+        rawDate: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
       };
-    });
+    }
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const updatedWorkers = (state.floorWorkers || []).map((w) => {
+    const finalWorkers = registeredWorkers.map((w) => {
       if (w.name.toUpperCase() === operator.trim().toUpperCase()) {
         return {
           ...w,
@@ -869,24 +893,12 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return w;
     });
 
-    const newLog = {
-      jobId: job.id,
-      product: job.product,
-      stage: 'Forming',
-      machine: selectedMachine,
-      shift: batch.shift,
-      action: `👥 Station Crew Assigned: Operator [${operator}] with ${helpers.length} Helpers (${helpers.join(', ')}) on ${selectedMachine} for Batch [${batch.batchId}]`,
-      worker: operator,
-      user: 'form_supervisor',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
-    };
-
     onSaveState({
       ...state,
       jobs: updatedJobs,
-      floorWorkers: updatedWorkers,
-      logs: [newLog, ...(state.logs || [])]
+      floorWorkers: finalWorkers,
+      deptWorkers: registeredDepts,
+      logs: crewLog ? [crewLog, ...(state.logs || [])] : (state.logs || [])
     });
     alert('Crew assigned successfully!');
     setIsCrewModalOpen(false);

@@ -11,7 +11,7 @@ import { LotGenealogyModal } from '../LotGenealogyModal';
 import { ShiftHandoverModal } from '../ShiftHandoverModal';
 import { StationCrewModal } from '../StationCrewModal';
 import { GlueUsageModal } from '../GlueUsageModal';
-import { autoRegisterWorker } from '../../lib/workerUtils';
+import { autoRegisterWorker, autoRegisterCrew } from '../../lib/workerUtils';
 import { LiveFloorManpowerTracker } from '../LiveFloorManpowerTracker';
 
 interface CuttingViewProps {
@@ -1044,10 +1044,22 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     setAssignedHelpers(helpers);
     setIsCrewModalOpen(false);
 
-    // If there is an active batch on this machine, update it immediately
+    // Auto-register crew on the fly if any name is new
+    const { floorWorkers: registeredWorkers, deptWorkers: registeredDepts } = autoRegisterCrew(
+      state,
+      operator,
+      helpers,
+      'Cutting',
+      selectedMachine,
+      shift
+    );
+
+    let updatedJobs = jobs;
+    let crewLog: LogEntry | null = null;
+
     if (activeBatchObj) {
       const { job, batch } = activeBatchObj;
-      const updatedJobs = jobs.map((j) => {
+      updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
         return {
           ...j,
@@ -1063,40 +1075,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         };
       });
 
-      const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const updatedWorkers = (state.floorWorkers || []).map((w) => {
-        if (w.name.toUpperCase() === operator.trim().toUpperCase()) {
-          return {
-            ...w,
-            assignedMachine: selectedMachine,
-            isPresent: true,
-            status: 'PRODUCING' as const,
-            inTime: w.inTime || nowTime
-          };
-        }
-        if (helpers.some((h) => h.toUpperCase() === w.name.toUpperCase())) {
-          return {
-            ...w,
-            assignedMachine: selectedMachine,
-            pairedWithOperator: operator.trim().toUpperCase(),
-            isPresent: true,
-            status: 'PRODUCING' as const,
-            inTime: w.inTime || nowTime
-          };
-        }
-        // Unpair previously assigned helpers for this machine or operator
-        if (w.role === 'HELPER' && (w.assignedMachine === selectedMachine || w.pairedWithOperator === operator.trim().toUpperCase())) {
-          return {
-            ...w,
-            assignedMachine: undefined,
-            pairedWithOperator: undefined,
-            status: undefined
-          };
-        }
-        return w;
-      });
-
-      const crewLog: LogEntry = {
+      crewLog = {
         jobId: job.id,
         product: job.product,
         stage: 'Cutting',
@@ -1108,14 +1087,48 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         rawDate: new Date().toISOString().split('T')[0],
         timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
       };
-
-      onSaveState({
-        ...state,
-        jobs: updatedJobs,
-        floorWorkers: updatedWorkers,
-        logs: [crewLog, ...(state.logs || [])]
-      });
     }
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const finalWorkers = registeredWorkers.map((w) => {
+      if (w.name.toUpperCase() === operator.trim().toUpperCase()) {
+        return {
+          ...w,
+          assignedMachine: selectedMachine,
+          isPresent: true,
+          status: 'PRODUCING' as const,
+          inTime: w.inTime || nowTime
+        };
+      }
+      if (helpers.some((h) => h.toUpperCase() === w.name.toUpperCase())) {
+        return {
+          ...w,
+          assignedMachine: selectedMachine,
+          pairedWithOperator: operator.trim().toUpperCase(),
+          isPresent: true,
+          status: 'PRODUCING' as const,
+          inTime: w.inTime || nowTime
+        };
+      }
+      // Unpair previously assigned helpers for this machine or operator
+      if (w.role === 'HELPER' && (w.assignedMachine === selectedMachine || w.pairedWithOperator === operator.trim().toUpperCase())) {
+        return {
+          ...w,
+          assignedMachine: undefined,
+          pairedWithOperator: undefined,
+          status: undefined
+        };
+      }
+      return w;
+    });
+
+    onSaveState({
+      ...state,
+      jobs: updatedJobs,
+      floorWorkers: finalWorkers,
+      deptWorkers: registeredDepts,
+      logs: crewLog ? [crewLog, ...(state.logs || [])] : (state.logs || [])
+    });
   };
 
   const handleResume = () => {
@@ -2222,7 +2235,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
               <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-xl space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-black text-blue-950 flex items-center gap-1.5">
-                    <RotateCcw className="w-4 h-4 text-blue-600" />
+                    <RotateCcw className="w-4 h-4 text-blue-600 animate-spin-slow" />
                     <span>Active Shift Handover on this Continuous Batch</span>
                   </span>
                   <span className="text-[10px] font-extrabold bg-blue-600 text-white px-2 py-0.5 rounded">
@@ -2232,6 +2245,26 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 <p className="text-blue-900 text-[11px] m-0 leading-relaxed">
                   👉 <b>Enter ONLY the new crates produced in YOUR current shift below.</b> Do not add the previous {activeBatchObj.batch.producedQty} crates. The system automatically calculates total batch output: <b>{activeBatchObj.batch.producedQty} + {parseFloat(outputCrates) || 0} = {((activeBatchObj.batch.producedQty || 0) + (parseFloat(outputCrates) || 0))} Crates</b>.
                 </p>
+
+                {/* Handover Communication from Outgoing Operator */}
+                {(() => {
+                  const lastSlice = activeBatchObj.batch.slices && activeBatchObj.batch.slices.length > 0
+                    ? activeBatchObj.batch.slices[activeBatchObj.batch.slices.length - 1]
+                    : null;
+                  if (!lastSlice) return null;
+                  return (
+                    <div className="mt-2 pt-2 border-t border-blue-200 space-y-1 bg-white/65 p-2 rounded-lg">
+                      <div className="font-extrabold text-blue-950 uppercase tracking-wider text-[9px] flex items-center gap-1">
+                        <span>💬 Handover Info from Outgoing Operator (ट्रेसेबिलिटी नोट):</span>
+                      </div>
+                      <div className="text-[11px] text-slate-800 leading-relaxed">
+                        • Outgoing: <b>{lastSlice.operator}</b> ➡️ Relieved By: <b>{lastSlice.relievedByOperator}</b><br />
+                        • Machine Display Handover Reading: <b className="text-blue-800">{lastSlice.endMeterReading || lastSlice.strokeCount || 'N/A'} Strokes</b><br />
+                        • Operator Note: <span className="italic text-slate-600">"{lastSlice.notes || 'No remarks left.'}"</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
