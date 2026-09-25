@@ -359,6 +359,60 @@ export const PackingView: React.FC<PackingViewProps> = ({
     );
   };
 
+  // Helper to calculate limiting bottleneck material stock capacity on machine
+  const getBottleneckCapacityForActiveJob = (order: PackJob, jobsList: Job[]) => {
+    if (!order.issuedCrates || Object.keys(order.issuedCrates).length === 0) {
+      return { maxPossiblePcs: Infinity, maxPossibleBoxes: Infinity, bottleneckItem: null, breakdown: [] };
+    }
+
+    const kitItems = order.kitItems && order.kitItems.length > 0 ? order.kitItems : [order.kitType];
+    const pcsPerBox = order.pcsPerBox || 100;
+
+    const itemPieceTotals: Record<string, number> = {};
+    kitItems.forEach((item) => {
+      if (item === 'Tissue') return;
+      itemPieceTotals[item] = 0;
+    });
+
+    Object.entries(order.issuedCrates).forEach(([jId, cratesCount]) => {
+      const jobObj = jobsList.find((j) => j.id === jId);
+      if (jobObj && cratesCount > 0) {
+        const prod = jobObj.product;
+        const pcsPerCrate = jobObj.pcsPerCrateForming || state.crateCapacityMaster?.[prod]?.formingPcs || 7000;
+        const totalPcsForJob = cratesCount * pcsPerCrate;
+
+        if (itemPieceTotals[prod] !== undefined) {
+          itemPieceTotals[prod] += totalPcsForJob;
+        }
+      }
+    });
+
+    let minPcs = Infinity;
+    let bottleneckItem = '';
+    const breakdownList: Array<{ item: string; totalIssuedPcs: number }> = [];
+
+    Object.entries(itemPieceTotals).forEach(([item, totalPcs]) => {
+      breakdownList.push({ item, totalIssuedPcs: totalPcs });
+      if (totalPcs < minPcs) {
+        minPcs = totalPcs;
+        bottleneckItem = item;
+      }
+    });
+
+    if (minPcs === Infinity) {
+      return { maxPossiblePcs: Infinity, maxPossibleBoxes: Infinity, bottleneckItem: null, breakdown: breakdownList };
+    }
+
+    const maxBoxes = Math.floor(minPcs / pcsPerBox);
+
+    return {
+      maxPossiblePcs: minPcs,
+      maxPossibleBoxes: maxBoxes,
+      bottleneckItem,
+      breakdown: breakdownList
+    };
+  };
+
   // =========================================================================
   // ACTION: PARTIAL FORWARD TO DISPATCH READY (MACHINE STAYS 100% RUNNING!)
   // =========================================================================
@@ -370,8 +424,29 @@ export const PackingView: React.FC<PackingViewProps> = ({
       return;
     }
 
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const newTotalBoxes = (activeJob.packedBoxes || 0) + addBoxes;
+
+    // BOTTLENECK COMPONENT MASS BALANCE AUDIT CHECK:
+    const bottleneckCap = getBottleneckCapacityForActiveJob(activeJob, state.jobs);
+    if (bottleneckCap.bottleneckItem && isFinite(bottleneckCap.maxPossiblePcs)) {
+      const newTotalPcs = newTotalBoxes * activeJob.pcsPerBox;
+      if (newTotalPcs > bottleneckCap.maxPossiblePcs) {
+        const itemBreakdownText = bottleneckCap.breakdown
+          .map(b => `• ${b.item}: ${b.totalIssuedPcs.toLocaleString()} Pcs ${b.item === bottleneckCap.bottleneckItem ? '(LIMITING BOTTLENECK STOCK!)' : ''}`)
+          .join('\n');
+
+        alert(
+          `⛔ AUDIT BLOCK: QC Stock Exceeded for [${bottleneckCap.bottleneckItem}]!\n\n` +
+          `The entered production (${newTotalPcs.toLocaleString()} Pcs = ${newTotalBoxes} Boxes) exceeds the issued QC stock for limiting component [${bottleneckCap.bottleneckItem}].\n\n` +
+          `Issued Stock Breakdown on Machine:\n${itemBreakdownText}\n\n` +
+          `Maximum Combo Kits possible from issued stock = ${bottleneckCap.maxPossiblePcs.toLocaleString()} Kits (${bottleneckCap.maxPossibleBoxes} Boxes).\n\n` +
+          `Machine packing is BLOCKED at ${bottleneckCap.maxPossiblePcs.toLocaleString()} Pcs because [${bottleneckCap.bottleneckItem}] stock is exhausted. Please issue more [${bottleneckCap.bottleneckItem}] crates from QC Desk to continue!`
+        );
+        return;
+      }
+    }
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const isOrderQtyMet = newTotalBoxes * activeJob.pcsPerBox >= activeJob.orderQty;
 
     // Build raw material description for history run
@@ -762,6 +837,26 @@ export const PackingView: React.FC<PackingViewProps> = ({
       return;
     }
 
+    // BOTTLENECK COMPONENT MASS BALANCE AUDIT CHECK:
+    const bottleneckCap = getBottleneckCapacityForActiveJob(activeJob, state.jobs);
+    if (bottleneckCap.bottleneckItem && isFinite(bottleneckCap.maxPossiblePcs)) {
+      const newTotalPcs = newTotalBoxes * activeJob.pcsPerBox;
+      if (newTotalPcs > bottleneckCap.maxPossiblePcs) {
+        const itemBreakdownText = bottleneckCap.breakdown
+          .map(b => `• ${b.item}: ${b.totalIssuedPcs.toLocaleString()} Pcs ${b.item === bottleneckCap.bottleneckItem ? '(LIMITING BOTTLENECK STOCK!)' : ''}`)
+          .join('\n');
+
+        alert(
+          `⛔ AUDIT BLOCK: QC Stock Exceeded for [${bottleneckCap.bottleneckItem}]!\n\n` +
+          `The entered production (${newTotalPcs.toLocaleString()} Pcs = ${newTotalBoxes} Boxes) exceeds the issued QC stock for limiting component [${bottleneckCap.bottleneckItem}].\n\n` +
+          `Issued Stock Breakdown on Machine:\n${itemBreakdownText}\n\n` +
+          `Maximum Combo Kits possible from issued stock = ${bottleneckCap.maxPossiblePcs.toLocaleString()} Kits (${bottleneckCap.maxPossibleBoxes} Boxes).\n\n` +
+          `Machine packing is BLOCKED at ${bottleneckCap.maxPossiblePcs.toLocaleString()} Pcs because [${bottleneckCap.bottleneckItem}] stock is exhausted. Please issue more [${bottleneckCap.bottleneckItem}] crates from QC Desk to continue!`
+        );
+        return;
+      }
+    }
+
     const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const isCompleted = newTotalBoxes * activeJob.pcsPerBox >= activeJob.orderQty;
 
@@ -783,6 +878,25 @@ export const PackingView: React.FC<PackingViewProps> = ({
       issuedCrates: activeJob.issuedCrates
     };
 
+    let totalReturnedCrates = 0;
+    const updatedJobs = state.jobs.map((j) => {
+      if (isCompleted && activeJob.issuedCrates?.[j.id]) {
+        const formCapacity = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
+        const totalPcsNeeded = newTotalBoxes * activeJob.pcsPerBox;
+        const cratesIssued = activeJob.issuedCrates[j.id] || 0;
+        const cratesNeeded = Math.ceil(totalPcsNeeded / formCapacity);
+        const unusedCrates = Math.max(0, cratesIssued - cratesNeeded);
+        if (unusedCrates > 0) {
+          totalReturnedCrates += unusedCrates;
+          return {
+            ...j,
+            availableQcCrates: (j.availableQcCrates || 0) + unusedCrates
+          };
+        }
+      }
+      return j;
+    });
+
     const updatedPackJobs = packJobs.map((pj) => {
       if (pj.id !== activeJob.id) return pj;
       return {
@@ -795,15 +909,20 @@ export const PackingView: React.FC<PackingViewProps> = ({
       };
     });
 
+    let packActionText = `⏹️ Finished Packing Run: ${addBoxes > 0 ? addBoxes : newTotalBoxes} Boxes for ${activeJob.customer} (Total Done: ${newTotalBoxes} Boxes / ${(
+      newTotalBoxes * activeJob.pcsPerBox
+    ).toLocaleString()} Pcs)`;
+    if (totalReturnedCrates > 0) {
+      packActionText += ` | Auto-Returned ${totalReturnedCrates} Unused Crates to QC Stock`;
+    }
+
     const newLog = {
       jobId: activeJob.id,
       product: activeJob.kitType,
       stage: 'Packing',
       machine: selectedMachine,
       shift: activeJob.shift,
-      action: `⏹️ Finished Packing Run: ${addBoxes > 0 ? addBoxes : newTotalBoxes} Boxes for ${activeJob.customer} (Total Done: ${newTotalBoxes} Boxes / ${(
-        newTotalBoxes * activeJob.pcsPerBox
-      ).toLocaleString()} Pcs)`,
+      action: packActionText,
       worker: activeJob.worker,
       user: 'pack_user',
       startTime: activeJob.startTime,
@@ -814,6 +933,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
 
     onSaveState({
       ...state,
+      jobs: updatedJobs,
       packJobs: updatedPackJobs,
       logs: [...state.logs, newLog]
     });
@@ -1076,6 +1196,51 @@ export const PackingView: React.FC<PackingViewProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* COMBO KITTING MATERIAL STOCK & BOTTLENECK GAUGE */}
+              {(() => {
+                const cap = getBottleneckCapacityForActiveJob(activeJob, state.jobs);
+                if (!cap.bottleneckItem || !isFinite(cap.maxPossiblePcs)) return null;
+
+                const curPackedPcs = (activeJob.packedBoxes || 0) * activeJob.pcsPerBox;
+                const isExhausted = curPackedPcs >= cap.maxPossiblePcs;
+
+                return (
+                  <div className={`p-3 rounded-xl border space-y-2 ${isExhausted ? 'bg-rose-50 border-rose-300' : 'bg-indigo-50/80 border-indigo-200 shadow-2xs'}`}>
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <span className="font-extrabold text-xs text-indigo-950 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-indigo-600" />
+                        Combo Kit Material Stock & Limiting Component Gauge:
+                      </span>
+                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${isExhausted ? 'bg-rose-200 text-rose-900 border border-rose-300 animate-pulse' : 'bg-indigo-100 text-indigo-900'}`}>
+                        {isExhausted ? '⚠️ QC STOCK EXHAUSTED (BOTTLENECK HARD STOP)' : `Max Combo Kits Capacity: ${cap.maxPossiblePcs.toLocaleString()} Kits (${cap.maxPossibleBoxes} Boxes)`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {cap.breakdown.map((b) => {
+                        const isBottleneck = b.item === cap.bottleneckItem;
+                        return (
+                          <div key={b.item} className={`p-2 rounded-lg border text-xs font-bold ${isBottleneck ? 'bg-amber-100/90 border-amber-300 text-amber-950 shadow-2xs' : 'bg-white border-slate-200 text-slate-800'}`}>
+                            <div className="flex items-center justify-between">
+                              <span>{b.item}:</span>
+                              {isBottleneck && <span className="text-[9px] font-black bg-amber-300 text-amber-950 px-1 rounded uppercase">BOTTLENECK ITEM</span>}
+                            </div>
+                            <div className="text-sm font-black mt-0.5">{b.totalIssuedPcs.toLocaleString()} Pcs</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {isExhausted && (
+                      <div className="text-[11px] font-bold text-rose-900 bg-rose-100 border border-rose-300 p-2 rounded-lg flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>Notice: Limiting component [{cap.bottleneckItem}] is exhausted ({cap.maxPossiblePcs.toLocaleString()} Pcs packed). Issue more [{cap.bottleneckItem}] crates from QC Desk to pack additional boxes!</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Stats Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-700 bg-white/70 p-2.5 rounded-lg border border-slate-200">
@@ -1424,66 +1589,87 @@ export const PackingView: React.FC<PackingViewProps> = ({
                             ⚠️ No QC Approved Crates available for {item}. Please process and pass crates in QC Desk first.
                           </div>
                         ) : (
-                          <div className="space-y-1.5">
+                          <div className="space-y-2">
                             {qcJobs.map((j) => {
                               const currentSelected = selectedCratesToIssue[j.id] || 0;
                               const maxAvail = j.availableQcCrates || 0;
+                              const crateCap = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
+
+                              // Find completed/running QC batches for batch-level traceability
+                              const qcBatches = (j.runningBatches || []).filter(
+                                (b) => b.stage === 'QC' || b.machine === 'QC-Desk'
+                              );
 
                               return (
                                 <div
                                   key={j.id}
-                                  className={`flex items-center justify-between p-2 rounded-lg border transition ${
+                                  className={`p-3 rounded-xl border transition space-y-2 ${
                                     currentSelected > 0
-                                      ? 'bg-amber-50/50 border-amber-300'
+                                      ? 'bg-amber-50/60 border-amber-300 shadow-2xs'
                                       : 'bg-slate-50 border-slate-200'
                                   }`}
                                 >
-                                  <div>
-                                    <span className="font-bold text-blue-800 text-xs">{j.id}</span>
-                                    <span className="text-[11px] text-slate-600 ml-2 font-medium">
-                                      Brand: <b>{j.paperBrand || 'ITC'}</b> | Available QC:{' '}
-                                      <b className="text-emerald-700">{maxAvail} Crates</b>
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[11px] font-bold text-slate-600">Issue:</span>
-                                    <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg p-0.5">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSetCrateQuantity(j.id, currentSelected - 1, maxAvail)}
-                                        disabled={currentSelected <= 0}
-                                        className="p-1 hover:bg-slate-100 rounded disabled:opacity-30 cursor-pointer"
-                                      >
-                                        <Minus className="w-3 h-3 text-slate-700" />
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        max={maxAvail}
-                                        value={currentSelected}
-                                        onChange={(e) =>
-                                          handleSetCrateQuantity(j.id, parseInt(e.target.value, 10) || 0, maxAvail)
-                                        }
-                                        className="w-10 text-center font-extrabold text-xs text-blue-950 bg-transparent outline-none"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSetCrateQuantity(j.id, currentSelected + 1, maxAvail)}
-                                        disabled={currentSelected >= maxAvail}
-                                        className="p-1 hover:bg-slate-100 rounded disabled:opacity-30 cursor-pointer"
-                                      >
-                                        <Plus className="w-3 h-3 text-slate-700" />
-                                      </button>
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-extrabold text-blue-900 text-xs">{j.id}</span>
+                                        <span className="text-[10px] font-bold bg-slate-200/80 px-2 py-0.5 rounded text-slate-700">
+                                          Brand: {j.paperBrand || 'ITC'}
+                                        </span>
+                                        <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                                          {maxAvail} QC Crates ({ (maxAvail * crateCap).toLocaleString() } Pcs)
+                                        </span>
+                                      </div>
+                                      {qcBatches.length > 0 && (
+                                        <div className="text-[10px] text-slate-500 font-semibold mt-1 flex flex-wrap gap-2">
+                                          {qcBatches.slice(0, 2).map((qb) => (
+                                            <span key={qb.batchId} className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">
+                                              🔍 Lot #{qb.batchId} | Inspector: <b>{qb.worker}</b> {qb.sourceOperator ? `(Formed by ${qb.sourceOperator})` : ''}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
 
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSetCrateQuantity(j.id, maxAvail, maxAvail)}
-                                      className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 px-1.5 py-1 rounded cursor-pointer border border-blue-200"
-                                    >
-                                      Max
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-extrabold text-slate-700">Issue Crates:</span>
+                                      <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg p-0.5 shadow-2xs">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSetCrateQuantity(j.id, currentSelected - 1, maxAvail)}
+                                          disabled={currentSelected <= 0}
+                                          className="p-1 hover:bg-slate-100 rounded disabled:opacity-30 cursor-pointer"
+                                        >
+                                          <Minus className="w-3.5 h-3.5 text-slate-700" />
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={maxAvail}
+                                          value={currentSelected}
+                                          onChange={(e) =>
+                                            handleSetCrateQuantity(j.id, parseInt(e.target.value, 10) || 0, maxAvail)
+                                          }
+                                          className="w-12 text-center font-black text-xs text-blue-950 bg-transparent outline-none"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSetCrateQuantity(j.id, currentSelected + 1, maxAvail)}
+                                          disabled={currentSelected >= maxAvail}
+                                          className="p-1 hover:bg-slate-100 rounded disabled:opacity-30 cursor-pointer"
+                                        >
+                                          <Plus className="w-3.5 h-3.5 text-slate-700" />
+                                        </button>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetCrateQuantity(j.id, maxAvail, maxAvail)}
+                                        className="text-[10px] font-black text-blue-700 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-2 py-1.5 rounded-lg cursor-pointer border border-blue-300 transition"
+                                      >
+                                        Select All ({maxAvail})
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               );

@@ -6,6 +6,7 @@ import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { mergeFactoryStates } from './src/lib/syncMerge';
+import { processWhatsAppIncomingQuery, generateWhatsAppStockQueryReply } from './src/lib/whatsappReports';
 
 dotenv.config();
 
@@ -267,6 +268,162 @@ app.post('/api/whatsapp/dispatch', async (req, res) => {
       success: false,
       error: error.message || 'Failed to dispatch webhook via server proxy'
     });
+  }
+});
+
+// Two-Way WhatsApp Automated Query API (Instant reply for "मुझे इसका स्टॉक चाहिए", "stock", "job", "report")
+app.get('/api/whatsapp/query', (req, res) => {
+  try {
+    const q = (req.query.q || req.query.text || req.query.query || 'stock').toString();
+    const currentState = loadCentralStateFromDisk() || { jobs: [], packJobs: [], logs: [] };
+    const processed = processWhatsAppIncomingQuery(currentState, q);
+
+    res.json({
+      success: true,
+      query: q,
+      category: processed.category,
+      matchedKeyword: processed.matchedKeyword,
+      reply: processed.reply,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    console.error('WhatsApp query error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/whatsapp/query', (req, res) => {
+  try {
+    const { query, message, text } = req.body;
+    const q = (query || message || text || 'stock').toString();
+    const currentState = loadCentralStateFromDisk() || { jobs: [], packJobs: [], logs: [] };
+    const processed = processWhatsAppIncomingQuery(currentState, q);
+
+    res.json({
+      success: true,
+      query: q,
+      category: processed.category,
+      matchedKeyword: processed.matchedKeyword,
+      reply: processed.reply,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    console.error('WhatsApp query POST error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// In-memory store for incoming WhatsApp messages
+const inboundWhatsAppLogs: Array<{
+  id: string;
+  timestamp: string;
+  from: string;
+  query: string;
+  reply: string;
+  category: string;
+  status: string;
+}> = [];
+
+// Meta Webhook Verification Handshake & Health Check
+app.get('/api/whatsapp/incoming', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode && token) {
+    if (mode === 'subscribe' && (token === 'wunderkraf_token' || token === (process.env.WHATSAPP_VERIFY_TOKEN || 'wunderkraf'))) {
+      console.log('Meta Webhook verified successfully!');
+      return res.status(200).send(challenge);
+    } else {
+      return res.sendStatus(403);
+    }
+  }
+
+  // Regular browser GET test
+  res.json({
+    status: 'online',
+    endpoint: '/api/whatsapp/incoming',
+    description: 'Wünderkraf Paperware ERP WhatsApp Two-Way Webhook Listener',
+    usage: 'POST JSON with { phone, message } to receive real-time stock/report reply',
+    recentInboundCount: inboundWhatsAppLogs.length
+  });
+});
+
+// Inbound logs endpoint for real-time frontend monitoring
+app.get('/api/whatsapp/inbound-logs', (req, res) => {
+  res.json({
+    success: true,
+    logs: inboundWhatsAppLogs.slice(-50).reverse()
+  });
+});
+
+// WhatsApp Incoming Webhook Handler (Receives inbound messages from Meta Cloud API, AutoResponder for WA, Google Apps Script or external webhook)
+app.post('/api/whatsapp/incoming', async (req, res) => {
+  try {
+    const body = req.body || {};
+    let incomingText = '';
+    let fromPhone = '';
+
+    // Meta WhatsApp Cloud API format: entry[0].changes[0].value.messages[0]
+    if (body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
+      const msgObj = body.entry[0].changes[0].value.messages[0];
+      incomingText = msgObj.text?.body || '';
+      fromPhone = msgObj.from || '';
+    } else {
+      // Standard webhook format: { phone, message, query, text }
+      incomingText = body.message || body.query || body.text || body.Body || '';
+      fromPhone = body.phone || body.from || body.From || '';
+    }
+
+    const currentState = loadCentralStateFromDisk() || { jobs: [], packJobs: [], logs: [] };
+    const processed = processWhatsAppIncomingQuery(currentState, incomingText || 'stock');
+
+    // Record in real-time inbound feed
+    const logItem = {
+      id: `IN-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      from: fromPhone || 'Unknown / Webhook',
+      query: incomingText || 'Stock Query',
+      reply: processed.reply,
+      category: processed.category,
+      status: 'REPLIED'
+    };
+    inboundWhatsAppLogs.push(logItem);
+    if (inboundWhatsAppLogs.length > 100) inboundWhatsAppLogs.shift();
+
+    // If outbound webhook is configured in ERP, dispatch the reply back to the sender
+    const webhookUrl = currentState.whatsappConfig?.webhookUrl;
+    if (webhookUrl && webhookUrl.startsWith('http') && fromPhone) {
+      try {
+        fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: fromPhone,
+            message: processed.reply,
+            category: processed.category,
+            sender: 'Wünderkraf Two-Way Bot',
+            timestamp: new Date().toISOString()
+          })
+        }).catch(err => console.warn('Inbound auto-reply dispatch warning:', err));
+      } catch (e) {
+        console.warn('Dispatch failed:', e);
+      }
+    }
+
+    // Return the response immediately for the webhook caller
+    res.json({
+      success: true,
+      from: fromPhone,
+      incomingText,
+      reply: processed.reply,
+      category: processed.category,
+      matchedKeyword: processed.matchedKeyword,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    console.error('WhatsApp incoming webhook error:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

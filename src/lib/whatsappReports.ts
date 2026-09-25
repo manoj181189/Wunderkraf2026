@@ -189,7 +189,9 @@ export function triggerWhatsAppShiftNotification(
     ? `https://wa.me/${cleanPhone}?text=${encodedText}`
     : `https://wa.me/?text=${encodedText}`;
 
-  window.open(waUrl, '_blank', 'noopener,noreferrer');
+  if (typeof window !== 'undefined' && window.open) {
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  }
 }
 
 // =========================================================================
@@ -530,4 +532,295 @@ export async function dispatchWhatsAppNotificationViaServer(
     }
   }
 }
+
+// =========================================================================
+// 9. AUTOMATED TWO-WAY QUERY BOT ENGINE ("मुझे इसका स्टॉक चाहिए")
+// =========================================================================
+
+/**
+ * Generates an automated, structured live inventory reply formatted for WhatsApp
+ * when a user asks for stock (all items or a specific cutlery product).
+ */
+export function generateWhatsAppStockQueryReply(
+  state: FactoryState,
+  queryText: string = ''
+): string {
+  const query = (queryText || '').toLowerCase().trim();
+  const today = new Date().toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+  const time = new Date().toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const allProducts = state.products && state.products.length > 0
+    ? state.products
+    : ['Spoon', 'Fork', 'Knife', 'Dessert Spoon'];
+
+  // Check if a specific product was mentioned (in English or Hindi)
+  let matchedProduct: string | null = null;
+  if (query.includes('spoon') || query.includes('चम्मच') || query.includes('स्पून') || query.includes('spn')) {
+    matchedProduct = allProducts.find((p) => p.toLowerCase().includes('spoon') && !p.toLowerCase().includes('dessert')) || 'Spoon';
+  } else if (query.includes('fork') || query.includes('कांटा') || query.includes('काटा') || query.includes('फोर्क') || query.includes('frk')) {
+    matchedProduct = allProducts.find((p) => p.toLowerCase().includes('fork')) || 'Fork';
+  } else if (query.includes('knife') || query.includes('चाकू') || query.includes('छुरी') || query.includes('नाइफ') || query.includes('knf')) {
+    matchedProduct = allProducts.find((p) => p.toLowerCase().includes('knife')) || 'Knife';
+  } else if (query.includes('dessert') || query.includes('मीठा') || query.includes('छोटा चम्मच') || query.includes('डेजर्ट')) {
+    matchedProduct = allProducts.find((p) => p.toLowerCase().includes('dessert')) || 'Dessert Spoon';
+  } else {
+    matchedProduct = allProducts.find((p) => query.includes(p.toLowerCase())) || null;
+  }
+
+  const jobs = state.jobs || [];
+  const packJobs = state.packJobs || [];
+  const motherReels = state.motherReelInventory || [];
+  const availableReels = motherReels.filter((r) => r.status === 'Available');
+  const totalReelWeightKg = availableReels.reduce((sum, r) => sum + (Number(r.weightKg) || 0), 0);
+
+  // If specific product matched: Return high-detail item WIP & finished report
+  if (matchedProduct) {
+    const isMainSpoon = matchedProduct.toLowerCase() === 'spoon';
+    const pJobs = jobs.filter((j) => {
+      const prod = (j.product || '').toLowerCase();
+      if (isMainSpoon) return prod.includes('spoon') && !prod.includes('dessert');
+      return prod.includes(matchedProduct!.toLowerCase());
+    });
+    const slitRolls = pJobs.reduce((s, j) => s + (Number(j.availableRolls) || 0), 0);
+    const cutCrates = pJobs.reduce((s, j) => s + (Number(j.availableCuttingCrates) || 0), 0);
+    const formCrates = pJobs.reduce((s, j) => s + (Number(j.availableFormingCrates) || 0), 0);
+    const qcCrates = pJobs.reduce((s, j) => s + (Number(j.availableQcCrates) || 0), 0);
+
+    const pPacks = packJobs.filter((pj) => {
+      const pProd = (pj.kitType || (pj as any).product || '').toLowerCase();
+      if (isMainSpoon) return (pProd.includes('spoon') && !pProd.includes('dessert')) || (pj.kitItems && pj.kitItems.includes('Spoon'));
+      return pProd.includes(matchedProduct!.toLowerCase()) || (pj.kitItems && pj.kitItems.includes(matchedProduct!));
+    });
+    const packedBoxes = pPacks.reduce(
+      (s, pj) => s + Math.max(0, (Number(pj.packedBoxes) || 0) - (Number(pj.dispatchedBoxes) || 0)),
+      0
+    );
+
+    const pcsPerCrate = matchedProduct === 'Fork' ? 6500 : matchedProduct === 'Knife' ? 7500 : 7000;
+    const estFormedPieces = formCrates * pcsPerCrate;
+
+    return `🏭 *WÜNDERKRAF LIVE STOCK REPORT*
+📦 *Product:* *${matchedProduct.toUpperCase()} (चम्मच / स्पून)*
+📅 *Audit Date:* ${today} | ⏱️ *Time:* ${time}
+━━━━━━━━━━━━━━━━━━━━
+📊 *LIVE FLOOR WIP & PACKED STOCK:*
+• 📜 Stage 1 (Slit Rolls): *${slitRolls.toLocaleString()} Rolls*
+• ✂️ Stage 2 (Cut WIP Crates): *${cutCrates.toLocaleString()} Crates*
+• ⚙️ Stage 3 (Formed Crates): *${formCrates.toLocaleString()} Crates* (~${estFormedPieces.toLocaleString()} Pcs)
+• 🔍 Stage 4 (QC Approved): *${qcCrates.toLocaleString()} Crates*
+• 📦 Stage 5 (Ready Packed): *${packedBoxes.toLocaleString()} Master Boxes*
+
+⚡ *FLOOR STATUS:*
+Active production jobs running on forming & slitting lines. Stock updated in real-time.
+
+💡 *Next Actions (WhatsApp Commands):*
+• Type *ALL STOCK* for full plant inventory
+• Type *REPORT* for today's shift handover
+• Type *HELP* for command options
+━━━━━━━━━━━━━━━━━━━━
+_Wünderkraf Paperware ERP Central System_`;
+  }
+
+  // Entire Factory Aggregate Stock Matrix
+  const totalSlitRolls = jobs.reduce((s, j) => s + (Number(j.availableRolls) || 0), 0);
+  const totalCutCrates = jobs.reduce((s, j) => s + (Number(j.availableCuttingCrates) || 0), 0);
+  const totalFormedCrates = jobs.reduce((s, j) => s + (Number(j.availableFormingCrates) || 0), 0);
+  const totalQcCrates = jobs.reduce((s, j) => s + (Number(j.availableQcCrates) || 0), 0);
+  const totalPackedBoxes = packJobs.reduce(
+    (s, pj) => s + Math.max(0, (Number(pj.packedBoxes) || 0) - (Number(pj.dispatchedBoxes) || 0)),
+    0
+  );
+
+  const productBreakdownLines = allProducts.map((prod) => {
+    const pJobs = jobs.filter((j) => j.product?.toLowerCase() === prod.toLowerCase());
+    const pForm = pJobs.reduce((s, j) => s + (Number(j.availableFormingCrates) || 0), 0);
+    const pQc = pJobs.reduce((s, j) => s + (Number(j.availableQcCrates) || 0), 0);
+    const pPacks = packJobs.filter(
+      (pj) => pj.kitType === prod || (pj.kitItems && pj.kitItems.includes(prod))
+    );
+    const pBoxes = pPacks.reduce(
+      (s, pj) => s + Math.max(0, (Number(pj.packedBoxes) || 0) - (Number(pj.dispatchedBoxes) || 0)),
+      0
+    );
+    return `• *${prod}:* Formed: ${pForm} Crates | QC OK: ${pQc} | Packed: *${pBoxes} Boxes*`;
+  }).join('\n');
+
+  return `🏭 *WÜNDERKRAF PAPERWARE ERP*
+📋 *REAL-TIME FACTORY STOCK AUDIT*
+📅 *Audit Date:* ${today} | ⏱️ ${time}
+━━━━━━━━━━━━━━━━━━━━
+📜 *RAW MATERIAL (PAPER MOTHER REELS):*
+• Available Reels in Store: *${availableReels.length} Reels*
+• Total Paper Weight: *${totalReelWeightKg > 0 ? `${totalReelWeightKg.toLocaleString()} KG` : 'Allocated / Normal'}*
+
+📊 *TOTAL FACTORY WIP STAGE BALANCES:*
+• 📜 Slit Rolls (Stage 1): *${totalSlitRolls.toLocaleString()} Rolls*
+• ✂️ Cut Blank Crates (Stage 2): *${totalCutCrates.toLocaleString()} Crates*
+• ⚙️ Formed Crates (Stage 3): *${totalFormedCrates.toLocaleString()} Crates*
+• 🔍 QC Approved Crates (Stage 4): *${totalQcCrates.toLocaleString()} Crates*
+• 📦 Ready Finished Packed (Stage 5): *${totalPackedBoxes.toLocaleString()} Boxes*
+
+📦 *PRODUCT-WISE READY STOCK:*
+${productBreakdownLines}
+
+━━━━━━━━━━━━━━━━━━━━
+💡 *QUICK COMMANDS (WhatsApp में भेजें):*
+• *SPOON* or *चम्मच* - चम्मच का स्टॉक
+• *FORK* or *कांटा* - कांटे का स्टॉक
+• *REPORT* or *रिपोर्ट* - दैनिक शिफ्ट रिपोर्ट
+• *JOB* or *जॉब* - रनिंग जॉब्स का स्टेटस
+• *BREAKDOWN* or *मशीन* - मशीन स्टॉपेज अलर्ट
+• *HELP* or *मदद* - सभी कमांड्स की लिस्ट
+━━━━━━━━━━━━━━━━━━━━
+_Wünderkraf Central Inventory Bridge (Auto-Generated)_`;
+}
+
+/**
+ * Intelligent incoming WhatsApp command processor.
+ * Routes user queries (English/Hindi) to the proper ERP reply.
+ */
+export function processWhatsAppIncomingQuery(
+  state: FactoryState,
+  incomingMessage: string
+): { reply: string; category: string; matchedKeyword: string } {
+  const clean = (incomingMessage || '').toLowerCase().trim();
+
+  // 1. Stock Queries ("मुझे इसका स्टॉक चाहिए", "स्पून", "stock", "स्टॉक", "inventory", "maal", "balance", etc.)
+  if (
+    clean.includes('stock') ||
+    clean.includes('स्टॉक') ||
+    clean.includes('माल') ||
+    clean.includes('inventory') ||
+    clean.includes('balance') ||
+    clean.includes('kitna') ||
+    clean.includes('कितना') ||
+    clean.includes('spoon') ||
+    clean.includes('स्पून') ||
+    clean.includes('चम्मच') ||
+    clean.includes('fork') ||
+    clean.includes('फोर्क') ||
+    clean.includes('कांटा') ||
+    clean.includes('knife') ||
+    clean.includes('नाइफ') ||
+    clean.includes('चाकू') ||
+    clean.includes('छुरी') ||
+    clean.includes('dessert') ||
+    clean.includes('डेजर्ट') ||
+    clean.includes('reels') ||
+    clean.includes('boxes')
+  ) {
+    return {
+      reply: generateWhatsAppStockQueryReply(state, clean),
+      category: 'STOCK_QUERY',
+      matchedKeyword: 'stock'
+    };
+  }
+
+  // 2. Day Shift Report ("report", "रिपोर्ट", "shift", "day", "डे रिपोर्ट")
+  if (
+    clean.includes('shift') ||
+    clean.includes('report') ||
+    clean.includes('रिपोर्ट') ||
+    clean.includes('day') ||
+    clean.includes('दिन')
+  ) {
+    return {
+      reply: generateShiftChangeoverReportText(state, 'DAY'),
+      category: 'SHIFT_REPORT',
+      matchedKeyword: 'report'
+    };
+  }
+
+  // 3. Night Shift Report
+  if (clean.includes('night') || clean.includes('नाइट') || clean.includes('रात')) {
+    return {
+      reply: generateShiftChangeoverReportText(state, 'NIGHT'),
+      category: 'SHIFT_REPORT',
+      matchedKeyword: 'night'
+    };
+  }
+
+  // 4. Job Production Status ("job", "जॉब", "order", "ऑर्डर", "status", "stage")
+  if (
+    clean.includes('job') ||
+    clean.includes('जॉब') ||
+    clean.includes('order') ||
+    clean.includes('ऑर्डर') ||
+    clean.includes('status') ||
+    clean.includes('प्रोग्रेस')
+  ) {
+    return {
+      reply: generateJobStatusReportText(state),
+      category: 'JOB_STATUS',
+      matchedKeyword: 'job'
+    };
+  }
+
+  // 5. Machine Breakdown ("breakdown", "ब्रेकडाउन", "machine", "मशीन", "repair", "stoppage", "खराब")
+  if (
+    clean.includes('breakdown') ||
+    clean.includes('ब्रेकडाउन') ||
+    clean.includes('machine') ||
+    clean.includes('मशीन') ||
+    clean.includes('stoppage') ||
+    clean.includes('खराब') ||
+    clean.includes('band')
+  ) {
+    return {
+      reply: generateBreakdownAlertText(state),
+      category: 'MAINTENANCE_ALERT',
+      matchedKeyword: 'breakdown'
+    };
+  }
+
+  // 6. Manpower / Attendance ("attendance", "हाजिरी", "manpower", "worker", "कर्मचारी")
+  if (
+    clean.includes('attendance') ||
+    clean.includes('हाजिरी') ||
+    clean.includes('manpower') ||
+    clean.includes('worker') ||
+    clean.includes('वर्कर') ||
+    clean.includes('staff')
+  ) {
+    return {
+      reply: generateManpowerAttendanceReportText(state),
+      category: 'MANPOWER_ATTENDANCE',
+      matchedKeyword: 'attendance'
+    };
+  }
+
+  // 7. Help & Command Guide ("help", "मदद", "menu", "कमांड", "hi", "hello", "नमस्ते")
+  return {
+    reply: `👋 *नमस्ते! WÜNDERKRAF ERP WHATSAPP ASSISTANT*
+━━━━━━━━━━━━━━━━━━━━
+आप मुझे नीचे दिए गए किसी भी शब्द को भेजकर तुरंत लाइव रिपोर्ट पा सकते हैं:
+
+📦 *1. स्टॉक रिपोर्ट:*
+• टाइप करें: *STOCK* या *स्टॉक*
+• उत्पाद अनुसार: *SPOON* (चम्मच), *FORK* (कांटा), *KNIFE* (चाकू)
+
+📋 *2. फैक्ट्री रिपोर्ट्स:*
+• *REPORT* - दैनिक शिफ्ट चेंजओवर रिपोर्ट
+• *NIGHT* - नाइट शिफ्ट रिपोर्ट
+• *JOB* - रनिंग प्रोडक्शन जॉब्स का लाइव स्टेटस
+• *MACHINE* - मशीन ब्रेकडाउन व मेंटेनेंस अलर्ट
+• *STAFF* - दैनिक अटेंडेंस व रोल कॉल
+
+━━━━━━━━━━━━━━━━━━━━
+🔒 _एंटी-बैन सुरक्षित: सभी रिप्लाई केवल आपके मैसेज करने पर ही भेजे जाते हैं।_
+_Wünderkraf Paperware ERP System_`,
+    category: 'HELP_MENU',
+    matchedKeyword: 'help'
+  };
+}
+
 

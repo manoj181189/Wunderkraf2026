@@ -185,10 +185,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
       totalNetPieces = (j.availableCuttingCrates || 0) * rawStdCutPcs;
     }
 
-    // Net pieces per cutting crate (minor rejections distributed evenly across crates):
-    const netPcsPerCrate = totalCutCrates > 0
-      ? Math.round(totalNetPieces / totalCutCrates)
-      : ((j.availableCuttingCrates || 0) > 0 ? Math.round(totalNetPieces / j.availableCuttingCrates) : rawStdCutPcs);
+    // Net pieces per cutting crate: adhere strictly to standard crate capacity (e.g. 10,000 pcs/crate)
+    // to prevent synthetic backend inflation (e.g. 100,500 instead of 1,00,000):
+    const netPcsPerCrate = rawStdCutPcs;
 
     const hasRejectionDeduction = cuttingRejectedPcs > 0 && totalNetPieces < ((totalCutCrates || j.availableCuttingCrates || 0) * rawStdCutPcs);
 
@@ -703,7 +702,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const { job, batch } = activeBatchObj;
 
     const nextHelpers = handoverData.helpers && handoverData.helpers.length > 0 ? handoverData.helpers : assignedHelpers;
-    const producedPiecesSlice = handoverData.sliceProducedPieces || (handoverData.sliceProducedQty * effectiveFormPcs);
+    const grossPiecesSlice = handoverData.sliceProducedPieces || (handoverData.sliceProducedQty * effectiveFormPcs);
+    const scrapPcsSlice = handoverData.sliceScrapQty || 0;
+    // Net OK Formed Pieces for the slice (subtracting defect/scrap pieces to prevent inflation)
+    const netProducedPiecesSlice = Math.max(0, grossPiecesSlice - scrapPcsSlice);
 
     const newSlice: OperatorRunSlice = {
       sliceId: `SLICE-FORM-${Date.now()}`,
@@ -719,9 +721,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
       endMeterReading: handoverData.meterReading,
       strokeCount: handoverData.meterReading,
       producedQty: handoverData.sliceProducedQty,
-      producedPieces: producedPiecesSlice,
-      scrapQty: handoverData.sliceScrapQty,
-      scrapPcs: handoverData.sliceScrapQty,
+      producedPieces: netProducedPiecesSlice,
+      scrapQty: scrapPcsSlice,
+      scrapPcs: scrapPcsSlice,
       notes: handoverData.handoverNotes,
       helpers: nextHelpers,
       helperCount: nextHelpers.length,
@@ -742,8 +744,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
       nextShift: handoverData.nextShift,
       meterReading: handoverData.meterReading,
       producedQty: handoverData.sliceProducedQty,
-      producedPieces: producedPiecesSlice,
-      scrapQty: handoverData.sliceScrapQty,
+      producedPieces: netProducedPiecesSlice,
+      scrapQty: scrapPcsSlice,
       notes: handoverData.handoverNotes,
       helpers: nextHelpers
     };
@@ -757,8 +759,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
           meterReading: handoverData.meterReading,
           startMeterReading: handoverData.meterReading,
           producedQty: (b.producedQty || 0) + handoverData.sliceProducedQty,
-          producedPieces: (b.producedPieces || 0) + producedPiecesSlice,
-          scrapPcs: (b.scrapPcs || 0) + handoverData.sliceScrapQty,
+          producedPieces: (b.producedPieces || 0) + netProducedPiecesSlice,
+          scrapPcs: (b.scrapPcs || 0) + scrapPcsSlice,
           helpers: nextHelpers,
           helperCount: nextHelpers.length,
           slices: [...(b.slices || []), newSlice]
@@ -772,9 +774,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return {
         ...j,
         availableFormingCrates: (j.availableFormingCrates || 0) + handoverData.sliceProducedQty,
-        totalFormedPieces: (j.totalFormedPieces || 0) + producedPiecesSlice,
-        formingScrapPcs: (j.formingScrapPcs || 0) + handoverData.sliceScrapQty,
-        formingRejectedPcs: (j.formingRejectedPcs || 0) + handoverData.sliceScrapQty,
+        totalFormedPieces: (j.totalFormedPieces || 0) + netProducedPiecesSlice,
+        formingScrapPcs: (j.formingScrapPcs || 0) + scrapPcsSlice,
+        formingRejectedPcs: (j.formingRejectedPcs || 0) + scrapPcsSlice,
         runningBatches: updatedBatches
       };
     });
@@ -1087,10 +1089,12 @@ export const FormingView: React.FC<FormingViewProps> = ({
       const limitCrates = jobMetrics.totalCutCrates || j.totalCutCrates || nextCutCrates;
       const cappedCutCrates = Math.min(nextCutCrates, limitCrates);
 
-      // Recalculate auto rejection pieces based on final adjusted input pieces
-      const autoRejectionPieces = Math.max(0, finalInputPieces - cumulativeOutputPieces);
-      const finalScrapPcs = Math.max(scrapPcsVal, autoRejectionPieces);
-      const totalFormedPcs = Math.round(cratesDone * effectiveFormPcs) + looseDone;
+      // Exact operator rejection pieces
+      const finalScrapPcs = scrapPcsVal;
+      // Net OK Formed Pieces for this finish session (subtracting defect/scrap pieces)
+      const totalFormedPcs = Math.max(0, Math.round(cratesDone * effectiveFormPcs) + looseDone - finalScrapPcs);
+      // Balance remaining flat blanks that were not formed or rejected
+      const remainingUnformedBlanks = Math.max(0, finalInputPieces - (cumulativeOutputPieces + finalScrapPcs));
 
       return {
         ...j,
@@ -1158,7 +1162,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     });
 
     const totalFormedPcs = Math.round(cratesDone * effectiveFormPcs) + looseDone;
-    const finalScrapPcs = Math.max(scrapPcsVal, Math.max(0, finalInputPieces - cumulativeOutputPieces));
+    const finalScrapPcs = scrapPcsVal;
     const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     let logAction = `⏹️ Finished Forming Batch ${batch.batchId} (${cratesDone} Crates = ${(totalFormedPcs ?? 0).toLocaleString()} 3D Pieces)`;

@@ -716,13 +716,16 @@ export const QCView: React.FC<QCViewProps> = ({
     }
 
     const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const uninspectedCrates = Math.max(0, inputCrates - cratesDone);
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
-      const remainingFormed = (j.availableForQcCrates || 0) + (j.availableFormingCrates || 0);
+      const nextAvailForQc = (j.availableForQcCrates || 0) + uninspectedCrates;
+      const remainingFormed = nextAvailForQc + (j.availableFormingCrates || 0);
       return {
         ...j,
         stage: remainingFormed === 0 ? 'Packing' : j.stage,
+        availableForQcCrates: nextAvailForQc,
         availableQcCrates: (j.availableQcCrates || 0) + cratesDone,
         totalQcPieces: (j.totalQcPieces || 0) + approvedPcs,
         qcLoosePcs: (j.qcLoosePcs || 0) + looseDone,
@@ -744,13 +747,18 @@ export const QCView: React.FC<QCViewProps> = ({
       };
     });
 
+    let logAction = `⏹️ Completed QC Inspection (${cratesDone} Crates = ${approvedPcs.toLocaleString()} Pieces Approved, Rejects: ${rejectedPcs.toLocaleString()} Pcs, Scrap: ${scrap} KG)`;
+    if (uninspectedCrates > 0) {
+      logAction += ` | Auto-Returned ${uninspectedCrates} Uninspected Formed Crates back to Queue`;
+    }
+
     const newLog = {
       jobId: job.id,
       product: job.product,
       stage: 'QC',
       machine: 'QC-Desk',
       shift: batch.shift,
-      action: `⏹️ Completed QC Inspection (${cratesDone} Crates = ${approvedPcs.toLocaleString()} Pieces Approved, Rejects: ${rejectedPcs.toLocaleString()} Pcs, Scrap: ${scrap} KG)`,
+      action: logAction,
       worker: batch.worker,
       user: 'qc_user',
       startTime: batch.startTime,
@@ -998,6 +1006,70 @@ export const QCView: React.FC<QCViewProps> = ({
             <p className="text-[11px] text-slate-500 m-0">
               Formed Crates Inspection, Scrap Segregation & Approval to Finished Goods
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* SLDS FORMED GOODS STREAM & ISSUE-RETURN ACCOUNTING PANEL */}
+      {/* ========================================================================= */}
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md space-y-3">
+        <div className="flex items-center justify-between border-b border-white/10 pb-2.5 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Box className="w-5 h-5 text-cyan-400" />
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300 m-0">
+                Forming ➔ QC Live Stock Location & Dispatch Stream (SLDS)
+              </h4>
+              <p className="text-[10px] text-slate-300 m-0">
+                Total Formed Crates received from Forming Desk, Crates issued for Inspection & Approved Stock Balance
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-extrabold bg-white/10 border border-white/15 px-3 py-1 rounded-xl">
+            <span className="text-emerald-400">● Live Stream Synchronized</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="bg-white/10 border border-white/15 p-2.5 rounded-xl">
+            <span className="text-[10px] text-slate-300 uppercase font-bold block">1. Formed Stock Received:</span>
+            <span className="text-base font-black text-white">
+              {jobs.reduce((sum, j) => sum + (j.availableFormingCrates || 0) + (j.availableForQcCrates || 0), 0)} Crates
+            </span>
+            <span className="text-[10px] text-cyan-300 block">
+              ({jobs.reduce((sum, j) => sum + ((j.availableFormingCrates || 0) + (j.availableForQcCrates || 0)) * (j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000), 0).toLocaleString()} Formed Pcs)
+            </span>
+          </div>
+
+          <div className="bg-white/10 border border-white/15 p-2.5 rounded-xl">
+            <span className="text-[10px] text-slate-300 uppercase font-bold block">2. Issued to QC Inspector:</span>
+            <span className="text-base font-black text-amber-300">
+              {activeBatches.reduce((sum, b) => sum + (b.batch.issuedQty || 0), 0)} Crates
+            </span>
+            <span className="text-[10px] text-amber-200 block">
+              ({activeBatches.length} Active Inspector{activeBatches.length === 1 ? '' : 's'})
+            </span>
+          </div>
+
+          <div className="bg-white/10 border border-white/15 p-2.5 rounded-xl">
+            <span className="text-[10px] text-slate-300 uppercase font-bold block">3. QC Passed Stock (Packing Ready):</span>
+            <span className="text-base font-black text-emerald-300">
+              {jobs.reduce((sum, j) => sum + (j.availableQcCrates || 0), 0)} Crates
+            </span>
+            <span className="text-[10px] text-emerald-200 block">
+              ({jobs.reduce((sum, j) => sum + (j.totalQcPieces || 0), 0).toLocaleString()} Approved Pcs)
+            </span>
+          </div>
+
+          <div className="bg-white/10 border border-white/15 p-2.5 rounded-xl">
+            <span className="text-[10px] text-slate-300 uppercase font-bold block">4. QC Defect Rejects:</span>
+            <span className="text-base font-black text-rose-300">
+              {jobs.reduce((sum, j) => sum + (j.formingRejectedPcs || 0), 0).toLocaleString()} Pcs
+            </span>
+            <span className="text-[10px] text-rose-200 block">
+              Recorded Defects / Scrap
+            </span>
           </div>
         </div>
       </div>
