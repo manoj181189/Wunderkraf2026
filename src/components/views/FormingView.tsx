@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Cog, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, Box, Wrench, Search, ShieldCheck, CheckCircle2, AlertTriangle, RotateCcw, Calendar, Clock, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, ChevronUp, ChevronDown } from 'lucide-react';
 import { FactoryState, Job, ProductType, RunningBatch, OperatorRunSlice, LogEntry, ShiftHandoverRecord } from '../../types';
 import { PRODUCTS, DEPT_WORKERS, MACHINES } from '../../lib/constants';
-import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms, getJobReelsSummary, getJobPlannedLayers } from '../../lib/utils';
+import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms, getJobReelsSummary, getJobPlannedLayers, calculateCratePieces, calculateDeskBalance } from '../../lib/utils';
 import { getJobStageShiftLedger } from '../../lib/shiftSlices';
 import { getNumberingMaster, generateFormingBatchId } from '../../lib/numberingMaster';
 import { MachineBreakdownBanner } from '../MachineBreakdownBanner';
@@ -185,9 +185,14 @@ export const FormingView: React.FC<FormingViewProps> = ({
       totalNetPieces = (j.availableCuttingCrates || 0) * rawStdCutPcs;
     }
 
-    // Net pieces per cutting crate: adhere strictly to standard crate capacity (e.g. 10,000 pcs/crate)
-    // to prevent synthetic backend inflation (e.g. 100,500 instead of 1,00,000):
-    const netPcsPerCrate = rawStdCutPcs;
+    // Net pieces per cutting crate: Calculate based on ACTUAL cut output if possible (strict whole integers)
+    let netPcsPerCrate = rawStdCutPcs;
+    const totalActualPieces = cuttingBatches.reduce((sum, b) => sum + (b.producedPieces || 0), 0);
+    if (totalActualPieces > 0 && totalCutCrates > 0) {
+      netPcsPerCrate = Math.round(totalActualPieces / totalCutCrates);
+    } else if (j.totalCutPieces && j.totalCutPieces > 0 && j.availableCuttingCrates && j.availableCuttingCrates > 0) {
+      netPcsPerCrate = Math.round(j.totalCutPieces / j.availableCuttingCrates);
+    }
 
     const hasRejectionDeduction = cuttingRejectedPcs > 0 && totalNetPieces < ((totalCutCrates || j.availableCuttingCrates || 0) * rawStdCutPcs);
 
@@ -240,8 +245,53 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const jobMetrics = getJobCuttingMetrics(job);
-    const netCutPcsPerCrate = jobMetrics.netPcsPerCrate;
-    const issuedInputPieces = Math.round(cratesCount * netCutPcsPerCrate);
+    let netCutPcsPerCrate = jobMetrics.netPcsPerCrate;
+
+    if (selectedCuttingBatchId) {
+      const specificBatch = (job.runningBatches || []).find(b => b.batchId === selectedCuttingBatchId);
+      if (specificBatch && (specificBatch.producedQty || 0) > 0 && (specificBatch.producedPieces || 0) > 0) {
+        netCutPcsPerCrate = (specificBatch.producedPieces || 0) / (specificBatch.producedQty || 1);
+      } else {
+        // Check slices
+        for (const b of (job.runningBatches || [])) {
+          const slice = (b.slices || []).find(s => s.sliceId === selectedCuttingBatchId);
+          if (slice && (slice.producedQty || 0) > 0 && (slice.producedPieces || 0) > 0) {
+            netCutPcsPerCrate = (slice.producedPieces || 0) / (slice.producedQty || 1);
+            break;
+          }
+        }
+      }
+    }
+
+    let issuedInputPieces = Math.round(cratesCount * netCutPcsPerCrate);
+
+    // Dynamic preservation logic: If the operator is issuing the ENTIRE remaining available cutting crates of the job,
+    // let's issue the EXACT remaining piece count to avoid any decimal or average rounding mismatch!
+    const isIssuingAllJobCrates = cratesCount === (job.availableCuttingCrates || 0);
+    const totalCutPiecesOfJob = job.totalCutPieces || 0;
+    const totalAlreadyIssuedPiecesOfJob = (job.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming')).reduce((sum, b) => sum + (b.inputPieces || 0), 0);
+    const remainingPiecesInJob = Math.max(0, totalCutPiecesOfJob - totalAlreadyIssuedPiecesOfJob);
+
+    if (isIssuingAllJobCrates && remainingPiecesInJob > 0) {
+      issuedInputPieces = remainingPiecesInJob;
+    } else if (selectedCuttingBatchId) {
+      const specificBatch = (job.runningBatches || []).find(b => b.batchId === selectedCuttingBatchId);
+      if (specificBatch) {
+        const totalP = specificBatch.producedPieces || 0;
+        const totalCrates = specificBatch.producedQty || 1;
+        const alreadyConsumedCrates = specificBatch.consumedQty || 0;
+        const isConsumingAllRemainingBatchCrates = (cratesCount + alreadyConsumedCrates) >= totalCrates;
+        if (isConsumingAllRemainingBatchCrates) {
+          const alreadyConsumedPieces = (job.runningBatches || [])
+            .filter(b => (b.stage === 'Forming' || b.machine?.startsWith('Forming')) && b.sourceLotId?.includes(selectedCuttingBatchId))
+            .reduce((sum, b) => sum + (b.inputPieces || 0), 0);
+          const remPieces = Math.max(0, totalP - alreadyConsumedPieces);
+          if (remPieces > 0) {
+            issuedInputPieces = remPieces;
+          }
+        }
+      }
+    }
 
     let remDeduct = cratesCount;
     const modifiedCuttingBatches = (job.runningBatches || []).map((b) => {

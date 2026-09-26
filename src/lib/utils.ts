@@ -94,6 +94,51 @@ export function calculateTimeDifference(startStr?: string, endStr?: string): str
   }
 }
 
+export interface DeskCrateInput {
+  crates: number;
+  pcsPerCrate: number;
+  loosePcs?: number;
+  rejectedScrapPcs?: number;
+}
+
+/**
+ * Dynamic Formula: Total Pieces = (Crates * Actual Pcs in Crate) + Loose Pcs - Rejected Pcs
+ */
+export function calculateCratePieces(input: DeskCrateInput): number {
+  const crates = Math.max(0, input.crates || 0);
+  const pcsPerCrate = Math.max(0, input.pcsPerCrate || 0);
+  const loosePcs = Math.max(0, input.loosePcs || 0);
+  const rejectedScrapPcs = Math.max(0, input.rejectedScrapPcs || 0);
+
+  const grossPieces = Math.round(crates * pcsPerCrate) + loosePcs;
+  return Math.max(0, grossPieces - rejectedScrapPcs);
+}
+
+/**
+ * Strict Conservation Law: Total Input Pcs = OK Pcs + Scrap/Defect Pcs + Balance Pcs
+ */
+export function calculateDeskBalance(
+  totalInputPieces: number,
+  okPieces: number,
+  scrapDefectPieces: number
+) {
+  const safeInput = Math.max(0, totalInputPieces || 0);
+  const safeOk = Math.max(0, okPieces || 0);
+  const safeScrap = Math.max(0, scrapDefectPieces || 0);
+
+  const remainingBalancePieces = Math.max(0, safeInput - (safeOk + safeScrap));
+  const isBalanced = safeOk + safeScrap <= safeInput;
+
+  return {
+    totalInputPieces: safeInput,
+    okPieces: safeOk,
+    scrapDefectPieces: safeScrap,
+    remainingBalancePieces,
+    isBalanced,
+    mismatchPcs: safeOk + safeScrap > safeInput ? (safeOk + safeScrap) - safeInput : 0
+  };
+}
+
 export function getCurrentExpectedShift(shiftConfig: ShiftConfig): 'DAY' | 'NIGHT' {
   const now = new Date();
   const curTime = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');

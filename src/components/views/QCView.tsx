@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, SearchCheck, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, PlusCircle, Users, Box, Search, ShieldCheck, Calendar, Clock, CheckCircle2, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { FactoryState, Job, ProductType, RunningBatch } from '../../types';
 import { PRODUCTS, DEPT_WORKERS, DEFAULT_PCS_PER_KG_MAP } from '../../lib/constants';
-import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms } from '../../lib/utils';
+import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms, calculateCratePieces, calculateDeskBalance } from '../../lib/utils';
 import { getNumberingMaster, generateQCInspectionBatchId } from '../../lib/numberingMaster';
 import { LotGenealogyModal } from '../LotGenealogyModal';
 
@@ -235,20 +235,66 @@ export const QCView: React.FC<QCViewProps> = ({
     const batchId = generateQCInspectionBatchId(job.id, job.runningBatches || [], master);
     const upstreamBatchId = selectedFormingBatchId || job.tracedLots?.Forming || job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
 
-    // Find worker name of selected forming lot for provenance
+    // Find worker name of selected forming lot for provenance and calculate sourcePcsPerCrate
     let selectedFormingWorker = '';
     const formingBatchesForJob = (job.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'));
-    for (const fb of formingBatchesForJob) {
-      if (fb.slices && fb.slices.length > 0) {
-        const matchingSlice = fb.slices.find(s => s.sliceId === selectedFormingBatchId);
-        if (matchingSlice) {
-          selectedFormingWorker = matchingSlice.operator;
-          break;
+    let sourcePcsPerCrate = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
+
+    if (selectedFormingBatchId) {
+      const bMatch = formingBatchesForJob.find(b => b.batchId === selectedFormingBatchId);
+      if (bMatch) {
+        if (bMatch.pcsPerCrate) {
+          sourcePcsPerCrate = bMatch.pcsPerCrate;
+        }
+        selectedFormingWorker = bMatch.worker;
+      } else {
+        for (const b of formingBatchesForJob) {
+          const sMatch = (b.slices || []).find(s => s.sliceId === selectedFormingBatchId);
+          if (sMatch) {
+            if (sMatch.producedPieces && sMatch.producedQty) {
+              sourcePcsPerCrate = Math.round(sMatch.producedPieces / sMatch.producedQty);
+            }
+            selectedFormingWorker = sMatch.operator;
+            break;
+          }
         }
       }
-      if (fb.batchId === selectedFormingBatchId) {
-        selectedFormingWorker = fb.worker;
-        break;
+    } else {
+      // Find average forming pcs per crate from all forming batches
+      const totalFormedPieces = formingBatchesForJob.reduce((sum, b) => sum + (b.producedPieces || 0), 0);
+      const totalFormedCrates = formingBatchesForJob.reduce((sum, b) => sum + (b.producedQty || 0), 0);
+      if (totalFormedPieces > 0 && totalFormedCrates > 0) {
+        sourcePcsPerCrate = Math.round(totalFormedPieces / totalFormedCrates);
+      }
+    }
+
+    let inputPieces = Math.round(cratesCount * sourcePcsPerCrate);
+
+    // Dynamic preservation logic: If the operator is issuing the ENTIRE remaining available forming crates of the job,
+    // let's issue the EXACT remaining piece count to avoid any decimal or average rounding mismatch!
+    const isIssuingAllJobFormedCrates = cratesCount === ((job.availableForQcCrates || 0) + (job.availableFormingCrates || 0));
+    const totalFormedPiecesOfJob = job.totalFormedPieces || 0;
+    const totalAlreadyIssuedPiecesForQc = (job.runningBatches || []).filter(b => b.stage === 'QC').reduce((sum, b) => sum + (b.inputPieces || 0), 0);
+    const remainingFormedPiecesInJob = Math.max(0, totalFormedPiecesOfJob - totalAlreadyIssuedPiecesForQc);
+
+    if (isIssuingAllJobFormedCrates && remainingFormedPiecesInJob > 0) {
+      inputPieces = remainingFormedPiecesInJob;
+    } else if (selectedFormingBatchId) {
+      const specificFormingBatch = (job.runningBatches || []).find(b => b.batchId === selectedFormingBatchId);
+      if (specificFormingBatch) {
+        const totalP = specificFormingBatch.producedPieces || 0;
+        const totalCrates = specificFormingBatch.producedQty || 1;
+        const alreadyConsumedCrates = specificFormingBatch.consumedQty || 0;
+        const isConsumingAllRemainingFormingCrates = (cratesCount + alreadyConsumedCrates) >= totalCrates;
+        if (isConsumingAllRemainingFormingCrates) {
+          const alreadyConsumedPieces = (job.runningBatches || [])
+            .filter(b => b.stage === 'QC' && b.sourceLotId?.includes(selectedFormingBatchId))
+            .reduce((sum, b) => sum + (b.inputPieces || 0), 0);
+          const remPieces = Math.max(0, totalP - alreadyConsumedPieces);
+          if (remPieces > 0) {
+            inputPieces = remPieces;
+          }
+        }
       }
     }
 
@@ -264,6 +310,8 @@ export const QCView: React.FC<QCViewProps> = ({
       sourceOperator: selectedFormingWorker || undefined,
       issuedQty: cratesCount,
       producedQty: 0,
+      pcsPerCrate: sourcePcsPerCrate,
+      inputPieces: inputPieces,
       worker: cleanInspector,
       user: 'qc_user'
     };
@@ -663,9 +711,9 @@ export const QCView: React.FC<QCViewProps> = ({
     const rejectedPcs = parseInt(rejectedPiecesInput, 10) || 0;
 
     const { job, batch } = activeBatchObj;
-    const formCrateCapacity = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
+    const formCrateCapacity = batch.pcsPerCrate || job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
     const inputCrates = batch.issuedQty || 0;
-    const totalInputPieces = inputCrates * formCrateCapacity;
+    const totalInputPieces = batch.inputPieces || (inputCrates * formCrateCapacity);
 
     const approvedPcs = cratesDone * formCrateCapacity + looseDone;
     const prevProducedPieces = batch.producedPieces || 0;
@@ -674,43 +722,19 @@ export const QCView: React.FC<QCViewProps> = ({
     const cumulativeOutputCrates = prevProducedCrates + cratesDone;
     const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[job.product] || 450;
     const scrapPcs = Math.round(scrap * pcsPerKg);
-    const totalOutputPieces = cumulativeOutputPieces + scrapPcs + rejectedPcs;
+    const totalDefectsAndScrapPcs = scrapPcs + rejectedPcs;
 
-    // Single crate overload check
-    if (cratesDone === 1 && approvedPcs > formCrateCapacity) {
-      setAuditMismatchError({
-        outputPcs: approvedPcs,
-        outputCrates: cratesDone,
-        inputPcs: formCrateCapacity,
-        inputCrates: 1,
-        scrapPcs: scrapPcs + rejectedPcs,
-        details: `Audit Block: Single crate capacity exceeded. Approved quantity (${approvedPcs.toLocaleString()} pcs across ${cratesDone} crate + ${looseDone} loose) exceeds single crate capacity (${formCrateCapacity.toLocaleString()} pcs). Entry blocked.`
-      });
-      return;
-    }
+    // Strict Mass Balance Conservation Check: Total Output (Approved + Scrap + Rejects) <= Total Input
+    const balanceCheck = calculateDeskBalance(totalInputPieces, cumulativeOutputPieces, totalDefectsAndScrapPcs);
 
-    // Piece-based mass balance audit check: Output exceeds input pieces
-    if (inputCrates > 0 && cumulativeOutputPieces > totalInputPieces) {
+    if (inputCrates > 0 && !balanceCheck.isBalanced) {
       setAuditMismatchError({
         outputPcs: cumulativeOutputPieces,
         outputCrates: cumulativeOutputCrates,
         inputPcs: totalInputPieces,
         inputCrates,
-        scrapPcs: scrapPcs + rejectedPcs,
-        details: `Audit Block: Output exceeds input pieces. Approved QC quantity (${cumulativeOutputPieces.toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
-      });
-      return;
-    }
-
-    // Piece-based mass balance audit check: Output + Scrap exceeds input pieces
-    if (inputCrates > 0 && totalOutputPieces > totalInputPieces) {
-      setAuditMismatchError({
-        outputPcs: cumulativeOutputPieces,
-        outputCrates: cumulativeOutputCrates,
-        inputPcs: totalInputPieces,
-        inputCrates,
-        scrapPcs: scrapPcs + rejectedPcs,
-        details: `Audit Block: Output exceeds input pieces. Total QC approved (${cumulativeOutputPieces.toLocaleString()} pcs) plus scrap & rejects (${(scrapPcs + rejectedPcs).toLocaleString()} pcs) exceeds issued formed input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates). Entry blocked.`
+        scrapPcs: totalDefectsAndScrapPcs,
+        details: `Audit Block: Total output (${cumulativeOutputPieces.toLocaleString()} approved pcs + ${totalDefectsAndScrapPcs.toLocaleString()} scrap/reject pcs) exceeds issued input pieces (${totalInputPieces.toLocaleString()} pcs across ${inputCrates} crates) by ${balanceCheck.mismatchPcs.toLocaleString()} pcs. Entry blocked.`
       });
       return;
     }
