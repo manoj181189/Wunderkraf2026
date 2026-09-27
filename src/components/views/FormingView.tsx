@@ -757,6 +757,18 @@ export const FormingView: React.FC<FormingViewProps> = ({
     // Net OK Formed Pieces for the slice (subtracting defect/scrap pieces to prevent inflation)
     const netProducedPiecesSlice = Math.max(0, grossPiecesSlice - scrapPcsSlice);
 
+    // Strict piece-count mass-balance validation for Shift Handover:
+    const inputCrates = batch.issuedQty || 0;
+    const totalInputPieces = batch.inputPieces || (inputCrates * standardCutPcs);
+    const prevProducedPieces = batch.producedPieces || 0;
+    const prevScrapPieces = batch.scrapPcs || 0;
+    const totalConsumedPieces = prevProducedPieces + netProducedPiecesSlice + prevScrapPieces + scrapPcsSlice;
+
+    if (totalConsumedPieces > totalInputPieces + 100) {
+      alert(`❌ Shift Handover Blocked (हैंडओवर रोका गया):\n\nYour total reported output in this shift (OK Pieces: ${netProducedPiecesSlice.toLocaleString()} + Scrap/Defect Pieces: ${scrapPcsSlice.toLocaleString()}) plus previous shifts' output exceeds the total cutting input pieces (${totalInputPieces.toLocaleString()}) by ${(totalConsumedPieces - totalInputPieces).toLocaleString()} pieces!\n\nकृपया कुल ओके पीसेज या स्क्रैप पीस की प्रविष्टि जांचें। ओके + रिजेक्ट क्वांटिटी कभी भी कटिंग इनपुट से ज्यादा नहीं होनी चाहिए।`);
+      return;
+    }
+
     const newSlice: OperatorRunSlice = {
       sliceId: `SLICE-FORM-${Date.now()}`,
       operator: batch.worker,
@@ -1036,9 +1048,13 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const cumulativeOutputPieces = prevProducedPieces + currentOutputPieces;
     const cumulativeOutputCrates = prevProducedCrates + cratesDone;
 
-    // Strict piece-count validation: Output cannot exceed input by more than 100 pieces
-    if (cumulativeOutputPieces > totalInputPieces + 100) {
-      alert(`❌ Submission Blocked (जमा करने से रोका गया):\nYour reported OK output pieces (${cumulativeOutputPieces.toLocaleString()}) exceed the total input pieces (${totalInputPieces.toLocaleString()}) from the issued cutting crates by more than 100 pieces! Please check your crate or loose piece entries.`);
+    // Strict piece-count mass-balance validation: OK pieces + Scrap pieces cannot exceed input pieces by more than 100 pieces
+    const prevScrapPieces = batch.scrapPcs || 0;
+    const cumulativeScrapPieces = prevScrapPieces + scrapPcsVal;
+    const totalConsumedPieces = cumulativeOutputPieces + cumulativeScrapPieces;
+
+    if (totalConsumedPieces > totalInputPieces + 100) {
+      alert(`❌ Submission Blocked (जमा करने से रोका गया):\n\nYour total reported output (OK Pieces: ${cumulativeOutputPieces.toLocaleString()} + Scrap/Defect Pieces: ${cumulativeScrapPieces.toLocaleString()} = ${totalConsumedPieces.toLocaleString()} Pcs) exceeds the total cutting input pieces (${totalInputPieces.toLocaleString()}) by ${(totalConsumedPieces - totalInputPieces).toLocaleString()} pieces!\n\nकृपया कुल ओके पीसेज या स्क्रैप पीस की प्रविष्टि जांचें। ओके + रिजेक्ट क्वांटिटी कभी भी कटिंग इनपुट से ज्यादा नहीं होनी चाहिए।`);
       return;
     }
 

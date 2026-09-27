@@ -1624,19 +1624,34 @@ export const QCView: React.FC<QCViewProps> = ({
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
                 >
                   <option value="">-- SELECT FORMED CRATES QUEUE --</option>
-                  {pendingFormedJobs.map((j) => (
-                    <option key={j.id} value={j.id}>
-                      {j.id} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {(j.availableForQcCrates || 0) + (j.availableFormingCrates || 0)} Crates)
-                    </option>
-                  ))}
+                  {pendingFormedJobs.map((j) => {
+                    const totalFormedPiecesOfJob = j.totalFormedPieces || 0;
+                    const totalAlreadyIssuedPiecesForQc = (j.runningBatches || []).filter(b => b.stage === 'QC').reduce((sum, b) => sum + (b.inputPieces || 0), 0);
+                    const remainingPieces = Math.max(0, totalFormedPiecesOfJob - totalAlreadyIssuedPiecesForQc);
+                    const availCrates = (j.availableForQcCrates || 0) + (j.availableFormingCrates || 0);
+                    return (
+                      <option key={j.id} value={j.id}>
+                        {j.id} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {availCrates} Crates / {remainingPieces.toLocaleString()} Pcs)
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
               {selectedPendingJob && (
                 <div className="space-y-2">
-                  <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-lg text-xs font-bold text-cyan-900 flex items-center justify-between">
-                    <span>Available Formed Stock: {(selectedPendingJob.availableFormingCrates || 0) + (selectedPendingJob.availableForQcCrates || 0)} Crates [Brand: {selectedPendingJob.paperBrand || 'ITC'}]</span>
-                  </div>
+                  {(() => {
+                    const j = selectedPendingJob;
+                    const totalFormedPiecesOfJob = j.totalFormedPieces || 0;
+                    const totalAlreadyIssuedPiecesForQc = (j.runningBatches || []).filter(b => b.stage === 'QC').reduce((sum, b) => sum + (b.inputPieces || 0), 0);
+                    const remainingPieces = Math.max(0, totalFormedPiecesOfJob - totalAlreadyIssuedPiecesForQc);
+                    const availCrates = (j.availableFormingCrates || 0) + (j.availableForQcCrates || 0);
+                    return (
+                      <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-lg text-xs font-bold text-cyan-900 flex items-center justify-between">
+                        <span>Available Formed Stock: {availCrates} Crates / {remainingPieces.toLocaleString()} Pcs [Brand: {j.paperBrand || 'ITC'}]</span>
+                      </div>
+                    );
+                  })()}
                   
                   {/* Forming Operator Lots / Batches Breakdown */}
                   <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5">
@@ -1654,6 +1669,8 @@ export const QCView: React.FC<QCViewProps> = ({
                           totalQty: number;
                           consumedQty: number;
                           remainingQty: number;
+                          totalPieces?: number;
+                          remainingPieces?: number;
                         }[] = [];
 
                         const formingBatches = (selectedPendingJob.runningBatches || []).filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'));
@@ -1661,12 +1678,16 @@ export const QCView: React.FC<QCViewProps> = ({
                         formingBatches.forEach(fb => {
                           const totalP = fb.producedQty || 0;
                           const consumedP = fb.consumedQty || 0;
+                          const pcsPerCrate = fb.pcsPerCrate || selectedPendingJob.pcsPerCrateForming || 7000;
                           
                           if (fb.slices && fb.slices.length > 0) {
                             fb.slices.forEach(slice => {
                               const sliceTotal = slice.producedQty || 0;
                               const sliceConsumed = slice.consumedQty || 0;
                               const sliceRemaining = Math.max(0, sliceTotal - sliceConsumed);
+                              const slicePieces = slice.producedPieces || (sliceTotal * pcsPerCrate);
+                              const remainingPieces = sliceTotal > 0 ? Math.round((sliceRemaining / sliceTotal) * slicePieces) : 0;
+                              
                               selectableFormingLots.push({
                                 id: slice.sliceId,
                                 batchId: fb.batchId,
@@ -1675,10 +1696,15 @@ export const QCView: React.FC<QCViewProps> = ({
                                 machine: fb.machine || slice.machine || 'Forming',
                                 totalQty: sliceTotal,
                                 consumedQty: sliceConsumed,
-                                remainingQty: sliceRemaining
+                                remainingQty: sliceRemaining,
+                                totalPieces: slicePieces,
+                                remainingPieces: remainingPieces
                               });
                             });
                           } else {
+                            const batchPieces = fb.producedPieces || (totalP * pcsPerCrate);
+                            const remainingPieces = totalP > 0 ? Math.round((Math.max(0, totalP - consumedP) / totalP) * batchPieces) : 0;
+                            
                             selectableFormingLots.push({
                               id: fb.batchId,
                               batchId: fb.batchId,
@@ -1687,7 +1713,9 @@ export const QCView: React.FC<QCViewProps> = ({
                               machine: fb.machine || 'Forming',
                               totalQty: totalP,
                               consumedQty: consumedP,
-                              remainingQty: Math.max(0, totalP - consumedP)
+                              remainingQty: Math.max(0, totalP - consumedP),
+                              totalPieces: batchPieces,
+                              remainingPieces: remainingPieces
                             });
                           }
                         });
@@ -1724,7 +1752,7 @@ export const QCView: React.FC<QCViewProps> = ({
                               </div>
                               <div className="font-mono text-right">
                                 <div className={`font-black ${lot.remainingQty > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
-                                  {lot.remainingQty} Crates Remaining
+                                  {lot.remainingQty} Crates ({lot.remainingPieces?.toLocaleString()} Pcs) Remaining
                                 </div>
                                 <div className="text-slate-400 text-[10px]">({lot.totalQty} Produced, {lot.consumedQty} Consumed)</div>
                               </div>
