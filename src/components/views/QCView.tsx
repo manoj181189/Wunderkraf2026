@@ -143,97 +143,6 @@ export const QCView: React.FC<QCViewProps> = ({
 
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const cleanInspector = inspectorName.trim().toUpperCase();
-    const existingBatch = (job.runningBatches || []).find(
-      (b) => b.stage === 'QC' && b.status === 'Running' && (b.worker || '').trim().toUpperCase() === cleanInspector
-    );
-
-    if (existingBatch) {
-      // TOP-UP EXISTING BATCH (Same inspector, same job -> Merge / Top-up crates instead of duplicate entry)
-      const prevQty = existingBatch.issuedQty || 0;
-      const newTotalQty = prevQty + cratesCount;
-
-      let remDeductTopup = cratesCount;
-      const updatedJobs = jobs.map((j) => {
-        if (j.id !== job.id) return j;
-        const deductForQc = Math.min(j.availableForQcCrates || 0, remDeductTopup);
-        const remAfterForQc = remDeductTopup - deductForQc;
-        const deductForming = Math.min(j.availableFormingCrates || 0, remAfterForQc);
-        const newAvailForQc = Math.max(0, (j.availableForQcCrates || 0) - deductForQc);
-        const newAvailForming = Math.max(0, (j.availableFormingCrates || 0) - deductForming);
-
-        let remBatchDeduct = cratesCount;
-        const newRunBatches = (j.runningBatches || []).map((b) => {
-          if (b.batchId === existingBatch.batchId) {
-            return { ...b, issuedQty: newTotalQty };
-          }
-          if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remBatchDeduct > 0) {
-            const totalP = b.producedQty || 0;
-            const consumedP = b.consumedQty || 0;
-            const remP = Math.max(0, totalP - consumedP);
-            if (remP > 0 && (!selectedFormingBatchId || b.batchId === selectedFormingBatchId)) {
-              const dec = Math.min(remP, remBatchDeduct);
-              remBatchDeduct -= dec;
-              return { ...b, consumedQty: consumedP + dec };
-            }
-          }
-          return b;
-        });
-        return {
-          ...j,
-          availableForQcCrates: newAvailForQc,
-          availableFormingCrates: newAvailForming,
-          isReadyForQcInspection: (newAvailForQc + newAvailForming) > 0,
-          runningBatches: newRunBatches
-        };
-      });
-
-      const newLog = {
-        jobId: job.id,
-        product: job.product,
-        stage: 'QC',
-        machine: 'QC-Desk',
-        shift,
-        action: `➕ QC Crate Top-up: Issued +${cratesCount} More Crates to Inspector [${cleanInspector}] on Job [${job.id}] (Total Crates with Inspector: ${newTotalQty} Crates)`,
-        worker: cleanInspector,
-        user: 'qc_user',
-        startTime: nowTime,
-        rawDate: new Date().toISOString().split('T')[0],
-        timestamp: new Date().toLocaleString()
-      };
-
-      const { floorWorkers, deptWorkers } = autoRegisterWorker(state, cleanInspector, 'QC', 'QC-Desk', shift);
-
-      onSaveState({
-        ...state,
-        jobs: updatedJobs,
-        floorWorkers,
-        deptWorkers,
-        logs: [...state.logs, newLog]
-      });
-
-      setIssueCratesQty('');
-      setSelectedPendingJobId('');
-      setSelectedActiveBatchId(existingBatch.batchId);
-      alert(
-        `✅ Crate Top-up Successful!\n\n` +
-        `• Inspector: ${cleanInspector}\n` +
-        `• Job: ${job.id} (${job.product})\n` +
-        `• Previously: ${prevQty} Crates
-` +
-        `• Newly Given: +${cratesCount} Crates
-` +
-        `• Total in Hand: ${newTotalQty} Crates
-
-` +
-        `Due to being the same product, a duplicate entry was not created; the quantity has been updated in the existing record.`
-      );
-      return;
-    }
-
-    // Fresh batch when new job or different inspector
-    const master = getNumberingMaster(state.seriesConfig);
-    const batchId = generateQCInspectionBatchId(job.id, job.runningBatches || [], master);
-    const upstreamBatchId = selectedFormingBatchId || job.tracedLots?.Forming || job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
 
     // Find worker name of selected forming lot for provenance and calculate sourcePcsPerCrate
     let selectedFormingWorker = '';
@@ -297,6 +206,96 @@ export const QCView: React.FC<QCViewProps> = ({
         }
       }
     }
+
+    const existingBatch = (job.runningBatches || []).find(
+      (b) => b.stage === 'QC' && b.status === 'Running' && (b.worker || '').trim().toUpperCase() === cleanInspector
+    );
+
+    if (existingBatch) {
+      // TOP-UP EXISTING BATCH (Same inspector, same job -> Merge / Top-up crates instead of duplicate entry)
+      const prevQty = existingBatch.issuedQty || 0;
+      const newTotalQty = prevQty + cratesCount;
+      const prevPieces = existingBatch.inputPieces || 0;
+      const newTotalPieces = prevPieces + inputPieces;
+
+      let remDeductTopup = cratesCount;
+      const updatedJobs = jobs.map((j) => {
+        if (j.id !== job.id) return j;
+        const deductForQc = Math.min(j.availableForQcCrates || 0, remDeductTopup);
+        const remAfterForQc = remDeductTopup - deductForQc;
+        const deductForming = Math.min(j.availableFormingCrates || 0, remAfterForQc);
+        const newAvailForQc = Math.max(0, (j.availableForQcCrates || 0) - deductForQc);
+        const newAvailForming = Math.max(0, (j.availableFormingCrates || 0) - deductForming);
+
+        let remBatchDeduct = cratesCount;
+        const newRunBatches = (j.runningBatches || []).map((b) => {
+          if (b.batchId === existingBatch.batchId) {
+            return { ...b, issuedQty: newTotalQty, inputPieces: newTotalPieces };
+          }
+          if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remBatchDeduct > 0) {
+            const totalP = b.producedQty || 0;
+            const consumedP = b.consumedQty || 0;
+            const remP = Math.max(0, totalP - consumedP);
+            if (remP > 0 && (!selectedFormingBatchId || b.batchId === selectedFormingBatchId)) {
+              const dec = Math.min(remP, remBatchDeduct);
+              remBatchDeduct -= dec;
+              return { ...b, consumedQty: consumedP + dec };
+            }
+          }
+          return b;
+        });
+        return {
+          ...j,
+          availableForQcCrates: newAvailForQc,
+          availableFormingCrates: newAvailForming,
+          isReadyForQcInspection: (newAvailForQc + newAvailForming) > 0,
+          runningBatches: newRunBatches
+        };
+      });
+
+      const newLog = {
+        jobId: job.id,
+        product: job.product,
+        stage: 'QC',
+        machine: 'QC-Desk',
+        shift,
+        action: `➕ QC Crate Top-up: Issued +${cratesCount} More Crates (= ${inputPieces.toLocaleString()} Pcs) to Inspector [${cleanInspector}] on Job [${job.id}] (Total Crates with Inspector: ${newTotalQty} Crates / ${newTotalPieces.toLocaleString()} Pcs)`,
+        worker: cleanInspector,
+        user: 'qc_user',
+        startTime: nowTime,
+        rawDate: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toLocaleString()
+      };
+
+      const { floorWorkers, deptWorkers } = autoRegisterWorker(state, cleanInspector, 'QC', 'QC-Desk', shift);
+
+      onSaveState({
+        ...state,
+        jobs: updatedJobs,
+        floorWorkers,
+        deptWorkers,
+        logs: [...state.logs, newLog]
+      });
+
+      setIssueCratesQty('');
+      setSelectedPendingJobId('');
+      setSelectedActiveBatchId(existingBatch.batchId);
+      alert(
+        `✅ Crate Top-up Successful!\n\n` +
+        `• Inspector: ${cleanInspector}\n` +
+        `• Job: ${job.id} (${job.product})\n` +
+        `• Previously: ${prevQty} Crates (${prevPieces.toLocaleString()} Pcs)\n` +
+        `• Newly Given: +${cratesCount} Crates (+${inputPieces.toLocaleString()} Pcs)\n` +
+        `• Total in Hand: ${newTotalQty} Crates (${newTotalPieces.toLocaleString()} Pcs)\n\n` +
+        `Due to being the same product, a duplicate entry was not created; the quantity has been updated in the existing record.`
+      );
+      return;
+    }
+
+    // Fresh batch when new job or different inspector
+    const master = getNumberingMaster(state.seriesConfig);
+    const batchId = generateQCInspectionBatchId(job.id, job.runningBatches || [], master);
+    const upstreamBatchId = selectedFormingBatchId || job.tracedLots?.Forming || job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
 
     const newBatch: RunningBatch = {
       batchId,
@@ -472,8 +471,39 @@ export const QCView: React.FC<QCViewProps> = ({
       return;
     }
 
+    const sourcePcsPerCrate = batch.pcsPerCrate || job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
+    let addedPieces = Math.round(addCount * sourcePcsPerCrate);
+
+    const isIssuingAllJobFormedCrates = addCount === ((job.availableForQcCrates || 0) + (job.availableFormingCrates || 0));
+    const totalFormedPiecesOfJob = job.totalFormedPieces || 0;
+    const totalAlreadyIssuedPiecesForQc = (job.runningBatches || []).filter(b => b.stage === 'QC').reduce((sum, b) => sum + (b.inputPieces || 0), 0);
+    const remainingFormedPiecesInJob = Math.max(0, totalFormedPiecesOfJob - totalAlreadyIssuedPiecesForQc);
+
+    if (isIssuingAllJobFormedCrates && remainingFormedPiecesInJob > 0) {
+      addedPieces = remainingFormedPiecesInJob;
+    } else if (batch.sourceLotId) {
+      const specificFormingBatch = (job.runningBatches || []).find(b => b.batchId === batch.sourceLotId);
+      if (specificFormingBatch) {
+        const totalP = specificFormingBatch.producedPieces || 0;
+        const totalCrates = specificFormingBatch.producedQty || 1;
+        const alreadyConsumedCrates = (specificFormingBatch.consumedQty || 0) + addCount;
+        if (alreadyConsumedCrates >= totalCrates) {
+          const alreadyConsumedPieces = (job.runningBatches || [])
+            .filter(b => b.stage === 'QC' && b.sourceLotId?.includes(batch.sourceLotId) && b.batchId !== batch.batchId)
+            .reduce((sum, b) => sum + (b.inputPieces || 0), 0);
+          const currentPrevPieces = batch.inputPieces || 0;
+          const remPieces = Math.max(0, totalP - (alreadyConsumedPieces + currentPrevPieces));
+          if (remPieces > 0) {
+            addedPieces = remPieces;
+          }
+        }
+      }
+    }
+
     const prevQty = batch.issuedQty || 0;
     const newTotal = prevQty + addCount;
+    const prevPieces = batch.inputPieces || 0;
+    const newTotalPieces = prevPieces + addedPieces;
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const updatedJobs = jobs.map((j) => {
@@ -493,7 +523,8 @@ export const QCView: React.FC<QCViewProps> = ({
           if (b.batchId !== batch.batchId) return b;
           return {
             ...b,
-            issuedQty: newTotal
+            issuedQty: newTotal,
+            inputPieces: newTotalPieces
           };
         })
       };
@@ -505,7 +536,7 @@ export const QCView: React.FC<QCViewProps> = ({
       stage: 'QC',
       machine: 'QC-Desk',
       shift: batch.shift || shift,
-      action: `➕ QC Crate Top-up: Issued +${addCount} More Crates to Inspector [${batch.worker}] on Job [${job.id}] (Previous: ${prevQty} ➔ Total in Hand: ${newTotal} Crates)`,
+      action: `➕ QC Crate Top-up: Issued +${addCount} More Crates (= ${addedPieces.toLocaleString()} Pcs) to Inspector [${batch.worker}] on Job [${job.id}] (Previous: ${prevQty} Crates / ${prevPieces.toLocaleString()} Pcs ➔ Total in Hand: ${newTotal} Crates / ${newTotalPieces.toLocaleString()} Pcs)`,
       worker: batch.worker,
       user: 'qc_user',
       startTime: nowTime,
@@ -553,13 +584,23 @@ export const QCView: React.FC<QCViewProps> = ({
     const remaining = curIssued - qty;
     const targetSourceLotId = unissueTargetLotId || batch.sourceLotId || batch.parentBatchId;
 
+    const pcsPerCrate = batch.pcsPerCrate || job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
+    const piecesToReturn = remaining === 0 ? (batch.inputPieces || 0) : Math.min(batch.inputPieces || 0, qty * pcsPerCrate);
+    const remainingPieces = Math.max(0, (batch.inputPieces || 0) - piecesToReturn);
+
     let remAddUnissue = qty;
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
       const updatedBatches = (j.runningBatches || [])
         .map((b) => {
           if (b.batchId === batch.batchId) {
-            return { ...b, issuedQty: remaining };
+            const isCompleted = (b.producedQty || 0) > 0;
+            return { 
+              ...b, 
+              issuedQty: remaining,
+              inputPieces: remainingPieces,
+              status: remaining === 0 ? (isCompleted ? 'Completed' : 'Cancelled') : b.status
+            };
           }
           if ((b.stage === 'Forming' || b.machine?.startsWith('Forming')) && remAddUnissue > 0) {
             if (b.slices && b.slices.length > 0) {

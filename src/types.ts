@@ -173,6 +173,7 @@ export interface RunningBatch {
   parentReelNo?: string;
   inputCrates?: number;
   inputPieces?: number;
+  formingAdjustmentPcs?: number;
   qcInspector?: string;
   qcAssignedCrates?: number;
   qcStatus?: 'Pending QC' | 'In Inspection' | 'Approved' | 'Rejected' | string;
@@ -264,6 +265,7 @@ export interface Job {
   cuttingRejectedPcs?: number;
   formingScrapPcs?: number;
   formingRejectedPcs?: number;
+  formingAdjustmentPcs?: number;
   glueUsageKg?: number;
   glueBrand?: string;
   glueEntries?: {

@@ -4932,7 +4932,7 @@ ${formLines.join('\n')}
                       {(jobEditForm.runningBatches || []).map((batch, bIdx) => (
                         <div
                           key={batch.batchId || bIdx}
-                          className="p-3 bg-white border border-slate-200 rounded-lg grid grid-cols-1 sm:grid-cols-6 gap-2 text-xs items-center"
+                          className="p-3 bg-white border border-slate-200 rounded-lg grid grid-cols-1 sm:grid-cols-8 gap-2 text-xs items-center"
                         >
                           <div>
                             <span className="text-[10px] text-slate-400 block uppercase font-bold">Batch ID:</span>
@@ -4990,7 +4990,7 @@ ${formLines.join('\n')}
                             </select>
                           </div>
                           <div>
-                            <span className="text-[10px] text-slate-400 block uppercase font-bold">Issued Qty:</span>
+                            <span className="text-[10px] text-slate-400 block uppercase font-bold">Issued Crates:</span>
                             <input
                               type="number"
                               value={batch.issuedQty || 0}
@@ -5000,6 +5000,32 @@ ${formLines.join('\n')}
                                 setJobEditForm({ ...jobEditForm, runningBatches: updated });
                               }}
                               className="w-full px-2 py-1 border border-slate-300 rounded font-bold text-xs"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block uppercase font-bold">In Pieces (इन):</span>
+                            <input
+                              type="number"
+                              value={batch.inputPieces || 0}
+                              onChange={(e) => {
+                                const updated = [...(jobEditForm.runningBatches || [])];
+                                updated[bIdx] = { ...updated[bIdx], inputPieces: Number(e.target.value) };
+                                setJobEditForm({ ...jobEditForm, runningBatches: updated });
+                              }}
+                              className="w-full px-2 py-1 border border-slate-300 text-blue-800 rounded font-bold text-xs"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block uppercase font-bold">Out Pieces (आउट):</span>
+                            <input
+                              type="number"
+                              value={batch.producedPieces || 0}
+                              onChange={(e) => {
+                                const updated = [...(jobEditForm.runningBatches || [])];
+                                updated[bIdx] = { ...updated[bIdx], producedPieces: Number(e.target.value) };
+                                setJobEditForm({ ...jobEditForm, runningBatches: updated });
+                              }}
+                              className="w-full px-2 py-1 border border-slate-300 text-emerald-800 rounded font-bold text-xs"
                             />
                           </div>
                           <div className="flex items-center justify-end">

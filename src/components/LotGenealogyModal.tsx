@@ -419,6 +419,18 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                   </div>
                 </div>
 
+                {job.formingAdjustmentPcs !== undefined && job.formingAdjustmentPcs !== 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 mt-2.5 text-xs text-amber-950 font-semibold flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <span>📉</span>
+                      <span>Forming Process Loss/Gain Auto-Adjustment (संख्या संतुलन सुधार):</span>
+                    </span>
+                    <span className="bg-amber-200/80 border border-amber-300 text-amber-900 font-mono font-bold px-2 py-0.5 rounded text-xs">
+                      {job.formingAdjustmentPcs > 0 ? '+' : ''}{job.formingAdjustmentPcs.toLocaleString()} Pieces
+                    </span>
+                  </div>
+                )}
+
                 {/* Shift & Changeover Production History Ledger */}
                 <div className="mt-3 pt-3 border-t border-slate-200/80">
                   <StageShiftLedgerTable

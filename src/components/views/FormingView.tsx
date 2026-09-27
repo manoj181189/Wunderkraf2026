@@ -1159,8 +1159,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
       const finalScrapPcs = scrapPcsVal;
       // Net OK Formed Pieces for this finish session (subtracting defect/scrap pieces)
       const totalFormedPcs = Math.max(0, Math.round(cratesDone * effectiveFormPcs) + looseDone - finalScrapPcs);
-      // Balance remaining flat blanks that were not formed or rejected
-      const remainingUnformedBlanks = Math.max(0, finalInputPieces - (cumulativeOutputPieces + finalScrapPcs));
+      // Balance remaining flat blanks that were not formed or rejected (Auto-Adjustment)
+      const adjustmentPcs = finalInputPieces - totalConsumedPieces;
 
       return {
         ...j,
@@ -1173,6 +1173,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
         formingLoosePcs: (j.formingLoosePcs || 0) + looseDone,
         formingScrapPcs: (j.formingScrapPcs || 0) + finalScrapPcs,
         formingRejectedPcs: (j.formingRejectedPcs || 0) + finalScrapPcs,
+        formingAdjustmentPcs: (j.formingAdjustmentPcs || 0) + adjustmentPcs,
         runningBatches: updatedBatches.map((b) => {
           if (b.batchId !== batch.batchId) return b;
           const finalSlices = [...(b.slices || [])];
@@ -1200,6 +1201,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
             producedPieces: (b.producedPieces || 0) + totalFormedPcs,
             loosePieces: looseDone,
             scrapPcs: finalScrapPcs,
+            formingAdjustmentPcs: adjustmentPcs,
             slices: finalSlices
           };
         })
@@ -1236,6 +1238,11 @@ export const FormingView: React.FC<FormingViewProps> = ({
       logAction += ` | Auto-Returned ${unusedCrates} Unused Cutting Crates back to Stock`;
     }
     logAction += ` | Defect/Scrap: ${finalScrapPcs.toLocaleString()} Pieces`;
+    
+    const adjustmentPcs = finalInputPieces - totalConsumedPieces;
+    if (adjustmentPcs !== 0) {
+      logAction += ` | Auto-Adjustment: ${adjustmentPcs > 0 ? '+' : ''}${adjustmentPcs.toLocaleString()} Pcs`;
+    }
 
     const newLog = {
       jobId: job.id,
@@ -2751,6 +2758,11 @@ export const FormingView: React.FC<FormingViewProps> = ({
                             {item.totalDefects > 0 && (
                               <span className="text-rose-700 font-bold text-[11px]">
                                 Scrap: {item.totalDefects} Pcs
+                              </span>
+                            )}
+                            {j.formingAdjustmentPcs !== undefined && j.formingAdjustmentPcs !== 0 && (
+                              <span className="text-amber-700 font-extrabold text-[10px] bg-amber-50 px-1 py-0.5 rounded border border-amber-200 mt-0.5 inline-block" title="Forming auto-adjustment to reconcile piece counts">
+                                Adjust: {j.formingAdjustmentPcs > 0 ? '+' : ''}{j.formingAdjustmentPcs.toLocaleString()} Pcs
                               </span>
                             )}
                           </div>
