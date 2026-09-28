@@ -20,12 +20,14 @@ interface StageShiftLedgerTableProps {
   ledger: StageShiftLedgerSummary;
   stageTitle: string;
   themeColor?: 'blue' | 'indigo' | 'purple' | 'emerald';
+  autoAdjustmentPcs?: number;
 }
 
 export const StageShiftLedgerTable: React.FC<StageShiftLedgerTableProps> = ({
   ledger,
   stageTitle,
-  themeColor = 'indigo'
+  themeColor = 'indigo',
+  autoAdjustmentPcs = 0
 }) => {
   const {
     items,
@@ -270,15 +272,28 @@ export const StageShiftLedgerTable: React.FC<StageShiftLedgerTableProps> = ({
 
           <div className="bg-slate-800/80 rounded-lg p-2 border border-slate-700">
             <span className="text-[10px] text-slate-400 block font-semibold uppercase">Total Scrap / Wastage</span>
-            <span className="text-sm font-black text-rose-400">
-              {totalScrapKg > 0 ? `${totalScrapKg} KG` : ''}
-              {totalScrapKg > 0 && totalScrapPcs > 0 ? ' + ' : ''}
-              {totalScrapPcs > 0 ? `${totalScrapPcs.toLocaleString()} Pcs` : ''}
-              {!totalScrapKg && !totalScrapPcs ? '0 KG' : ''}
-            </span>
-            <span className="text-[10px] text-slate-400 block">
-              Cumulative Rejection
-            </span>
+            {autoAdjustmentPcs && autoAdjustmentPcs > 0 ? (
+              <div className="mt-0.5 space-y-0.5">
+                <span className="text-sm font-black text-rose-400 block">
+                  {(totalScrapPcs + autoAdjustmentPcs).toLocaleString()} Pcs Total
+                </span>
+                <span className="text-[9px] text-slate-300 block font-bold leading-tight">
+                  (Manual: {totalScrapPcs.toLocaleString()} Pcs + Auto: {autoAdjustmentPcs.toLocaleString()} Pcs)
+                </span>
+              </div>
+            ) : (
+              <>
+                <span className="text-sm font-black text-rose-400">
+                  {totalScrapKg > 0 ? `${totalScrapKg} KG` : ''}
+                  {totalScrapKg > 0 && totalScrapPcs > 0 ? ' + ' : ''}
+                  {totalScrapPcs > 0 ? `${totalScrapPcs.toLocaleString()} Pcs` : ''}
+                  {!totalScrapKg && !totalScrapPcs ? '0 KG' : ''}
+                </span>
+                <span className="text-[10px] text-slate-400 block">
+                  Cumulative Rejection
+                </span>
+              </>
+            )}
           </div>
 
           {ledger.totalGlueKg !== undefined && ledger.totalGlueKg > 0 && (

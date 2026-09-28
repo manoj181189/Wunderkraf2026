@@ -50,6 +50,10 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
   const formBatches = batches.filter((b) => b.stage === 'Forming' || b.machine.startsWith('Forming'));
   const qcBatches = batches.filter((b) => b.stage === 'QC' || b.machine === 'QC-Desk');
 
+  const formingOperatorDefects = formBatches.reduce((sum, b) => sum + (b.scrapPcs || 0), 0);
+  const formingAutoAdjustment = Math.max(0, job.formingAdjustmentPcs || 0);
+  const formingTotalScrap = formingOperatorDefects + formingAutoAdjustment;
+
   const cutPcsStd = job.pcsPerCrateCutting || state.crateCapacityMaster?.[job.product]?.cuttingPcs || 10000;
   const formPcsStd = job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
 
@@ -419,15 +423,27 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                   </div>
                 </div>
 
-                {job.formingAdjustmentPcs !== undefined && job.formingAdjustmentPcs !== 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 mt-2.5 text-xs text-amber-950 font-semibold flex items-center justify-between">
-                    <span className="flex items-center gap-1">
-                      <span>📉</span>
-                      <span>Forming Process Loss/Gain Auto-Adjustment (संख्या संतुलन सुधार):</span>
-                    </span>
-                    <span className="bg-amber-200/80 border border-amber-300 text-amber-900 font-mono font-bold px-2 py-0.5 rounded text-xs">
-                      {job.formingAdjustmentPcs > 0 ? '+' : ''}{job.formingAdjustmentPcs.toLocaleString()} Pieces
-                    </span>
+                {formingTotalScrap > 0 && (
+                  <div className="bg-rose-50/80 border border-rose-200 rounded-xl p-3 mt-2.5 text-xs text-rose-950 space-y-1.5 shadow-3xs">
+                    <div className="flex items-center justify-between font-black text-rose-900">
+                      <span className="flex items-center gap-1.5 uppercase tracking-wide">
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                        Total Forming Scrap & Rejections (कुल स्क्रैप एवं रिजेक्शन):
+                      </span>
+                      <span className="bg-rose-100 text-rose-900 border border-rose-300 font-mono font-black px-2.5 py-0.5 rounded text-xs shrink-0">
+                        {formingTotalScrap.toLocaleString()} Pieces
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-1 text-[11px] font-bold text-slate-600 bg-white/80 p-2 rounded-lg border border-slate-100">
+                      <div>
+                        <span className="text-slate-400 font-semibold block uppercase text-[9px]">Manual Operator Rejections (मैनुअल रिजेक्शन):</span>
+                        <span className="text-slate-800 font-extrabold text-xs">{formingOperatorDefects.toLocaleString()} Pieces</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block uppercase text-[9px]">Auto Process Loss (पॉप-अप ऑटो एडजस्ट):</span>
+                        <span className="text-slate-800 font-extrabold text-xs">{formingAutoAdjustment.toLocaleString()} Pieces</span>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -437,6 +453,7 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                     ledger={formLedger}
                     stageTitle="Forming Machines"
                     themeColor="purple"
+                    autoAdjustmentPcs={formingAutoAdjustment}
                   />
                 </div>
               </div>

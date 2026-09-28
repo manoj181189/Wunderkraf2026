@@ -116,7 +116,23 @@ export const QCView: React.FC<QCViewProps> = ({
     activeBatches.find((item) => item.batch?.batchId === selectedActiveBatchId) ||
     (activeBatches.length === 1 ? activeBatches[0] : null);
 
-  const effectiveQcPcs = activeBatchObj?.job.pcsPerCrateForming || (activeBatchObj ? state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs : 7000) || 7000;
+  const effectiveQcPcs = activeBatchObj?.batch?.pcsPerCrate || activeBatchObj?.job.pcsPerCrateForming || (activeBatchObj ? state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs : 7000) || 7000;
+
+  const liveInputPieces = activeBatchObj ? (activeBatchObj.batch.inputPieces || (activeBatchObj.batch.issuedQty * effectiveQcPcs)) : 0;
+  const liveCratesDone = parseInt(outputApprovedCrates, 10) || 0;
+  const liveLooseDone = parseInt(loosePiecesInput, 10) || 0;
+  const liveRejectedPcs = parseInt(rejectedPiecesInput, 10) || 0;
+  const liveScrapKg = parseFloat(scrapKg) || 0;
+  const livePcsPerKg = activeBatchObj ? (DEFAULT_PCS_PER_KG_MAP[activeBatchObj.job.product] || 450) : 450;
+  const liveScrapPcs = Math.round(liveScrapKg * livePcsPerKg);
+  // Bilaterally integrated: Rejected Pieces and Scrap KG represent the SAME rejection.
+  const liveTotalDefects = liveRejectedPcs;
+
+  const liveIsEntireBatch = activeBatchObj ? (liveCratesDone === activeBatchObj.batch.issuedQty || ( (liveLooseDone > 0 ? (liveCratesDone - 1) * effectiveQcPcs + liveLooseDone : liveCratesDone * effectiveQcPcs) + liveTotalDefects >= liveInputPieces - 100)) : false;
+
+  const liveApprovedPcs = liveIsEntireBatch 
+    ? Math.max(0, liveInputPieces - liveTotalDefects)
+    : (liveLooseDone > 0 ? (liveCratesDone - 1) * effectiveQcPcs + liveLooseDone : liveCratesDone * effectiveQcPcs);
 
   const handleStartInspection = (e: React.FormEvent) => {
     e.preventDefault();
@@ -756,14 +772,36 @@ export const QCView: React.FC<QCViewProps> = ({
     const inputCrates = batch.issuedQty || 0;
     const totalInputPieces = batch.inputPieces || (inputCrates * formCrateCapacity);
 
-    const approvedPcs = cratesDone * formCrateCapacity + looseDone;
+    const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[job.product] || 450;
+    // Bilaterally integrated: Rejected Pieces and Scrap KG represent the SAME rejection.
+    const totalDefectsAndScrapPcs = rejectedPcs;
+
+    // Strict Mass Balance Conservation: If we have accounted for the entire lot (same crates or nearly all pieces),
+    // then Approved Pcs = Total Input Pcs - Rejects. Otherwise, compute proportionally.
+    const isEntireBatchInspected = (cratesDone === inputCrates) || 
+      (((looseDone > 0 ? (cratesDone - 1) * formCrateCapacity + looseDone : cratesDone * formCrateCapacity) + totalDefectsAndScrapPcs) >= (totalInputPieces - 100));
+
+    let approvedPcs = 0;
+    if (isEntireBatchInspected) {
+      approvedPcs = Math.max(0, totalInputPieces - totalDefectsAndScrapPcs);
+    } else {
+      approvedPcs = looseDone > 0 ? (cratesDone - 1) * formCrateCapacity + looseDone : cratesDone * formCrateCapacity;
+    }
+
     const prevProducedPieces = batch.producedPieces || 0;
     const prevProducedCrates = batch.producedQty || 0;
     const cumulativeOutputPieces = prevProducedPieces + approvedPcs;
     const cumulativeOutputCrates = prevProducedCrates + cratesDone;
-    const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[job.product] || 450;
-    const scrapPcs = Math.round(scrap * pcsPerKg);
-    const totalDefectsAndScrapPcs = scrapPcs + rejectedPcs;
+
+    if (cumulativeOutputCrates > inputCrates) {
+      alert(`⚠️ Validation Error: Total Passed Crates (${cumulativeOutputCrates} Crates) cannot exceed total Issued Crates (${inputCrates} Crates) for this QC Batch! Please correct the crate count.`);
+      return;
+    }
+
+    if (cumulativeOutputPieces > totalInputPieces) {
+      alert(`⚠️ Validation Error: Total Passed Pieces (${cumulativeOutputPieces.toLocaleString()} Pcs) cannot exceed total Issued Pieces (${totalInputPieces.toLocaleString()} Pcs) for this QC Batch!`);
+      return;
+    }
 
     // Strict Mass Balance Conservation Check: Total Output (Approved + Scrap + Rejects) <= Total Input
     const balanceCheck = calculateDeskBalance(totalInputPieces, cumulativeOutputPieces, totalDefectsAndScrapPcs);
@@ -781,7 +819,7 @@ export const QCView: React.FC<QCViewProps> = ({
     }
 
     const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const uninspectedCrates = Math.max(0, inputCrates - cratesDone);
+    const uninspectedCrates = isEntireBatchInspected ? 0 : Math.max(0, inputCrates - cratesDone);
 
     const updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
@@ -1374,7 +1412,7 @@ export const QCView: React.FC<QCViewProps> = ({
                   {parseInt(loosePiecesInput, 10) > 0 && <span> + {loosePiecesInput} Loose</span>}
                 </div>
                 <div className="text-emerald-950 font-black bg-emerald-100 px-2.5 py-1 rounded-md text-xs border border-emerald-300">
-                  = {((parseInt(outputApprovedCrates, 10) || 0) * effectiveQcPcs + (parseInt(loosePiecesInput, 10) || 0)).toLocaleString()} Finished Pieces (Total Passed)
+                  = {liveApprovedPcs.toLocaleString()} Finished Pieces (Total Passed)
                 </div>
               </div>
             )}
@@ -1393,18 +1431,23 @@ export const QCView: React.FC<QCViewProps> = ({
                   onChange={(e) => {
                     const val = e.target.value;
                     setRejectedPiecesInput(val);
-                    const formCrateCapacity = activeBatchObj.job.pcsPerCrateForming || state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs || 7000;
+                    const formCrateCapacity = activeBatchObj.batch.pcsPerCrate || activeBatchObj.job.pcsPerCrateForming || state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs || 7000;
                     const inputCrates = activeBatchObj.batch.issuedQty || 0;
-                    const totalInputPieces = inputCrates * formCrateCapacity;
+                    const totalInputPieces = activeBatchObj.batch.inputPieces || (inputCrates * formCrateCapacity);
                     
                     const rejectedVal = parseInt(val, 10) || 0;
                     const computedApproved = Math.max(0, totalInputPieces - rejectedVal);
                     
-                    const autoCrates = Math.floor(computedApproved / formCrateCapacity);
-                    const autoLoose = computedApproved % formCrateCapacity;
+                    const autoCrates = Math.ceil(computedApproved / formCrateCapacity);
+                    const autoLoose = Math.round(computedApproved % formCrateCapacity);
                     
                     setOutputApprovedCrates(String(autoCrates));
                     setLoosePiecesInput(String(autoLoose));
+
+                    // Real-time bilateral sync: calculate KG from pieces
+                    const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[activeBatchObj.job.product] || 450;
+                    const calculatedKg = Number((rejectedVal / pcsPerKg).toFixed(3));
+                    setScrapKg(String(calculatedKg));
                   }}
                   placeholder="e.g. 250 Pcs"
                   className="w-full px-3 py-2 bg-rose-50/50 border border-rose-300 rounded-lg text-xs font-extrabold text-rose-900 outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
@@ -1420,8 +1463,17 @@ export const QCView: React.FC<QCViewProps> = ({
                   value={outputApprovedCrates}
                   onChange={(e) => setOutputApprovedCrates(e.target.value)}
                   placeholder="e.g. 6 Crates"
-                  className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                  className={`w-full px-3 py-2 border rounded-lg text-xs font-extrabold outline-none ${
+                    parseInt(outputApprovedCrates, 10) > (activeBatchObj?.batch.issuedQty || 0)
+                      ? 'border-rose-500 bg-rose-50 text-rose-900 focus:ring-rose-500 focus:ring-1'
+                      : 'bg-white border-emerald-300 text-slate-800 focus:border-emerald-500'
+                  }`}
                 />
+                {parseInt(outputApprovedCrates, 10) > (activeBatchObj?.batch.issuedQty || 0) && (
+                  <span className="text-[10px] text-rose-600 block mt-0.5 font-bold animate-pulse">
+                    ⚠️ Cannot exceed {activeBatchObj?.batch.issuedQty} issued crates!
+                  </span>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-bold text-emerald-800 uppercase mb-1">
@@ -1442,9 +1494,29 @@ export const QCView: React.FC<QCViewProps> = ({
                 <input
                   type="number"
                   value={scrapKg}
-                  onChange={(e) => setScrapKg(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setScrapKg(val);
+                    
+                    const scrapVal = parseFloat(val) || 0;
+                    const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[activeBatchObj.job.product] || 450;
+                    const calculatedPieces = Math.round(scrapVal * pcsPerKg);
+                    setRejectedPiecesInput(String(calculatedPieces));
+
+                    const formCrateCapacity = activeBatchObj.batch.pcsPerCrate || activeBatchObj.job.pcsPerCrateForming || state.crateCapacityMaster?.[activeBatchObj.job.product]?.formingPcs || 7000;
+                    const inputCrates = activeBatchObj.batch.issuedQty || 0;
+                    const totalInputPieces = activeBatchObj.batch.inputPieces || (inputCrates * formCrateCapacity);
+                    
+                    const computedApproved = Math.max(0, totalInputPieces - calculatedPieces);
+                    
+                    const autoCrates = Math.ceil(computedApproved / formCrateCapacity);
+                    const autoLoose = Math.round(computedApproved % formCrateCapacity);
+                    
+                    setOutputApprovedCrates(String(autoCrates));
+                    setLoosePiecesInput(String(autoLoose));
+                  }}
                   placeholder="e.g. 1.5 KG"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                  className="w-full px-3 py-2 bg-rose-50/50 border border-rose-300 rounded-lg text-xs font-extrabold text-rose-900 outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
                 />
               </div>
             </div>
@@ -1455,13 +1527,13 @@ export const QCView: React.FC<QCViewProps> = ({
                 <span>📊 Live Balance Audit:</span>
               </div>
               <div>
-                Input: <span className="text-blue-900">{(activeBatchObj.batch.issuedQty * effectiveQcPcs).toLocaleString()} Pcs</span> ({activeBatchObj.batch.issuedQty} Crates)
+                Input: <span className="text-blue-900">{liveInputPieces.toLocaleString()} Pcs</span> ({activeBatchObj.batch.issuedQty} Crates)
               </div>
               <div className="text-emerald-700">
-                Approved: {(((parseInt(outputApprovedCrates, 10) || 0) * effectiveQcPcs) + (parseInt(loosePiecesInput, 10) || 0)).toLocaleString()} Pcs
+                Approved: {liveApprovedPcs.toLocaleString()} Pcs
               </div>
               <div className="text-rose-700">
-                Rejected: {(parseInt(rejectedPiecesInput, 10) || 0).toLocaleString()} Pcs
+                Rejected: {liveRejectedPcs.toLocaleString()} Pcs
               </div>
             </div>
 
@@ -1659,8 +1731,7 @@ export const QCView: React.FC<QCViewProps> = ({
                   value={selectedPendingJobId}
                   onChange={(e) => {
                     setSelectedPendingJobId(e.target.value);
-                    const j = jobs.find((x) => x.id === e.target.value);
-                    if (j) setIssueCratesQty(String(((j.availableForQcCrates || 0) + (j.availableFormingCrates || 0)) || 1));
+                    setIssueCratesQty(''); // Keep empty so operator must enter manually to avoid confusion
                   }}
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
                 >

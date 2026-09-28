@@ -2800,8 +2800,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
               value={selectedPendingJobId}
               onChange={(e) => {
                 setSelectedPendingJobId(e.target.value);
-                const j = jobs.find((x) => x.id === e.target.value);
-                if (j) setIssueRollsQty(String(j.availableRolls || 1));
+                setIssueRollsQty(''); // Keep empty so operator must enter manually to avoid confusion
               }}
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
             >

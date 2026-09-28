@@ -98,12 +98,33 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
       scrapKg = parseFloat(matchGenericScrap[1]) || 0;
     }
 
-    // Parse scrap pieces / defects
-    const matchDefects = action.match(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*([0-9,]+)/i) || 
-                         action.match(/([0-9,]+)\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/i);
+    // 2. Matches "Defect Pieces: 500", "Rejected Pcs: 500", "Defect/Scrap: 500", "Auto-Adjustment: +500", etc.
+    // Format A: "Defect/Scrap: X Pieces" or "Defect/Scrap: X"
+    const matchDefectScrap = action.match(/Defect\/Scrap:\s*([0-9,]+)/i);
+    if (matchDefectScrap) {
+      scrapPieces += parseInt(matchDefectScrap[1].replace(/,/g, ''), 10) || 0;
+    }
 
-    if (matchDefects) {
-      scrapPieces = parseInt(matchDefects[1].replace(/,/g, ''), 10) || 0;
+    // Format B: "Auto-Adjustment: +X Pcs" or "Auto-Adjustment: X"
+    const matchAutoAdjustment = action.match(/Auto-Adjustment:\s*\+?([0-9,]+)/i);
+    if (matchAutoAdjustment) {
+      scrapPieces += parseInt(matchAutoAdjustment[1].replace(/,/g, ''), 10) || 0;
+    }
+
+    // Format C: "X Defect Pcs" or "X Defect Pieces" or "X Defects" (e.g. "Locked slice: X Formed Crates, Y Defect Pcs")
+    const matchDefectPcs = action.match(/(\d+)\s*(?:Defect Pcs|Defect Pieces|Defects)/i);
+    if (matchDefectPcs) {
+      scrapPieces += parseInt(matchDefectPcs[1], 10) || 0;
+    }
+
+    // Format D: Other generic defects (like "Defect Pieces: X", "Defects: X", "Scrap Pcs: X", "Rejected Pcs: X")
+    // Only capture if we haven't already captured anything above to avoid any double-counting
+    if (scrapPieces === 0) {
+      const matchGeneric = action.match(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*([0-9,]+)/i) ||
+                           action.match(/([0-9,]+)\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/i);
+      if (matchGeneric) {
+        scrapPieces = parseInt(matchGeneric[1].replace(/,/g, ''), 10) || 0;
+      }
     }
 
     // Convert pieces to KG if scrapKg is 0 but scrapPieces is greater than 0

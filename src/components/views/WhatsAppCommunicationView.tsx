@@ -77,7 +77,7 @@ interface WhatsAppCommunicationViewProps {
   currentUser?: { username: string; perms: string[] } | null;
 }
 
-type TabType = 'safe_qr_session' | 'dispatcher' | 'coordination_matrix' | 'triggers' | 'dispatch_logs';
+type TabType = 'dispatcher' | 'coordination_matrix' | 'dispatch_logs';
 
 type MessageCategory =
   | 'SHIFT_DAY'
@@ -98,7 +98,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
   onNavigateToView,
   currentUser
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('safe_qr_session');
+  const [activeTab, setActiveTab] = useState<TabType>('dispatcher');
 
   // Permission & Role Checks
   const username = currentUser?.username || 'admin';
@@ -1085,27 +1085,6 @@ _Wünderkraf Factory Communication System_`;
       {/* 3. DESK NAVIGATION TABS */}
       <div className="bg-white border border-slate-200 rounded-2xl p-1.5 shadow-xs flex flex-wrap gap-1">
         <button
-          onClick={() => setActiveTab('safe_qr_session')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
-            activeTab === 'safe_qr_session'
-              ? 'bg-emerald-700 text-white shadow-xs ring-2 ring-emerald-400'
-              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <QrCode className="w-4 h-4 text-emerald-300" />
-          <span>📱 QR स्कैन & सुरक्षित बॉट (Safe Two-Way Bot)</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-            sessionStatus === 'ACTIVE'
-              ? 'bg-emerald-400 text-slate-950 animate-pulse'
-              : sessionStatus === 'EXPIRED'
-              ? 'bg-rose-200 text-rose-800'
-              : 'bg-slate-200 text-slate-700'
-          }`}>
-            {sessionStatus === 'ACTIVE' ? '🟢 सक्रिय (Active)' : sessionStatus === 'EXPIRED' ? '🔒 स्वतः समाप्त' : '⚪ स्कैन रेडी'}
-          </span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('dispatcher')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeTab === 'dispatcher'
@@ -1114,7 +1093,7 @@ _Wünderkraf Factory Communication System_`;
           }`}
         >
           <Send className="w-4 h-4" />
-          <span>Broadcast & Shift Dispatcher</span>
+          <span>Manual Broadcast & Shift Dispatcher</span>
         </button>
 
         <button
@@ -1126,24 +1105,12 @@ _Wünderkraf Factory Communication System_`;
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Staff & Escalation Contact Matrix</span>
+          <span>Staff Escalation Matrix</span>
           <span className={`px-2 py-0.2 rounded-full text-[10px] font-extrabold ${
             activeTab === 'coordination_matrix' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
           }`}>
             {totalMatrixContacts}
           </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('triggers')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-            activeTab === 'triggers'
-              ? 'bg-amber-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          <span>Notification Triggers & Gateway</span>
         </button>
 
         <button
@@ -1155,7 +1122,7 @@ _Wünderkraf Factory Communication System_`;
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>Automated Shift Reports & Audit Log</span>
+          <span>Live Monitoring & Dispatch Logs</span>
           <span className={`px-2 py-0.2 rounded-full text-[10px] font-extrabold ${
             activeTab === 'dispatch_logs' ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-700'
           }`}>
@@ -1165,9 +1132,9 @@ _Wünderkraf Factory Communication System_`;
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 0: QR SCAN & ANTI-BAN AUTO-DISCONNECT SESSION (SAFE TWO-WAY BOT)       */}
+      {/* TAB 0: REMOVED FOR SECURITY & ACCURACY                                   */}
       {/* ========================================================================= */}
-      {activeTab === 'safe_qr_session' && (
+      {false && (
         <div className="space-y-6">
           {/* Top Safety Status Banner */}
           <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white border border-emerald-500/40 rounded-3xl p-6 shadow-xl space-y-4">
@@ -2803,9 +2770,9 @@ _Wünderkraf Factory Communication System_`;
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: NOTIFICATION TRIGGERS & GATEWAY CONFIGURATION                      */}
+      {/* TAB 3: REMOVED DUPLICATE CONTROLS                                         */}
       {/* ========================================================================= */}
-      {activeTab === 'triggers' && (
+      {false && (
         <div className="space-y-5">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-6">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 flex-wrap gap-2">
@@ -3392,6 +3359,75 @@ function doPost(e) {
       {/* ========================================================================= */}
       {activeTab === 'dispatch_logs' && (
         <div className="space-y-5">
+          {/* Two-Way Bot Live Inbound Feed */}
+          <div className="bg-slate-900 text-white rounded-3xl p-5 shadow-xl border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/20 rounded-2xl border border-emerald-500/30">
+                  <Bot className="w-5 h-5 text-emerald-400 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider m-0 text-white">
+                    Two-Way Bot Live Inbound Monitor
+                  </h3>
+                  <p className="text-[11px] text-slate-400 m-0">
+                    Real-time monitoring of incoming queries received from operators/customers on WhatsApp and automated bot replies.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full font-bold">
+                {inboundFeedLogs.length} Messages Captured
+              </span>
+            </div>
+
+            <div className="bg-slate-950/50 rounded-2xl border border-white/5 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-900 border-b border-white/5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      <th className="py-2.5 px-4">Time</th>
+                      <th className="py-2.5 px-4">Sender Phone</th>
+                      <th className="py-2.5 px-4">Incoming Message</th>
+                      <th className="py-2.5 px-4">Bot Automated Reply</th>
+                      <th className="py-2.5 px-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-xs font-mono">
+                    {inboundFeedLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-500 font-medium text-xs">
+                          No inbound messages received yet. Send a keyword like "stock" or "report" from your phone to start live monitoring.
+                        </td>
+                      </tr>
+                    ) : (
+                      inboundFeedLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-white/[0.02] transition">
+                          <td className="py-2.5 px-4 text-slate-400 font-bold whitespace-nowrap">
+                            {log.timestamp}
+                          </td>
+                          <td className="py-2.5 px-4 text-emerald-400 font-bold whitespace-nowrap">
+                            {log.from}
+                          </td>
+                          <td className="py-2.5 px-4 text-slate-300 max-w-[200px] truncate" title={log.query}>
+                            "{log.query}"
+                          </td>
+                          <td className="py-2.5 px-4 text-slate-300 max-w-md truncate" title={log.reply}>
+                            {log.reply}
+                          </td>
+                          <td className="py-2.5 px-4 text-center whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 uppercase">
+                              Replied
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           {/* Header & Log Controls */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>

@@ -378,7 +378,15 @@ export const PackingView: React.FC<PackingViewProps> = ({
       const jobObj = jobsList.find((j) => j.id === jId);
       if (jobObj && cratesCount > 0) {
         const prod = jobObj.product;
-        const pcsPerCrate = jobObj.pcsPerCrateForming || state.crateCapacityMaster?.[prod]?.formingPcs || 7000;
+        // Calculate dynamic actual QC approved pieces per crate from completed QC batches:
+        const qcBatches = (jobObj.runningBatches || []).filter(b => b.stage === 'QC' && b.status === 'Completed');
+        const completedQcPieces = qcBatches.reduce((sum, b) => sum + (b.producedPieces || 0), 0);
+        const completedQcCrates = qcBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
+        
+        const pcsPerCrate = completedQcPieces > 0 && completedQcCrates > 0
+          ? Math.round(completedQcPieces / completedQcCrates)
+          : (jobObj.pcsPerCrateForming || state.crateCapacityMaster?.[prod]?.formingPcs || 7000);
+          
         const totalPcsForJob = cratesCount * pcsPerCrate;
 
         if (itemPieceTotals[prod] !== undefined) {
@@ -881,7 +889,14 @@ export const PackingView: React.FC<PackingViewProps> = ({
     let totalReturnedCrates = 0;
     const updatedJobs = state.jobs.map((j) => {
       if (isCompleted && activeJob.issuedCrates?.[j.id]) {
-        const formCapacity = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
+        const qcBatches = (j.runningBatches || []).filter(b => b.stage === 'QC' && b.status === 'Completed');
+        const completedQcPieces = qcBatches.reduce((sum, b) => sum + (b.producedPieces || 0), 0);
+        const completedQcCrates = qcBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
+        
+        const formCapacity = completedQcPieces > 0 && completedQcCrates > 0
+          ? Math.round(completedQcPieces / completedQcCrates)
+          : (j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000);
+
         const totalPcsNeeded = newTotalBoxes * activeJob.pcsPerBox;
         const cratesIssued = activeJob.issuedCrates[j.id] || 0;
         const cratesNeeded = Math.ceil(totalPcsNeeded / formCapacity);
@@ -1593,7 +1608,14 @@ export const PackingView: React.FC<PackingViewProps> = ({
                             {qcJobs.map((j) => {
                               const currentSelected = selectedCratesToIssue[j.id] || 0;
                               const maxAvail = j.availableQcCrates || 0;
-                              const crateCap = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
+                              
+                              const completedQcBatches = (j.runningBatches || []).filter(b => b.stage === 'QC' && b.status === 'Completed');
+                              const completedQcPieces = completedQcBatches.reduce((sum, b) => sum + (b.producedPieces || 0), 0);
+                              const completedQcCrates = completedQcBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
+                              
+                              const crateCap = completedQcPieces > 0 && completedQcCrates > 0
+                                ? Math.round(completedQcPieces / completedQcCrates)
+                                : (j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000);
 
                               // Find completed/running QC batches for batch-level traceability
                               const qcBatches = (j.runningBatches || []).filter(

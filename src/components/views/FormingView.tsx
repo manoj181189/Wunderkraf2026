@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Cog, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, Box, Wrench, Search, ShieldCheck, CheckCircle2, AlertTriangle, RotateCcw, Calendar, Clock, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, ChevronUp, ChevronDown } from 'lucide-react';
 import { FactoryState, Job, ProductType, RunningBatch, OperatorRunSlice, LogEntry, ShiftHandoverRecord } from '../../types';
-import { PRODUCTS, DEPT_WORKERS, MACHINES } from '../../lib/constants';
+import { PRODUCTS, DEPT_WORKERS, MACHINES, DEFAULT_PCS_PER_KG_MAP } from '../../lib/constants';
 import { getCurrentExpectedShift, getJobAllReels, getJobAllGsms, getJobReelsSummary, getJobPlannedLayers, calculateCratePieces, calculateDeskBalance } from '../../lib/utils';
 import { getJobStageShiftLedger } from '../../lib/shiftSlices';
 import { getNumberingMaster, generateFormingBatchId } from '../../lib/numberingMaster';
@@ -42,6 +42,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
   const [loosePiecesInput, setLoosePiecesInput] = useState('0');
   const [pcsPerCrateOverride, setPcsPerCrateOverride] = useState<string>('');
   const [scrapPcs, setScrapPcs] = useState('0');
+  const [scrapKg, setScrapKg] = useState('0');
   const [selectedActiveBatchId, setSelectedActiveBatchId] = useState('');
   const [tableSearch, setTableSearch] = useState('');
   const [sortColumn, setSortColumn] = useState<string>('id');
@@ -866,6 +867,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     setOutputCrates('');
     setLoosePiecesInput('');
     setScrapPcs('0');
+    setScrapKg('0');
     setOperatorName(handoverData.relievedByOperator);
     if (handoverData.helpers && handoverData.helpers.length > 0) setAssignedHelpers(handoverData.helpers);
     setShift(handoverData.nextShift as 'DAY' | 'NIGHT');
@@ -1276,6 +1278,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     setLoosePiecesInput('0');
     setPcsPerCrateOverride('');
     setScrapPcs('0');
+    setScrapKg('0');
     setSelectedActiveBatchId('');
   };
 
@@ -1848,7 +1851,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
             {/* Output and scrap entries */}
             <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-emerald-800 uppercase mb-1">
                     Passed Formed Crates Output (Current Shift):
@@ -1879,15 +1882,44 @@ export const FormingView: React.FC<FormingViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-rose-700 uppercase mb-1">
+                  <label className="block text-xs font-bold text-rose-800 uppercase mb-1">
                     Defective Pieces (PCS):
                   </label>
                   <input
                     type="number"
                     value={scrapPcs}
-                    onChange={(e) => setScrapPcs(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setScrapPcs(val);
+                      const pVal = parseInt(val, 10) || 0;
+                      if (activeBatchObj?.job) {
+                        const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[activeBatchObj.job.product] || 450;
+                        setScrapKg(String(Number((pVal / pcsPerKg).toFixed(3))));
+                      }
+                    }}
                     placeholder="e.g. 45 Pcs"
-                    className="w-full px-3 py-2 bg-white border border-rose-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                    className="w-full px-3 py-2 bg-rose-50/50 border border-rose-300 rounded-lg text-xs font-extrabold text-rose-900 outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-rose-800 uppercase mb-1">
+                    Defective Scrap (KG):
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={scrapKg}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setScrapKg(val);
+                      const kgVal = parseFloat(val) || 0;
+                      if (activeBatchObj?.job) {
+                        const pcsPerKg = DEFAULT_PCS_PER_KG_MAP[activeBatchObj.job.product] || 450;
+                        setScrapPcs(String(Math.round(kgVal * pcsPerKg)));
+                      }
+                    }}
+                    placeholder="e.g. 1.5 KG"
+                    className="w-full px-3 py-2 bg-rose-50/50 border border-rose-300 rounded-lg text-xs font-extrabold text-rose-900 outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
                   />
                 </div>
               </div>
@@ -2089,8 +2121,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
               value={selectedPendingJobId}
               onChange={(e) => {
                 setSelectedPendingJobId(e.target.value);
-                const j = jobs.find((x) => x.id === e.target.value);
-                if (j) setIssueCratesQty(String(j.availableCuttingCrates || 1));
+                setIssueCratesQty(''); // Keep empty so operator must enter manually to avoid confusion
               }}
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
             >
@@ -2229,15 +2260,17 @@ export const FormingView: React.FC<FormingViewProps> = ({
                       });
 
 
-                      if (selectableLots.length === 0) {
-                        return <div className="text-slate-400 italic text-[11px]">No specific cutting lot metadata found (Legacy or Direct entry).</div>;
+                      const activeLots = selectableLots.filter(l => l.remainingQty > 0);
+
+                      if (activeLots.length === 0) {
+                        return <div className="text-slate-400 italic text-[11px]">No active cutting lot stock found. All lots fully consumed.</div>;
                       }
 
                       // If no lot is currently selected, pick the first one with remaining quantity
-                      const activeSelectionId = selectedCuttingBatchId || selectableLots.find(l => l.remainingQty > 0)?.id || selectableLots[0].id;
+                      const activeSelectionId = selectedCuttingBatchId || activeLots[0]?.id;
 
                       // Deduplicate lots by ID to prevent inflation
-                      const uniqueLots = Array.from(new Map(selectableLots.map(l => [l.id, l])).values());
+                      const uniqueLots = Array.from(new Map(activeLots.map(l => [l.id, l])).values());
                       return uniqueLots.map(lot => {
                         const isSelected = activeSelectionId === lot.id;
                         
@@ -2357,7 +2390,11 @@ export const FormingView: React.FC<FormingViewProps> = ({
           const formStageLedger = getJobStageShiftLedger(j, 'Forming', state);
           const formPcsStd = j.pcsPerCrateForming || state.crateCapacityMaster?.[j.product]?.formingPcs || 7000;
           const totalFormedPcs = j.totalFormedPieces || ((j.availableFormingCrates || 0) * formPcsStd);
-          const totalDefects = formBatches.reduce((sum, b) => sum + (b.scrapPcs || 0), 0);
+          
+          const operatorDefects = formBatches.reduce((sum, b) => sum + (b.scrapPcs || 0), 0);
+          const autoAdjustment = Math.max(0, j.formingAdjustmentPcs || 0);
+          const totalDefects = operatorDefects + autoAdjustment;
+
           const totalInCrates = formBatches.reduce((sum, b) => sum + (b.issuedQty || 0), 0);
 
           const latestLog = (state.logs || []).filter((l) => l.jobId === j.id).slice(-1)[0];
@@ -2388,6 +2425,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
             stock: stock,
             totalFormedPcs,
             totalDefects,
+            operatorDefects,
             totalInCrates,
             statusText,
             formStageLedger,
@@ -2756,13 +2794,18 @@ export const FormingView: React.FC<FormingViewProps> = ({
                               Out: {item.stock} Crates
                             </span>
                             {item.totalDefects > 0 && (
-                              <span className="text-rose-700 font-bold text-[11px]">
-                                Scrap: {item.totalDefects} Pcs
+                              <span className="text-rose-700 font-bold text-[11px] leading-tight text-right block">
+                                Scrap: {item.totalDefects.toLocaleString()} Pcs
+                                {j.formingAdjustmentPcs !== undefined && j.formingAdjustmentPcs > 0 ? (
+                                  <span className="text-[10px] text-slate-500 font-normal block">
+                                    (Operator: {item.operatorDefects.toLocaleString()} + Auto: {j.formingAdjustmentPcs.toLocaleString()})
+                                  </span>
+                                ) : null}
                               </span>
                             )}
-                            {j.formingAdjustmentPcs !== undefined && j.formingAdjustmentPcs !== 0 && (
+                            {j.formingAdjustmentPcs !== undefined && j.formingAdjustmentPcs < 0 && (
                               <span className="text-amber-700 font-extrabold text-[10px] bg-amber-50 px-1 py-0.5 rounded border border-amber-200 mt-0.5 inline-block" title="Forming auto-adjustment to reconcile piece counts">
-                                Adjust: {j.formingAdjustmentPcs > 0 ? '+' : ''}{j.formingAdjustmentPcs.toLocaleString()} Pcs
+                                Adjust: {j.formingAdjustmentPcs.toLocaleString()} Pcs
                               </span>
                             )}
                           </div>

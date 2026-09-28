@@ -213,9 +213,15 @@ app.post('/api/ai/transcribe', async (req, res) => {
 // WhatsApp Server-Side Dispatch Proxy (Supports Google Apps Script, Meta Cloud API, and generic Webhooks)
 app.post('/api/whatsapp/dispatch', async (req, res) => {
   try {
-    const { webhookUrl, phone, message, category = 'GENERAL', apiKey, sender = 'Wünderkraf ERP' } = req.body;
+    const currentState = loadCentralStateFromDisk() || { jobs: [], packJobs: [], logs: [] };
+    const configWebhook = currentState.whatsappConfig?.webhookUrl || '';
+    const configApiKey = currentState.whatsappConfig?.apiKey || '';
 
-    if (!webhookUrl || typeof webhookUrl !== 'string' || !webhookUrl.startsWith('http')) {
+    const finalWebhookUrl = (req.body.webhookUrl || configWebhook || '').trim();
+    const finalApiKey = req.body.apiKey || configApiKey || '';
+    const { phone, message, category = 'GENERAL', sender = 'Wünderkraf ERP' } = req.body;
+
+    if (!finalWebhookUrl || !finalWebhookUrl.startsWith('http')) {
       return res.status(400).json({ success: false, error: 'Valid webhookUrl starting with http is required' });
     }
 
@@ -228,20 +234,32 @@ app.post('/api/whatsapp/dispatch', async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    const isGoogleScript = webhookUrl.includes('script.google.com');
+    const isGoogleScript = finalWebhookUrl.includes('script.google.com');
 
     // Make server-side POST request - Node.js follows 302 redirects cleanly without CORS restrictions
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
+    if (finalApiKey) {
+      headers['Authorization'] = `Bearer ${finalApiKey}`;
     }
 
-    const response = await fetch(webhookUrl, {
+    let finalPayload: any = payload;
+    if (finalWebhookUrl.includes('graph.facebook.com')) {
+      finalPayload = {
+        messaging_product: "whatsapp",
+        to: cleanPhone.replace(/[^0-9]/g, ''),
+        type: "text",
+        text: {
+          body: message || ''
+        }
+      };
+    }
+
+    const response = await fetch(finalWebhookUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload),
+      body: JSON.stringify(finalPayload),
       redirect: 'follow'
     });
 
@@ -395,16 +413,31 @@ app.post('/api/whatsapp/incoming', async (req, res) => {
     const webhookUrl = currentState.whatsappConfig?.webhookUrl;
     if (webhookUrl && webhookUrl.startsWith('http') && fromPhone) {
       try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (currentState.whatsappConfig?.apiKey) {
+          headers['Authorization'] = `Bearer ${currentState.whatsappConfig.apiKey}`;
+        }
+        let finalPayload: any = {
+          phone: fromPhone,
+          message: processed.reply,
+          category: processed.category,
+          sender: 'Wünderkraf Two-Way Bot',
+          timestamp: new Date().toISOString()
+        };
+        if (webhookUrl.includes('graph.facebook.com')) {
+          finalPayload = {
+            messaging_product: "whatsapp",
+            to: fromPhone.replace(/[^0-9]/g, ''),
+            type: "text",
+            text: {
+              body: processed.reply
+            }
+          };
+        }
         fetch(webhookUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: fromPhone,
-            message: processed.reply,
-            category: processed.category,
-            sender: 'Wünderkraf Two-Way Bot',
-            timestamp: new Date().toISOString()
-          })
+          headers,
+          body: JSON.stringify(finalPayload)
         }).catch(err => console.warn('Inbound auto-reply dispatch warning:', err));
       } catch (e) {
         console.warn('Dispatch failed:', e);
