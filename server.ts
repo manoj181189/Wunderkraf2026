@@ -6,7 +6,7 @@ import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { mergeFactoryStates } from './src/lib/syncMerge';
-import { processWhatsAppIncomingQuery, generateWhatsAppStockQueryReply } from './src/lib/whatsappReports';
+import { processWhatsAppIncomingQuery, generateWhatsAppStockQueryReply, generateShiftChangeoverReportText } from './src/lib/whatsappReports';
 
 dotenv.config();
 
@@ -231,6 +231,7 @@ app.post('/api/whatsapp/dispatch', async (req, res) => {
       message: message || '',
       category,
       sender,
+      apiKey: finalApiKey,
       timestamp: new Date().toISOString()
     };
 
@@ -422,6 +423,7 @@ app.post('/api/whatsapp/incoming', async (req, res) => {
           message: processed.reply,
           category: processed.category,
           sender: 'Wünderkraf Two-Way Bot',
+          apiKey: currentState.whatsappConfig?.apiKey || '',
           timestamp: new Date().toISOString()
         };
         if (webhookUrl.includes('graph.facebook.com')) {
@@ -505,6 +507,104 @@ app.post('/api/ai/search-grounding', async (req, res) => {
     });
   }
 });
+
+// Background checking function for Scheduled WhatsApp Shift Reports (Every 60 seconds)
+setInterval(async () => {
+  try {
+    const currentState = loadCentralStateFromDisk();
+    if (!currentState || !currentState.whatsappConfig) return;
+
+    const config = currentState.whatsappConfig;
+    const rawPhone = config.phone || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    const apiKey = config.apiKey || '';
+
+    // If no phone or no API Key (CallMeBot key is stored in config.apiKey), we cannot send automated reports
+    if (!cleanPhone || !apiKey) return;
+
+    // Get current time in India/Kolkata (HH:MM)
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    };
+    const formatter = new Intl.DateTimeFormat('en-US', options);
+    const currentTimeStr = formatter.format(new Date()); // e.g., "20:00"
+
+    const todayDateStr = new Date().toISOString().split('T')[0]; // e.g., "2026-09-28"
+
+    // 1. Check Day Shift Report
+    const dayTime = config.dayShiftReportTime || '20:00';
+    const hasSentDayToday = config.lastSentDayDate === todayDateStr;
+    const shouldSendDay = config.autoSendShiftReportDay && currentTimeStr === dayTime && !hasSentDayToday;
+
+    if (shouldSendDay) {
+      console.log(`⏰ Triggering automated Day Shift Report to ${cleanPhone} at ${currentTimeStr}`);
+      // Generate report text
+      const reportText = generateShiftChangeoverReportText(currentState, 'DAY');
+      
+      // Dispatch via CallMeBot (100% free)
+      const callmebotUrl = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodeURIComponent(reportText)}&apikey=${apiKey}`;
+      const response = await fetch(callmebotUrl);
+      if (response.ok) {
+        console.log(`✅ Automated Day Shift Report sent successfully!`);
+        config.lastSentDayDate = todayDateStr;
+        
+        // Record in logs
+        if (!config.dispatchLogs) config.dispatchLogs = [];
+        config.dispatchLogs.unshift({
+          id: `SCHED-DAY-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }),
+          category: 'SHIFT_DAY',
+          recipient: cleanPhone,
+          sender: 'System Scheduler',
+          preview: reportText.slice(0, 85) + '...',
+          status: 'SENT'
+        });
+        saveCentralStateToDisk(currentState);
+      } else {
+        console.warn(`❌ Failed to send Day Shift Report via CallMeBot: ${response.statusText}`);
+      }
+    }
+
+    // 2. Check Night Shift Report
+    const nightTime = config.nightShiftReportTime || '08:00';
+    const hasSentNightToday = config.lastSentNightDate === todayDateStr;
+    const shouldSendNight = config.autoSendShiftReportNight && currentTimeStr === nightTime && !hasSentNightToday;
+
+    if (shouldSendNight) {
+      console.log(`⏰ Triggering automated Night Shift Report to ${cleanPhone} at ${currentTimeStr}`);
+      // Generate report text
+      const reportText = generateShiftChangeoverReportText(currentState, 'NIGHT');
+      
+      // Dispatch via CallMeBot (100% free)
+      const callmebotUrl = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodeURIComponent(reportText)}&apikey=${apiKey}`;
+      const response = await fetch(callmebotUrl);
+      if (response.ok) {
+        console.log(`✅ Automated Night Shift Report sent successfully!`);
+        config.lastSentNightDate = todayDateStr;
+        
+        // Record in logs
+        if (!config.dispatchLogs) config.dispatchLogs = [];
+        config.dispatchLogs.unshift({
+          id: `SCHED-NIGHT-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }),
+          category: 'SHIFT_NIGHT',
+          recipient: cleanPhone,
+          sender: 'System Scheduler',
+          preview: reportText.slice(0, 85) + '...',
+          status: 'SENT'
+        });
+        saveCentralStateToDisk(currentState);
+      } else {
+        console.warn(`❌ Failed to send Night Shift Report via CallMeBot: ${response.statusText}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error in scheduled WhatsApp dispatcher:', err);
+  }
+}, 60000); // Check every 60 seconds
 
 // Vite Middleware & Static handling
 async function setupVite() {
