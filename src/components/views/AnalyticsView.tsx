@@ -412,99 +412,25 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
                 </select>
               </div>
 
-              {/* Date Filter Presets */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Date Filter Presets Dropdown */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-blue-950 uppercase flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-blue-700" /> Period:
+                  <Calendar className="w-3.5 h-3.5 text-blue-700" /> Select Period (अवधि चुनें):
                 </span>
-                {/* 8-Day Production Button Highlighted */}
-                <button
-                  onClick={() => setMachineTimeRange('8_DAYS')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer ${
-                    machineTimeRange === '8_DAYS'
-                      ? 'bg-blue-900 text-white ring-2 ring-blue-400 shadow-sm'
-                      : 'bg-white text-blue-900 border border-blue-300 hover:bg-blue-100'
-                  }`}
+                <select
+                  value={machineTimeRange}
+                  onChange={(e) => setMachineTimeRange(e.target.value as any)}
+                  className="bg-white border border-blue-300 rounded-xl px-3 py-1.5 text-xs font-bold text-blue-900 shadow-xs outline-none cursor-pointer hover:border-blue-500 transition"
                 >
-                  ⚡ 8 Days Output (8 Day Production)
-                </button>
-
-                <button
-                  onClick={() => setMachineTimeRange('TODAY')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    machineTimeRange === 'TODAY'
-                      ? 'bg-blue-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  Today
-                </button>
-
-                <button
-                  onClick={() => setMachineTimeRange('5_DAYS')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    machineTimeRange === '5_DAYS'
-                      ? 'bg-blue-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  5 Days
-                </button>
-
-                <button
-                  onClick={() => setMachineTimeRange('7_DAYS')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    machineTimeRange === '7_DAYS'
-                      ? 'bg-blue-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  7 Days
-                </button>
-
-                <button
-                  onClick={() => setMachineTimeRange('30_DAYS')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    machineTimeRange === '30_DAYS'
-                      ? 'bg-blue-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  1 Month
-                </button>
-
-                <button
-                  onClick={() => setMachineTimeRange('180_DAYS')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    machineTimeRange === '180_DAYS'
-                      ? 'bg-blue-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  6 Months
-                </button>
-
-                <button
-                  onClick={() => setMachineTimeRange('ALL')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    machineTimeRange === 'ALL'
-                      ? 'bg-blue-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  All-Time
-                </button>
-
-                <button
-                  onClick={() => setMachineTimeRange('CUSTOM')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    machineTimeRange === 'CUSTOM'
-                      ? 'bg-blue-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  📅 Custom
-                </button>
+                  <option value="TODAY">Today (आज)</option>
+                  <option value="5_DAYS">Last 5 Days (पिछले 5 दिन)</option>
+                  <option value="8_DAYS">Last 8 Days (पिछले 8 दिन - Standard)</option>
+                  <option value="7_DAYS">Last 7 Days (पिछले 7 दिन)</option>
+                  <option value="30_DAYS">Last 30 Days (1 Month / 1 महीना)</option>
+                  <option value="180_DAYS">Last 180 Days (6 Months / 6 महीने)</option>
+                  <option value="ALL">All-Time (पूरा इतिहास)</option>
+                  <option value="CUSTOM">📅 Custom Date Range (कस्टम अवधि)</option>
+                </select>
               </div>
             </div>
 
@@ -849,80 +775,24 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ state, onBackToHub
                 </select>
               </div>
 
-              {/* Date Filter Buttons (Directly matching user prompt: 5 days, 8 days, 1 month, 6 months!) */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Date Filter Presets Dropdown */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-violet-950 uppercase flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-violet-700" /> Timeframe:
+                  <Calendar className="w-3.5 h-3.5 text-violet-700" /> Select Period (अवधि चुनें):
                 </span>
-
-                {/* 5-Day Operator Button Highlighted */}
-                <button
-                  onClick={() => setOperatorTimeRange('5_DAYS')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer ${
-                    operatorTimeRange === '5_DAYS'
-                      ? 'bg-violet-900 text-white ring-2 ring-violet-400 shadow-sm'
-                      : 'bg-white text-violet-900 border border-violet-300 hover:bg-violet-100'
-                  }`}
+                <select
+                  value={operatorTimeRange}
+                  onChange={(e) => setOperatorTimeRange(e.target.value as any)}
+                  className="bg-white border border-violet-300 rounded-xl px-3 py-1.5 text-xs font-bold text-violet-900 shadow-xs outline-none cursor-pointer hover:border-violet-500 transition"
                 >
-                  ⚡ 5 Days Output
-                </button>
-
-                <button
-                  onClick={() => setOperatorTimeRange('8_DAYS')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    operatorTimeRange === '8_DAYS'
-                      ? 'bg-violet-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  8 Days
-                </button>
-
-                {/* 1 Month Button Highlighted */}
-                <button
-                  onClick={() => setOperatorTimeRange('30_DAYS')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer ${
-                    operatorTimeRange === '30_DAYS'
-                      ? 'bg-violet-900 text-white ring-2 ring-violet-400 shadow-sm'
-                      : 'bg-white text-violet-900 border border-violet-300 hover:bg-violet-100'
-                  }`}
-                >
-                  📅 1 Month
-                </button>
-
-                {/* 6 Months Button Highlighted */}
-                <button
-                  onClick={() => setOperatorTimeRange('180_DAYS')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer ${
-                    operatorTimeRange === '180_DAYS'
-                      ? 'bg-violet-900 text-white ring-2 ring-violet-400 shadow-sm'
-                      : 'bg-white text-violet-900 border border-violet-300 hover:bg-violet-100'
-                  }`}
-                >
-                  📅 6 Months
-                </button>
-
-                <button
-                  onClick={() => setOperatorTimeRange('ALL')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    operatorTimeRange === 'ALL'
-                      ? 'bg-violet-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  All-Time
-                </button>
-
-                <button
-                  onClick={() => setOperatorTimeRange('CUSTOM')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    operatorTimeRange === 'CUSTOM'
-                      ? 'bg-violet-900 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  📅 Custom
-                </button>
+                  <option value="TODAY">Today (आज)</option>
+                  <option value="5_DAYS">Last 5 Days (पिछले 5 दिन - Standard)</option>
+                  <option value="8_DAYS">Last 8 Days (पिछले 8 दिन)</option>
+                  <option value="30_DAYS">Last 30 Days (1 Month / 1 महीना)</option>
+                  <option value="180_DAYS">Last 180 Days (6 Months / 6 महीने)</option>
+                  <option value="ALL">All-Time (पूरा इतिहास)</option>
+                  <option value="CUSTOM">📅 Custom Date Range (कस्टम अवधि)</option>
+                </select>
               </div>
             </div>
 

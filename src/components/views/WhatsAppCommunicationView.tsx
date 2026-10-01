@@ -21,6 +21,8 @@ import {
   generateManpowerAttendanceReportText,
   generateQcDefectAlertText,
   generateDispatchDeliveryNoteText,
+  generateConsolidatedDispatchReportText,
+  generateDispatchByInvoiceText,
   generatePurchaseIndentAlertText,
   generateScrapYieldReportText,
   generateJobStatusReportText,
@@ -80,6 +82,31 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
   const [messageText, setMessageText] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
+  // States for enhanced Dispatch Note selection
+  const [dispatchFilterType, setDispatchFilterType] = useState<'CONSOLIDATED_DATE' | 'SPECIFIC_INVOICE'>('CONSOLIDATED_DATE');
+  const [dispatchDateFilter, setDispatchDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string>('');
+
+  // Extract all unique invoice numbers from all dispatch logs across all packJobs
+  const allInvoices = Array.from(
+    new Set(
+      (state.packJobs || []).flatMap((pj) => (pj.dispatchLogs || []).map((log) => log.invoiceNo))
+    )
+  ).filter(Boolean);
+
+  // States for advanced category selections
+  const [shiftDateFilter, setShiftDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
+  const [attendanceDateFilter, setAttendanceDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
+  const [scrapDateFilter, setScrapDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedQcLogId, setSelectedQcLogId] = useState<string>('');
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
+  const [selectedRequisitionId, setSelectedRequisitionId] = useState<string>('');
+
+  // Extract QC logs for dropdown
+  const qcLogs = (state.logs || []).filter(
+    (l) => l.stage === 'QC' || l.action?.toLowerCase().includes('qc') || l.details?.toLowerCase().includes('qc')
+  );
+
   // State for background scheduler
   const [dayTime, setDayTime] = useState(state.whatsappConfig?.dayShiftReportTime || '20:00');
   const [nightTime, setNightTime] = useState(state.whatsappConfig?.nightShiftReportTime || '08:00');
@@ -92,31 +119,43 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
   useEffect(() => {
     switch (selectedCategory) {
       case 'SHIFT_DAY':
-        setMessageText(generateShiftChangeoverReportText(state, 'DAY'));
+        setMessageText(generateShiftChangeoverReportText(state, 'DAY', shiftDateFilter));
         break;
       case 'SHIFT_NIGHT':
-        setMessageText(generateShiftChangeoverReportText(state, 'NIGHT'));
+        setMessageText(generateShiftChangeoverReportText(state, 'NIGHT', shiftDateFilter));
         break;
       case 'JOB_STATUS':
         setMessageText(generateJobStatusReportText(state, selectedJobId));
         break;
-      case 'MAINTENANCE_BREAKDOWN':
-        setMessageText(generateBreakdownAlertText(state));
+      case 'MAINTENANCE_BREAKDOWN': {
+        const targetIncident = (state.maintenanceIncidents || []).find(i => i.id === selectedIncidentId);
+        setMessageText(generateBreakdownAlertText(state, targetIncident));
         break;
+      }
       case 'MANPOWER_ATTENDANCE':
-        setMessageText(generateManpowerAttendanceReportText(state));
+        setMessageText(generateManpowerAttendanceReportText(state, attendanceDateFilter));
         break;
       case 'QC_DEFECT':
-        setMessageText(generateQcDefectAlertText(state));
+        setMessageText(generateQcDefectAlertText(state, selectedQcLogId));
         break;
       case 'DISPATCH_NOTE':
-        setMessageText(generateDispatchDeliveryNoteText(state));
+        if (dispatchFilterType === 'CONSOLIDATED_DATE') {
+          setMessageText(generateConsolidatedDispatchReportText(state, dispatchDateFilter));
+        } else {
+          const targetInvoice = selectedInvoiceNo || allInvoices[0] || '';
+          if (targetInvoice && !selectedInvoiceNo) {
+            setSelectedInvoiceNo(targetInvoice);
+          }
+          setMessageText(generateDispatchByInvoiceText(state, targetInvoice));
+        }
         break;
-      case 'PURCHASE_INDENT':
-        setMessageText(generatePurchaseIndentAlertText(state));
+      case 'PURCHASE_INDENT': {
+        const targetReq = (state.materialRequisitions || []).find(r => r.id === selectedRequisitionId);
+        setMessageText(generatePurchaseIndentAlertText(state, targetReq));
         break;
+      }
       case 'SCRAP_YIELD':
-        setMessageText(generateScrapYieldReportText(state));
+        setMessageText(generateScrapYieldReportText(state, scrapDateFilter));
         break;
       case 'CUSTOM_BROADCAST':
         setMessageText(
@@ -124,7 +163,20 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
         );
         break;
     }
-  }, [selectedCategory, selectedJobId, state]);
+  }, [
+    selectedCategory,
+    selectedJobId,
+    state,
+    dispatchFilterType,
+    dispatchDateFilter,
+    selectedInvoiceNo,
+    shiftDateFilter,
+    attendanceDateFilter,
+    scrapDateFilter,
+    selectedQcLogId,
+    selectedIncidentId,
+    selectedRequisitionId
+  ]);
 
   // Handle manual Copy to Clipboard
   const handleCopy = () => {
@@ -189,7 +241,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-900 m-0">
-                Wünderkraf WhatsApp Desk
+                WhatsApp Messages
               </h2>
               <p className="text-xs text-slate-500 font-semibold m-0 mt-0.5">
                 1-Click Direct Sending (100% Free) & Scheduled Time Reports
@@ -217,17 +269,17 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
       {/* Main Two Columns Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Direct Manual 1-Click Dispatcher */}
-        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+        <div className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <div className="bg-emerald-100 p-1.5 rounded-lg text-emerald-700">
               <Send className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide m-0">
-                1-Click Direct WhatsApp Sender (१-क्लिक संदेश प्रेषक)
+                1-Click Direct WhatsApp Sender
               </h3>
               <p className="text-[11px] text-slate-500 m-0 mt-0.5">
-                रिपोर्ट चुनें, नंबर डालें और व्हाट्सएप पर भेजें — 100% मुफ्त, कोई एपीआई चार्ज नहीं
+                Select report category, enter recipient number and send via WhatsApp — 100% free with no API charges
               </p>
             </div>
           </div>
@@ -235,7 +287,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                Select Report Category (रिपोर्ट प्रकार)
+                Select Report Category
               </label>
               <select
                 value={selectedCategory}
@@ -257,7 +309,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
 
             <div>
               <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                Recipient Mobile Number (व्हाट्सएप नंबर)
+                Recipient Mobile Number
               </label>
               <input
                 type="text"
@@ -293,10 +345,200 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
             </div>
           )}
 
+          {/* Conditional Shift Selection Date */}
+          {(selectedCategory === 'SHIFT_DAY' || selectedCategory === 'SHIFT_NIGHT') && (
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-[10px] font-black text-indigo-950 uppercase mb-1">
+                📅 Select Shift Report Date (शिफ्ट की तारीख चुनें)
+              </label>
+              <input
+                type="date"
+                value={shiftDateFilter}
+                onChange={(e) => setShiftDateFilter(e.target.value)}
+                className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+              />
+            </div>
+          )}
+
+          {/* Conditional Attendance Selection Date */}
+          {selectedCategory === 'MANPOWER_ATTENDANCE' && (
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-[10px] font-black text-indigo-950 uppercase mb-1">
+                📅 Select Attendance Date (उपस्थिति की तारीख चुनें)
+              </label>
+              <input
+                type="date"
+                value={attendanceDateFilter}
+                onChange={(e) => setAttendanceDateFilter(e.target.value)}
+                className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+              />
+            </div>
+          )}
+
+          {/* Conditional Scrap Selection Date */}
+          {selectedCategory === 'SCRAP_YIELD' && (
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-[10px] font-black text-indigo-950 uppercase mb-1">
+                📅 Select Scrap Date (स्क्रैप की तारीख चुनें)
+              </label>
+              <input
+                type="date"
+                value={scrapDateFilter}
+                onChange={(e) => setScrapDateFilter(e.target.value)}
+                className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+              />
+            </div>
+          )}
+
+          {/* Conditional QC Log Selection */}
+          {selectedCategory === 'QC_DEFECT' && (
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-[10px] font-black text-indigo-950 uppercase mb-1">
+                🧪 Select QC Inspection Record (क्वालिटी प्रविष्टि चुनें)
+              </label>
+              <select
+                value={selectedQcLogId}
+                onChange={(e) => setSelectedQcLogId(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+              >
+                {qcLogs.length === 0 ? (
+                  <option value="">No QC defects recorded on floor (Defaults to Template)</option>
+                ) : (
+                  qcLogs.map((log, idx) => (
+                    <option key={log.timestamp || idx} value={log.timestamp}>
+                      {log.rawDate || log.timestamp?.split(' ')?.[0]} - {log.machine} | {log.details || log.action}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
+
+          {/* Conditional Breakdown Incident Selection */}
+          {selectedCategory === 'MAINTENANCE_BREAKDOWN' && (
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-[10px] font-black text-indigo-950 uppercase mb-1">
+                🛠️ Select Breakdown Incident (मशीन ब्रेकडाउन चुनें)
+              </label>
+              <select
+                value={selectedIncidentId}
+                onChange={(e) => setSelectedIncidentId(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+              >
+                {(state.maintenanceIncidents || []).length === 0 ? (
+                  <option value="">No machine breakdowns recorded (All Operational)</option>
+                ) : (
+                  (state.maintenanceIncidents || []).map((inc) => (
+                    <option key={inc.id} value={inc.id}>
+                      {inc.machine} - {inc.issue} | Status: {inc.status}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
+
+          {/* Conditional Purchase Indent Selection */}
+          {selectedCategory === 'PURCHASE_INDENT' && (
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="block text-[10px] font-black text-indigo-950 uppercase mb-1">
+                📦 Select Material Indent / Requisition (मटीरियल इंडेंट चुनें)
+              </label>
+              <select
+                value={selectedRequisitionId}
+                onChange={(e) => setSelectedRequisitionId(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+              >
+                {(state.materialRequisitions || []).length === 0 ? (
+                  <option value="">No purchase indents present in system</option>
+                ) : (
+                  (state.materialRequisitions || []).map((req) => (
+                    <option key={req.id} value={req.id}>
+                      {req.id} - {req.item || req.spareName} ({req.qty} Pcs) | Urgency: {req.urgency}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
+
+          {/* Conditional Dispatch Note Selection Controls */}
+          {selectedCategory === 'DISPATCH_NOTE' && (
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2 flex-wrap gap-2">
+                <span className="text-xs font-black text-indigo-950 uppercase tracking-wide flex items-center gap-1">
+                  🚚 Dispatch Report Parameters (पैरामीटर सेट करें)
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold">Configure what to send</span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-wider">
+                    Select Filter Type
+                  </label>
+                  <select
+                    value={dispatchFilterType}
+                    onChange={(e) => setDispatchFilterType(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                  >
+                    <option value="CONSOLIDATED_DATE">📅 Consolidated Date Wise (पूरे दिन की कुल रिपोर्ट)</option>
+                    <option value="SPECIFIC_INVOICE">🧾 Specific Invoice / Challan (कोई विशेष बिल चुनें)</option>
+                  </select>
+                </div>
+
+                {dispatchFilterType === 'CONSOLIDATED_DATE' ? (
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-wider">
+                      Select Dispatch Date
+                    </label>
+                    <input
+                      type="date"
+                      value={dispatchDateFilter}
+                      onChange={(e) => setDispatchDateFilter(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-wider">
+                      Select Specific Invoice
+                    </label>
+                    <select
+                      value={selectedInvoiceNo}
+                      onChange={(e) => setSelectedInvoiceNo(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+                    >
+                      {allInvoices.length === 0 ? (
+                        <option value="">No dispatch invoices logged in system</option>
+                      ) : (
+                        allInvoices.map((inv) => {
+                          let customerName = '';
+                          for (const pj of state.packJobs || []) {
+                            const found = (pj.dispatchLogs || []).some(l => l.invoiceNo === inv);
+                            if (found) {
+                              customerName = pj.customer;
+                              break;
+                            }
+                          }
+                          return (
+                            <option key={inv} value={inv}>
+                              🧾 {inv} - {customerName || 'N/A'}
+                            </option>
+                          );
+                        })
+                      )}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Real-Time Generated Text Area Preview */}
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase px-1">
-              <span>📝 Message Preview (मैसेज प्रिव्यू)</span>
+              <span>📝 Message Preview</span>
               <button
                 type="button"
                 onClick={handleCopy}
@@ -309,7 +551,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
             <textarea
               readOnly
               value={messageText}
-              className="w-full h-80 px-4 py-3 bg-slate-900 text-emerald-300 rounded-2xl text-xs font-mono border border-slate-800 focus:outline-none leading-relaxed resize-none overflow-y-auto"
+              className="w-full h-80 px-4 py-3 bg-slate-50 text-slate-800 border border-slate-300 rounded-2xl text-xs font-mono focus:outline-none leading-relaxed resize-none overflow-y-auto shadow-inner"
             />
           </div>
 
@@ -320,40 +562,30 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
             className="w-full py-3 px-6 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black rounded-2xl shadow-lg hover:shadow-emerald-100 transition duration-150 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
           >
             <MessageSquare className="w-5 h-5" />
-            <span>💬 Open & Send in WhatsApp (व्हाट्सएप पर भेजें)</span>
+            <span>💬 Open & Send in WhatsApp</span>
           </button>
         </div>
 
         {/* Right Column: Background Scheduler Trigger Config */}
-        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-5">
+        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-5">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <div className="bg-indigo-100 p-1.5 rounded-lg text-indigo-700">
               <Clock className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide m-0">
-                Automated Time Reports (स्वचालित रिपोर्ट टाइमर)
+                Automated Time Reports
               </h3>
               <p className="text-[11px] text-slate-500 m-0 mt-0.5">
-                निर्धारित समय पर सीधे बैकएंड से बिना व्हाट्सएप खोले ऑटोमैटिक रिपोर्ट प्राप्त करें
+                Configure scheduled automatic reports to be sent directly from the background server
               </p>
             </div>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs leading-relaxed text-slate-600">
-            <div className="font-bold text-slate-800 flex items-center gap-1 text-[11px] uppercase tracking-wide">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>100% Free Background Automation</span>
-            </div>
-            <p className="m-0 text-[11px]">
-              यह फीचर बैकएंड सर्वर में स्वचालित चलता है। इसके लिए <strong>CallMeBot</strong> की निशुल्क एपीआई कुंजी का उपयोग होता है ताकि बिना किसी चार्ज के मैसेज सीधे आपके फोन पर डिलीवर हो सके।
-            </p>
           </div>
 
           <div className="space-y-4 pt-1">
             <div>
               <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                Scheduler Recipient Mobile Number (रिपोर्ट प्राप्त करने वाला नंबर)
+                Scheduler Recipient Mobile Number
               </label>
               <input
                 type="text"
@@ -368,7 +600,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  ☀️ Day Report Time (दिन का समय)
+                  ☀️ Day Report Time
                 </label>
                 <input
                   type="time"
@@ -384,13 +616,13 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
                     onChange={(e) => setAutoSendDay(e.target.checked)}
                     className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
                   />
-                  <span>सक्रिय (Active)</span>
+                  <span>Active</span>
                 </label>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  🌙 Night Report Time (रात का समय)
+                  🌙 Night Report Time
                 </label>
                 <input
                   type="time"
@@ -406,14 +638,14 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
                     onChange={(e) => setAutoSendNight(e.target.checked)}
                     className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
                   />
-                  <span>सक्रिय (Active)</span>
+                  <span>Active</span>
                 </label>
               </div>
             </div>
 
             <div className="border-t border-slate-100 pt-3">
               <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                CallMeBot Free API Key (मुफ्त एपीआई कुंजी)
+                CallMeBot Free API Key
               </label>
               <input
                 type="password"
@@ -423,14 +655,6 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
                 placeholder="••••••••"
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
-              <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-2.5 mt-2 text-[10px] text-emerald-800 font-medium space-y-1">
-                <span className="font-bold block uppercase tracking-wide text-[9px] text-emerald-700">🔑 १ मिनट में चाबी प्राप्त करें:</span>
-                <p className="m-0 leading-relaxed">
-                  अपने व्हाट्सएप से <strong>+34 644 10 55 84</strong> नंबर पर यह मैसेज भेजें: 
-                  <code className="bg-emerald-100/80 px-1 py-0.5 rounded font-mono font-bold mx-1">I allow callmebot to send me messages</code>
-                  इसके जवाब में जो API Key मिले, उसे ऊपर पेस्ट करके सेव कर दें!
-                </p>
-              </div>
             </div>
           </div>
 
@@ -442,7 +666,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
               className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-md transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             >
               <Save className="w-4 h-4" />
-              <span>💾 Save Automated Scheduler Settings</span>
+              <span>Save Automated Scheduler Settings</span>
             </button>
           )}
         </div>

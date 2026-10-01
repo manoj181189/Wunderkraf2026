@@ -284,7 +284,7 @@ export const NavigationHub: React.FC<NavigationHubProps> = ({
     },
     {
       id: 'WHATSAPP',
-      title: 'WhatsApp Communication Desk',
+      title: 'WhatsApp Messages',
       subtitle: 'Multi-Module Dispatch, Shift Changeovers, Breakdown Alerts & Contact Directory',
       icon: <MessageSquare className="w-8 h-8 text-emerald-600" />,
       perm: 'WhatsApp',

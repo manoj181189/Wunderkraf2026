@@ -284,8 +284,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'WHATSAPP',
-      title: 'WhatsApp Communication Desk',
-      shortTitle: 'Communication',
+      title: 'WhatsApp Messages',
+      shortTitle: 'WhatsApp Messages',
       icon: <MessageSquare className="w-5 h-5" />,
       perm: 'WhatsApp',
       category: 'operations',

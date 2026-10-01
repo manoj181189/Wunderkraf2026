@@ -55,6 +55,8 @@ export const PackingView: React.FC<PackingViewProps> = ({
   const [selectedMachine, setSelectedMachine] = useState('Packing-1');
   const [shift, setShift] = useState<'DAY' | 'NIGHT'>(() => getCurrentExpectedShift(shiftConfig));
   const [packerName, setPackerName] = useState((state.floorWorkers || []).filter(w => w.department === 'Packing')[0]?.name || 'Operator');
+  const [selectedHelpers, setSelectedHelpers] = useState<string[]>([]);
+  const [helperInput, setHelperInput] = useState('');
   const [filterCust, setFilterCust] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [packedBoxesInput, setPackedBoxesInput] = useState('');
@@ -100,6 +102,50 @@ export const PackingView: React.FC<PackingViewProps> = ({
   if (filterCust) {
     pendingOrders = pendingOrders.filter((pj) => pj.customer === filterCust);
   }
+
+  const allHistoryRuns = React.useMemo(() => {
+    const list: Array<{
+      date: string;
+      startTime?: string;
+      endTime?: string;
+      machine: string;
+      shift: string;
+      worker: string;
+      helpers?: string[];
+      boxesPacked: number;
+      orderId: string;
+      customer: string;
+      kitType: string;
+      pcsPerBox: number;
+    }> = [];
+
+    packJobs.forEach((pj) => {
+      if (pj.historyRuns && pj.historyRuns.length > 0) {
+        pj.historyRuns.forEach((run) => {
+          list.push({
+            date: run.date,
+            startTime: run.startTime,
+            endTime: run.endTime,
+            machine: run.machine,
+            shift: run.shift,
+            worker: run.worker,
+            helpers: run.helpers || [],
+            boxesPacked: run.boxesPacked,
+            orderId: pj.id,
+            customer: pj.customer,
+            kitType: pj.kitType,
+            pcsPerBox: pj.pcsPerBox || 100
+          });
+        });
+      }
+    });
+
+    return list.sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return (b.endTime || '').localeCompare(a.endTime || '');
+    });
+  }, [packJobs]);
 
   const selectedOrder = packJobs.find((pj) => pj.id === selectedOrderId);
 
@@ -215,6 +261,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
         machine: selectedMachine,
         shift,
         worker: packerName.trim().toUpperCase(),
+        helpers: selectedHelpers,
         startTime: nowTime,
         status: 'Running' as const,
         holdReason: undefined,
@@ -222,13 +269,14 @@ export const PackingView: React.FC<PackingViewProps> = ({
       };
     });
 
+    const crewText = selectedHelpers.length > 0 ? ` [Helpers: ${selectedHelpers.join(', ')}]` : '';
     const newLog = {
       jobId: order.id,
       product: order.kitType,
       stage: 'Packing',
       machine: selectedMachine,
       shift,
-      action: `▶️ Packing Started on ${selectedMachine} for ${order.customer} | Issued: [${issuedSummaryText}] | Team: ${packerName.toUpperCase()}`,
+      action: `▶️ Packing Started on ${selectedMachine} for ${order.customer} | Issued: [${issuedSummaryText}] | Team: ${packerName.toUpperCase()}${crewText}`,
       worker: packerName.toUpperCase(),
       user: 'pack_user',
       startTime: nowTime,
@@ -236,20 +284,83 @@ export const PackingView: React.FC<PackingViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
-    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, packerName, 'Packing', selectedMachine, shift);
+    let currentFloorWorkers = state.floorWorkers || [];
+    let currentDeptWorkers = state.deptWorkers || {};
+
+    const primaryReg = autoRegisterWorker(state, packerName, 'Packing', selectedMachine, shift);
+    currentFloorWorkers = primaryReg.floorWorkers;
+    currentDeptWorkers = primaryReg.deptWorkers;
+
+    selectedHelpers.forEach((hName) => {
+      const helperReg = autoRegisterWorker(
+        { ...state, floorWorkers: currentFloorWorkers, deptWorkers: currentDeptWorkers },
+        hName,
+        'Packing',
+        selectedMachine,
+        shift
+      );
+      currentFloorWorkers = helperReg.floorWorkers;
+      currentDeptWorkers = helperReg.deptWorkers;
+    });
 
     onSaveState({
       ...state,
       jobs: updatedJobs,
       packJobs: updatedPackJobs,
-      floorWorkers,
-      deptWorkers,
+      floorWorkers: currentFloorWorkers,
+      deptWorkers: currentDeptWorkers,
       logs: [...state.logs, newLog]
     });
 
     setSelectedOrderId('');
     setSelectedCratesToIssue({});
+    setSelectedHelpers([]);
     alert(`✅ Packing Started for Order [${order.id}] on ${selectedMachine}!\nIssued Crates: ${issuedSummaryText}`);
+  };
+
+  // ==========================================
+  // ACTION: DYNAMICALLY MANAGE HELPERS / CREW
+  // ==========================================
+  const handleAddHelperToActiveJob = (hNameInput: string) => {
+    if (!activeJob || !hNameInput.trim()) return;
+    const hName = hNameInput.trim().toUpperCase();
+    const currentHelpers = activeJob.helpers || [];
+    if (currentHelpers.includes(hName)) {
+      alert('⚠️ Helper is already assigned to this workstation!');
+      return;
+    }
+    const updatedHelpers = [...currentHelpers, hName];
+    const updatedPackJobs = packJobs.map(pj => {
+      if (pj.id === activeJob.id) {
+        return { ...pj, helpers: updatedHelpers };
+      }
+      return pj;
+    });
+
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, hName, 'Packing', selectedMachine, activeJob.shift || shift);
+
+    onSaveState({
+      ...state,
+      packJobs: updatedPackJobs,
+      floorWorkers,
+      deptWorkers
+    });
+    setHelperInput('');
+  };
+
+  const handleRemoveHelperFromActiveJob = (hName: string) => {
+    if (!activeJob) return;
+    const updatedHelpers = (activeJob.helpers || []).filter(h => h !== hName);
+    const updatedPackJobs = packJobs.map(pj => {
+      if (pj.id === activeJob.id) {
+        return { ...pj, helpers: updatedHelpers };
+      }
+      return pj;
+    });
+    onSaveState({
+      ...state,
+      packJobs: updatedPackJobs
+    });
   };
 
   // =========================================================================
@@ -878,6 +989,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
       machine: selectedMachine,
       shift: activeJob.shift || shift,
       worker: activeJob.worker || packerName,
+      helpers: activeJob.helpers || [],
       boxesPacked: addBoxes > 0 ? addBoxes : activeJob.packedBoxes,
       startTime: activeJob.startTime || '',
       endTime: stopTime,
@@ -946,10 +1058,21 @@ export const PackingView: React.FC<PackingViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
+    const updatedProductionPlans = (state.productionPlans || []).map((plan) => {
+      if (isCompleted && (plan.id === activeJob.id || plan.jobId === activeJob.id || plan.id === activeJob.planId)) {
+        return {
+          ...plan,
+          status: 'Completed' as const
+        };
+      }
+      return plan;
+    });
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
       packJobs: updatedPackJobs,
+      productionPlans: updatedProductionPlans,
       logs: [...state.logs, newLog]
     });
 
@@ -1257,6 +1380,69 @@ export const PackingView: React.FC<PackingViewProps> = ({
                 );
               })()}
 
+              {/* ACTIVE WORKSTATION CREW PANEL */}
+              <div className="bg-slate-50 p-3.5 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-1 border-b border-slate-200 pb-1.5">
+                  <span className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-purple-600" />
+                    Active Workstation Crew:
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    1 Lead Packer + {activeJob.helpers?.length || 0} Helpers
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* Lead Operator Tag */}
+                  <div className="bg-purple-100 border border-purple-300 text-purple-900 px-2.5 py-1 rounded-lg font-black flex items-center gap-1">
+                    <span>👑 Lead:</span>
+                    <span>{activeJob.worker}</span>
+                  </div>
+
+                  {/* Helpers list */}
+                  {activeJob.helpers && activeJob.helpers.map((hName) => (
+                    <div key={hName} className="bg-slate-200 border border-slate-300 text-slate-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 shadow-2xs">
+                      <span>👤 {hName}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveHelperFromActiveJob(hName)}
+                        className="text-slate-400 hover:text-red-600 font-bold transition text-[10px] px-0.5 cursor-pointer"
+                        title={`Remove helper ${hName}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Inline Add Helper Form */}
+                <div className="flex items-center gap-1.5 pt-1">
+                  <input
+                    type="text"
+                    list="crewHelperList"
+                    placeholder="Type helper name to add..."
+                    value={helperInput}
+                    onChange={(e) => setHelperInput(e.target.value)}
+                    className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold outline-none"
+                  />
+                  <datalist id="crewHelperList">
+                    {(state.floorWorkers || [])
+                      .filter(w => w.name !== activeJob.worker && !(activeJob.helpers || []).includes(w.name))
+                      .map(w => (
+                        <option key={w.name} value={w.name} />
+                      ))
+                    }
+                  </datalist>
+                  <button
+                    type="button"
+                    onClick={() => handleAddHelperToActiveJob(helperInput)}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg cursor-pointer transition shadow-2xs"
+                  >
+                    + Add Helper
+                  </button>
+                </div>
+              </div>
+
               {/* Stats Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-700 bg-white/70 p-2.5 rounded-lg border border-slate-200">
                 <div>
@@ -1461,6 +1647,49 @@ export const PackingView: React.FC<PackingViewProps> = ({
                 <option value="NIGHT">NIGHT SHIFT</option>
               </select>
             </div>
+          </div>
+
+          {/* Row 1b: Helper / Crew Selection */}
+          <div className="bg-purple-50/50 p-3.5 border border-purple-200 rounded-xl space-y-2">
+            <span className="block text-xs font-bold text-purple-900 uppercase">
+              Add Helpers to Workstation Crew:
+            </span>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {(state.floorWorkers || [])
+                .filter(w => w.name !== packerName)
+                .map((worker) => {
+                  const isChecked = selectedHelpers.includes(worker.name);
+                  return (
+                    <label
+                      key={worker.name}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-semibold cursor-pointer transition select-none ${
+                        isChecked
+                          ? 'bg-purple-200 border-purple-400 text-purple-900'
+                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setSelectedHelpers((prev) =>
+                            isChecked
+                              ? prev.filter((h) => h !== worker.name)
+                              : [...prev, worker.name]
+                          );
+                        }}
+                        className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                      />
+                      <span>{worker.name}</span>
+                    </label>
+                  );
+                })}
+            </div>
+            {selectedHelpers.length > 0 && (
+              <p className="text-[10px] text-purple-800 font-bold m-0 mt-1">
+                Selected Crew: Lead {packerName} + {selectedHelpers.length} Helpers ({selectedHelpers.join(', ')})
+              </p>
+            )}
           </div>
 
           {/* Row 2: Customer Filter & Order Selection */}
@@ -2190,6 +2419,100 @@ export const PackingView: React.FC<PackingViewProps> = ({
           onConfirmHandover={handleConfirmShiftHandover}
         />
       )}
+
+      {/* ======================================================== */}
+      {/* 📊 DAILY PACKING & OPERATOR PERFORMANCE REPORT TABLE */}
+      {/* ======================================================== */}
+      <div className="border-t border-slate-200 pt-6 mt-6">
+        <div className="flex items-center justify-between pb-3 flex-wrap gap-2">
+          <div>
+            <h4 className="text-sm font-extrabold text-[#1a365d] uppercase tracking-wide m-0 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-emerald-600" />
+              Daily Packing & Operator Productivity Reports
+            </h4>
+            <p className="text-[11px] text-slate-500 m-0 mt-0.5">
+              Complete historical log of completed runs, team assignments, and box outputs
+            </p>
+          </div>
+          <span className="text-xs bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-1 rounded-full">
+            Total Packing Sessions: {allHistoryRuns.length}
+          </span>
+        </div>
+
+        {allHistoryRuns.length === 0 ? (
+          <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl text-slate-500 text-xs font-semibold">
+            No packing run sessions completed yet. Start and complete runs to see live performance audits.
+          </div>
+        ) : (
+          <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-2xs">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-900 text-white font-extrabold uppercase text-[10px] tracking-wider">
+                  <th className="px-4 py-3">Date & Shift</th>
+                  <th className="px-4 py-3">Workstation</th>
+                  <th className="px-4 py-3">Lead Packer (Operator)</th>
+                  <th className="px-4 py-3">Helpers / Crew</th>
+                  <th className="px-4 py-3">Customer Order</th>
+                  <th className="px-4 py-3 text-right">Output Packed</th>
+                  <th className="px-4 py-3 text-center">Run Duration</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {allHistoryRuns.map((run, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors font-medium text-slate-800">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="font-extrabold text-slate-900">{run.date}</div>
+                      <span className={`inline-block text-[9px] font-black px-1.5 py-0.2 rounded mt-0.5 uppercase ${
+                        run.shift === 'NIGHT'
+                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                          : 'bg-amber-100 text-amber-900 border border-amber-200'
+                      }`}>
+                        {run.shift} SHIFT
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap font-bold text-blue-900">
+                      {run.machine}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="font-black text-slate-900">{run.worker}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {run.helpers && run.helpers.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {run.helpers.map((h) => (
+                            <span key={h} className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-700">
+                              👤 {h}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic text-[11px]">No helpers</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-slate-900 truncate max-w-[150px]">{run.customer}</div>
+                      <span className="text-slate-500 font-semibold text-[10px]">{run.kitType} ({run.pcsPerBox} pcs/box)</span>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <div className="font-black text-emerald-700 text-sm">
+                        {run.boxesPacked.toLocaleString()} <span className="text-[11px] font-bold text-slate-500">Boxes</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold block">
+                        = { (run.boxesPacked * run.pcsPerBox).toLocaleString() } Pcs
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      <div className="bg-slate-100 px-2 py-1 rounded text-[10px] font-extrabold text-slate-700 inline-block font-mono border border-slate-200">
+                        ⏱️ {run.startTime || '-'} to {run.endTime || '-'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

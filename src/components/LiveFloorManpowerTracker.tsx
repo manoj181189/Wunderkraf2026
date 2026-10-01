@@ -28,12 +28,14 @@ interface LiveFloorManpowerTrackerProps {
   state: FactoryState;
   onSaveState: (newState: FactoryState) => void;
   compact?: boolean;
+  currentUser?: { username: string; perms: string[] } | null;
 }
 
 export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> = ({
   state,
   onSaveState,
-  compact = false
+  compact = false,
+  currentUser
 }) => {
   const workers: FloorWorker[] = (state.floorWorkers !== undefined
     ? state.floorWorkers
@@ -345,13 +347,15 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setIsAddWorkerOpen(true)}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>+ Add New Employee / Helper</span>
-            </button>
+            {currentUser?.username === 'admin' && (
+              <button
+                onClick={() => setIsAddWorkerOpen(true)}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Add New Employee / Helper</span>
+              </button>
+            )}
             <button
               onClick={generateWhatsAppAudit}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
@@ -709,7 +713,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
 
                     <td className="p-3 text-right flex items-center justify-end gap-1.5">
                       {/* Unassign Machine Button - Safe operational control without deleting employee */}
-                      {w.assignedMachine && (
+                      {w.assignedMachine && currentUser?.username === 'admin' && (
                         <button
                           onClick={() => {
                             if (confirm(`Unassign (मशीन से हटाएँ):\nAre you sure you want to unassign "${w.name}" from machine ${w.assignedMachine}? This keeps them in the company roster.`)) {
@@ -732,16 +736,26 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
                         </button>
                       )}
 
-                      <button
-                        onClick={() => handleToggleAttendance(w.id)}
-                        className={`px-3 py-1 rounded-full text-xs font-extrabold transition cursor-pointer active:scale-95 ${
+                      {currentUser?.username === 'admin' ? (
+                        <button
+                          onClick={() => handleToggleAttendance(w.id)}
+                          className={`px-3 py-1 rounded-full text-xs font-extrabold transition cursor-pointer active:scale-95 ${
+                            w.isPresent
+                              ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200 border border-emerald-300'
+                              : 'bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300'
+                          }`}
+                        >
+                          {w.isPresent ? '● Present' : '○ Absent'}
+                        </button>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${
                           w.isPresent
-                            ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200 border border-emerald-300'
-                            : 'bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300'
-                        }`}
-                      >
-                        {w.isPresent ? '● Present' : '○ Absent'}
-                      </button>
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-slate-50 text-slate-500 border-slate-200'
+                        }`}>
+                          {w.isPresent ? '● Present' : '○ Absent'}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))

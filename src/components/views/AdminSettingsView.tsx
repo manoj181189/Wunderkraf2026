@@ -65,6 +65,7 @@ import {
   PRODUCTS,
   PAPER_BRANDS,
   DEPT_WORKERS,
+  DEFAULT_FLOOR_WORKERS,
   INITIAL_STATE,
   DEFAULT_USERS,
   PRODUCT_PREFIX_MAP,
@@ -1373,7 +1374,7 @@ _If you received this message, your contact number and routing configuration are
   const handleDeleteAllOrders = () => {
     if (state.packJobs.length === 0) return;
     const pass = prompt(`Enter Master Password 'MANOJ' to Delete ALL Customer Packing Orders:`);
-    if (pass !== 'MANOJ') {
+    if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
       alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
       return;
     }
@@ -2233,7 +2234,7 @@ _If you received this message, your contact number and routing configuration are
       isDanger: true,
       onConfirm: () => {
         const pass = prompt("Enter Master Password 'MANOJ' to Confirm Purge of Completed Plans:");
-        if (pass !== 'MANOJ') {
+        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
           showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
           return;
         }
@@ -2278,7 +2279,7 @@ _If you received this message, your contact number and routing configuration are
       isDanger: true,
       onConfirm: () => {
         const pass = prompt("Enter Master Password 'MANOJ' to Purge ALL Production Plans:");
-        if (pass !== 'MANOJ') {
+        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
           showToast('❌ Incorrect Master Password! Expunge aborted.', 'error');
           return;
         }
@@ -2324,7 +2325,7 @@ _If you received this message, your contact number and routing configuration are
       isDanger: true,
       onConfirm: () => {
         const pass = prompt("Enter Master Password 'MANOJ' to Purge Dispatched Orders:");
-        if (pass !== 'MANOJ') {
+        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
           showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
           return;
         }
@@ -2365,7 +2366,7 @@ _If you received this message, your contact number and routing configuration are
       isDanger: true,
       onConfirm: () => {
         const pass = prompt("Enter Master Password 'MANOJ' to Purge Filtered Logs:");
-        if (pass !== 'MANOJ') {
+        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
           showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
           return;
         }
@@ -2400,7 +2401,7 @@ _If you received this message, your contact number and routing configuration are
       isDanger: true,
       onConfirm: () => {
         const pass = prompt("Enter Master Password 'MANOJ' to Expunge ALL Audit Logs:");
-        if (pass !== 'MANOJ') {
+        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
           showToast('❌ Incorrect Master Password! Expunge aborted.', 'error');
           return;
         }
@@ -3093,7 +3094,9 @@ ${formLines.join('\n')}
           motherReelInventory: [],
           shiftHandovers: [],
           users: state.users,
-          adminPassword: state.adminPassword
+          adminPassword: state.adminPassword,
+          floorWorkers: DEFAULT_FLOOR_WORKERS,
+          deptWorkers: DEPT_WORKERS
         };
         break;
     }
@@ -4127,7 +4130,7 @@ ${formLines.join('\n')}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="max-w-2xl mx-auto">
             {/* Pcs/Kg Master */}
             <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
               <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-black text-slate-800 uppercase text-xs flex justify-between">
@@ -4165,40 +4168,6 @@ ${formLines.join('\n')}
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </div>
-
-            {/* Scrap Limits Master */}
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-black text-slate-800 uppercase text-xs flex justify-between">
-                <span>Scrap Tolerance Limits (%)</span>
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-              </div>
-              <div className="p-4 space-y-4">
-                {['Slitting', 'Cutting', 'Forming'].map(dept => (
-                  <div key={dept} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 group hover:border-amber-300 transition">
-                    <div>
-                      <span className="text-xs font-black text-slate-700 uppercase">{dept}</span>
-                      <p className="text-[10px] text-slate-500 m-0">Standard scrap threshold for {dept}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={scrapLimitsMaster[dept] || 2.5}
-                        onChange={(e) => handleUpdateScrapLimit(dept, parseFloat(e.target.value))}
-                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-black text-amber-700 outline-none focus:border-amber-500 text-center"
-                      />
-                      <span className="text-xs font-bold text-slate-400">%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="px-4 py-3 bg-amber-50 border-t border-amber-100">
-                <p className="text-[10px] text-amber-800 font-medium m-0 flex items-start gap-1.5">
-                  <span className="shrink-0 mt-0.5 font-black">ⓘ</span>
-                  <span>If actual scrap exceeds these limits during production, a warning will be flagged on the batch report.</span>
-                </p>
               </div>
             </div>
           </div>
@@ -6731,8 +6700,40 @@ ${formLines.join('\n')}
                       All deleted jobs, plans, shift handovers, and orders are securely archived here. Inspect who deleted them under which login, and restore them instantly.
                     </p>
                   </div>
-                  <div className="bg-rose-950/80 border border-rose-700/50 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-200">
-                    Archived Items: {(state.deletedVaultItems || []).length}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="bg-rose-950/80 border border-rose-700/50 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-200">
+                      Archived Items: {(state.deletedVaultItems || []).length}
+                    </div>
+                    {(state.deletedVaultItems || []).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmModal({
+                            isOpen: true,
+                            title: '🧹 Clear Entire Recovery Vault (पूरी तरह खाली करें)',
+                            message: 'क्या आप सचमुच डेटा रिकवरी वॉल्ट की सभी प्रविष्टियों को स्थायी रूप से नष्ट करना चाहते हैं? यह करने के बाद आप इन्हें फिर कभी रिस्टोर नहीं कर पाएंगे!',
+                            confirmLabel: 'Yes, Delete All Permanently',
+                            isDanger: true,
+                            requiresPassword: true,
+                            passwordTarget: 'MANOJ',
+                            onConfirm: () => {
+                              onSaveState({
+                                ...state,
+                                deletedVaultItems: [],
+                                deletedJobIds: [],
+                                deletedPlanIds: []
+                              });
+                              setConfirmModal(null);
+                              setDeletePassword('');
+                              alert('✅ रिकवरी वॉल्ट पूरी तरह से खाली कर दिया गया है! अब आप नए सिरे से काम शुरू कर सकते हैं।');
+                            }
+                          });
+                        }}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1 shadow-sm animate-pulse"
+                      >
+                        🧹 Clear Entire Vault (पूरी तरह खाली करें)
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -6765,28 +6766,40 @@ ${formLines.join('\n')}
                         <button
                           type="button"
                           onClick={() => {
-                            if (!confirm(`Restore [${vaultItem.title}] back to active factory database?`)) return;
-                            let nextState = { ...state };
-                            if (vaultItem.type === 'JOB') {
-                              const restoredJob = vaultItem.data?.job;
-                              const restoredPlan = vaultItem.data?.productionPlan;
-                              if (restoredJob) {
-                                nextState.jobs = [restoredJob, ...(nextState.jobs || [])];
-                                nextState.deletedJobIds = (nextState.deletedJobIds || []).filter(id => id !== restoredJob.id);
+                            setConfirmModal({
+                              isOpen: true,
+                              title: '🔄 Restore Deleted Item',
+                              message: `क्या आप [${vaultItem.title}] को वापस मुख्य प्रोडक्शन डेटाबेस में पुनर्स्थापित (Restore) करना चाहते हैं?`,
+                              confirmLabel: 'Yes, Restore Item',
+                              isDanger: false,
+                              requiresPassword: true,
+                              passwordTarget: 'MANOJ',
+                              onConfirm: () => {
+                                let nextState = { ...state };
+                                if (vaultItem.type === 'JOB') {
+                                  const restoredJob = vaultItem.data?.job;
+                                  const restoredPlan = vaultItem.data?.productionPlan;
+                                  if (restoredJob) {
+                                    nextState.jobs = [restoredJob, ...(nextState.jobs || [])];
+                                    nextState.deletedJobIds = (nextState.deletedJobIds || []).filter(id => id !== restoredJob.id);
+                                  }
+                                  if (restoredPlan) {
+                                    nextState.productionPlans = [restoredPlan, ...(nextState.productionPlans || [])];
+                                    nextState.deletedPlanIds = (nextState.deletedPlanIds || []).filter(id => id !== restoredPlan.id);
+                                  }
+                                } else if (vaultItem.type === 'SHIFT_HANDOVER') {
+                                  const restoredHo = vaultItem.data;
+                                  if (restoredHo) {
+                                    nextState.shiftHandovers = [restoredHo, ...(nextState.shiftHandovers || [])];
+                                  }
+                                }
+                                nextState.deletedVaultItems = (nextState.deletedVaultItems || []).filter(v => v.id !== vaultItem.id);
+                                onSaveState(nextState);
+                                setConfirmModal(null);
+                                setDeletePassword('');
+                                alert(`✅ Successfully restored [${vaultItem.title}]!`);
                               }
-                              if (restoredPlan) {
-                                nextState.productionPlans = [restoredPlan, ...(nextState.productionPlans || [])];
-                                nextState.deletedPlanIds = (nextState.deletedPlanIds || []).filter(id => id !== restoredPlan.id);
-                              }
-                            } else if (vaultItem.type === 'SHIFT_HANDOVER') {
-                              const restoredHo = vaultItem.data;
-                              if (restoredHo) {
-                                nextState.shiftHandovers = [restoredHo, ...(nextState.shiftHandovers || [])];
-                              }
-                            }
-                            nextState.deletedVaultItems = (nextState.deletedVaultItems || []).filter(v => v.id !== vaultItem.id);
-                            onSaveState(nextState);
-                            alert(`✅ Successfully restored [${vaultItem.title}] to active production database!`);
+                            });
                           }}
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-extrabold transition shadow-xs flex items-center gap-1 cursor-pointer"
                         >
@@ -6795,11 +6808,24 @@ ${formLines.join('\n')}
                         <button
                           type="button"
                           onClick={() => {
-                            if (!confirm(`Permanently delete [${vaultItem.title}] from vault? This cannot be undone.`)) return;
-                            const nextVault = (state.deletedVaultItems || []).filter(v => v.id !== vaultItem.id);
-                            onSaveState({
-                              ...state,
-                              deletedVaultItems: nextVault
+                            setConfirmModal({
+                              isOpen: true,
+                              title: '🗑️ Permanent Purge',
+                              message: `क्या आप [${vaultItem.title}] को रिकवरी वॉल्ट से स्थायी रूप से नष्ट करना चाहते हैं? यह वापस नहीं आ सकेगा।`,
+                              confirmLabel: 'Yes, Delete Permanently',
+                              isDanger: true,
+                              requiresPassword: true,
+                              passwordTarget: 'MANOJ',
+                              onConfirm: () => {
+                                const nextVault = (state.deletedVaultItems || []).filter(v => v.id !== vaultItem.id);
+                                onSaveState({
+                                  ...state,
+                                  deletedVaultItems: nextVault
+                                });
+                                setConfirmModal(null);
+                                setDeletePassword('');
+                                showToast('✅ Item permanently deleted from vault.');
+                              }
                             });
                           }}
                           className="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 rounded-lg text-xs font-bold transition cursor-pointer"
@@ -9084,7 +9110,15 @@ ${formLines.join('\n')}
                 type="button"
                 onClick={() => {
                   if (confirmModal.requiresPassword) {
-                    if (deletePassword !== (confirmModal.passwordTarget || 'MANOJ')) {
+                    const entered = deletePassword.trim();
+                    const target = (confirmModal.passwordTarget || 'MANOJ').trim();
+                    const adminPass = (state.adminPassword || '1234').trim();
+
+                    const isManojMatch = entered.toUpperCase() === 'MANOJ' || entered.toLowerCase() === 'manoj';
+                    const isTargetMatch = entered === target || entered.toUpperCase() === target.toUpperCase();
+                    const isAdminPassMatch = entered === adminPass;
+
+                    if (!isManojMatch && !isTargetMatch && !isAdminPassMatch) {
                       alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
                       return;
                     }

@@ -29,9 +29,10 @@ interface ScrapManagementViewProps {
   state: FactoryState;
   onBackToHub: () => void;
   onSaveState: (state: FactoryState) => void;
+  currentUser?: { username: string; perms: string[] } | null;
 }
 
-export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state, onBackToHub, onSaveState }) => {
+export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state, onBackToHub, onSaveState, currentUser }) => {
   const [filterStage, setFilterStage] = useState<string>('ALL');
   const [filterProduct, setFilterProduct] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -73,15 +74,19 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
   const [ratePerKg, setRatePerKg] = useState<string>('18');
   const [saleDate, setSaleDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
+  // Manual Stock Adjustment form state
+  const [targetPhysicalStock, setTargetPhysicalStock] = useState<string>('');
+  const [adjustmentRemarks, setAdjustmentRemarks] = useState<string>('');
+
   const logs = state.logs || [];
   const scrapSales: ScrapSale[] = state.scrapSales || [];
 
   // Parse all production events
   const allEvents = useMemo(() => parseAllProductionEvents(state), [state]);
 
-  // Extract scrap records from events
+  // Extract scrap records from events (Excluding Slitting stage scrap)
   const scrapEvents = useMemo(() => {
-    return allEvents.filter((e) => e.scrapKg > 0);
+    return allEvents.filter((e) => e.scrapKg > 0 && e.stage.toLowerCase() !== 'slitting');
   }, [allEvents]);
 
   // Total Scrap metrics
@@ -97,19 +102,56 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
       .reduce((sum, e) => sum + e.scrapKg, 0);
   }, [scrapEvents]);
 
-  const totalSlittingScrapKg = useMemo(() => {
-    return scrapEvents
-      .filter((e) => e.stage.toLowerCase() === 'slitting')
-      .reduce((sum, e) => sum + e.scrapKg, 0);
-  }, [scrapEvents]);
-
   const totalQcScrapKg = useMemo(() => {
     return scrapEvents
       .filter((e) => e.stage.toLowerCase() === 'qc' || e.stage.toLowerCase() === 'packing')
       .reduce((sum, e) => sum + e.scrapKg, 0);
   }, [scrapEvents]);
 
-  const totalScrapGenerated = totalCuttingScrapKg + totalFormingScrapKg + totalSlittingScrapKg + totalQcScrapKg;
+  const totalScrapSoldKg = useMemo(() => {
+    return (state.scrapSales || []).reduce((sum, s) => sum + (s.weightKg || s.soldKg || 0), 0);
+  }, [state.scrapSales]);
+
+  // One-time automatic clean up of past scrap records to start fresh from 0
+  React.useEffect(() => {
+    const hasJobScrap = state.jobs.some(j => (j.scrapKg || 0) > 0 || (j.scrapQty || 0) > 0 || (j.scrapPcs || 0) > 0);
+    const hasSales = (state.scrapSales || []).length > 0;
+    const alreadyReset = localStorage.getItem('wunderkraf_scrap_reset_done_v2');
+
+    if (!alreadyReset && (hasJobScrap || hasSales)) {
+      const clearedJobs = state.jobs.map(j => ({
+        ...j,
+        scrapKg: 0,
+        scrapQty: 0,
+        scrapPcs: 0,
+        scrapPieces: 0
+      }));
+
+      const clearedLogs = (state.logs || []).map(l => {
+        if (!l.action) return l;
+        let action = l.action;
+        action = action
+          .replace(/(?:Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/gi, 'Scrap: 0 KG')
+          .replace(/(?:Scrap|Extra Paper Scrap|Paper Scrap):\s*[0-9.]+/gi, 'Scrap: 0')
+          .replace(/Defect\/Scrap:\s*[0-9,]+/gi, 'Defect/Scrap: 0')
+          .replace(/Auto-Adjustment:\s*\+?[0-9,]+/gi, 'Auto-Adjustment: 0')
+          .replace(/(\d+)\s*(?:Defect Pcs|Defect Pieces|Defects)/gi, '0 Defect Pcs')
+          .replace(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*[0-9,]+/gi, 'Defect Pieces: 0')
+          .replace(/[0-9,]+\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/gi, '0 Defects');
+        return { ...l, action };
+      });
+
+      onSaveState({
+        ...state,
+        jobs: clearedJobs,
+        scrapSales: [],
+        logs: clearedLogs
+      });
+      localStorage.setItem('wunderkraf_scrap_reset_done_v2', 'true');
+    }
+  }, [state.jobs, state.scrapSales, state.logs]);
+
+  const totalScrapGenerated = totalCuttingScrapKg + totalFormingScrapKg + totalQcScrapKg;
   const netAvailableScrap = calculateAvailableScrapKg(logs, scrapSales, state.deletedJobIds);
 
   const cuttingScrap = totalCuttingScrapKg;
@@ -194,6 +236,43 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
     });
   };
 
+  const handleApplyStockAdjustment = (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetStock = parseFloat(targetPhysicalStock);
+    if (isNaN(targetStock) || targetStock < 0) {
+      alert('⚠️ Please enter a valid physical stock weight (≥ 0)!');
+      return;
+    }
+
+    const difference = targetStock - netAvailableScrap;
+    if (Math.abs(difference) < 0.01) {
+      alert('⚠️ The entered weight matches the current available stock. No adjustment needed.');
+      return;
+    }
+
+    const adjustmentId = 'ADJ-' + Math.floor(1000 + Math.random() * 9000);
+    const adjustmentLog = {
+      jobId: adjustmentId,
+      product: 'Paper Scrap',
+      stage: 'Scrap Adjustment',
+      machine: 'WAREHOUSE-BAY',
+      action: `⚖️ Manual Stock Adjustment: Set physical scrap inventory to ${targetStock} KG (Correction: ${difference > 0 ? '+' : ''}${difference.toFixed(2)} KG). Reason: ${adjustmentRemarks.trim() || 'Physical inventory audit adjustment'}`,
+      user: 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    onSaveState({
+      ...state,
+      logs: [adjustmentLog, ...(state.logs || [])]
+    });
+
+    setTargetPhysicalStock('');
+    setAdjustmentRemarks('');
+    alert(`✅ Scrap Inventory adjusted to physically measured ${targetStock} KG successfully!`);
+  };
+
   const handleExportCSV = () => {
     const rows = filteredScrapEvents.map((e) => ({
       Date: e.date,
@@ -224,8 +303,8 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      {/* Top Header */}
-      <header className="bg-slate-900 text-white shadow-md px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+      {/* Top Header - Corporate Blue Background */}
+      <header className="bg-[#1a365d] text-white shadow-md px-4 py-3 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToHub}
@@ -245,14 +324,55 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                   Live Audit
                 </span>
               </h1>
-              <p className="text-xs text-slate-400 m-0">
-                Detailed source tracking for Cutting, Forming, Slitting, and QC Scrap & Wastage
+              <p className="text-xs text-slate-200 m-0">
+                Detailed source tracking for Cutting, Forming, and QC Scrap & Wastage
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {currentUser?.username === 'admin' && (
+            <button
+              onClick={() => {
+                if (window.confirm('⚠️ क्या आप सचमुच पूरा स्क्रैप डेटा और पिछला इतिहास शून्य (0) करना चाहते हैं?')) {
+                  const clearedJobs = state.jobs.map(j => ({
+                    ...j,
+                    scrapKg: 0,
+                    scrapQty: 0,
+                    scrapPcs: 0,
+                    scrapPieces: 0
+                  }));
+
+                  const clearedLogs = (state.logs || []).map(l => {
+                    if (!l.action) return l;
+                    let action = l.action;
+                    action = action
+                      .replace(/(?:Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/gi, 'Scrap: 0 KG')
+                      .replace(/(?:Scrap|Extra Paper Scrap|Paper Scrap):\s*[0-9.]+/gi, 'Scrap: 0')
+                      .replace(/Defect\/Scrap:\s*[0-9,]+/gi, 'Defect/Scrap: 0')
+                      .replace(/Auto-Adjustment:\s*\+?[0-9,]+/gi, 'Auto-Adjustment: 0')
+                      .replace(/(\d+)\s*(?:Defect Pcs|Defect Pieces|Defects)/gi, '0 Defect Pcs')
+                      .replace(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*[0-9,]+/gi, 'Defect Pieces: 0')
+                      .replace(/[0-9,]+\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/gi, '0 Defects');
+                    return { ...l, action };
+                  });
+
+                  onSaveState({
+                    ...state,
+                    jobs: clearedJobs,
+                    scrapSales: [],
+                    logs: clearedLogs
+                  });
+                  localStorage.setItem('wunderkraf_scrap_reset_done_v2', 'true');
+                  alert('✅ सभी पुराने स्क्रैप आंकड़े सफलतापूर्वक शून्य (0) कर दिए गए हैं!');
+                }
+              }}
+              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+            >
+              🧹 Reset Scrap to 0
+            </button>
+          )}
           <button
             onClick={handleExportCSV}
             className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer"
@@ -273,7 +393,7 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           <div 
             onClick={() => { setFilterStage('ALL'); setFilterProduct('ALL'); }}
             className={`rounded-2xl p-4 shadow-sm border flex flex-col justify-between hover:scale-[1.02] hover:shadow-md cursor-pointer transition-all duration-200 ${filterStage === 'ALL' && filterProduct === 'ALL' ? 'border-slate-900 bg-slate-50/50' : 'border-slate-200 bg-white'}`}
@@ -321,13 +441,13 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
             className={`rounded-2xl p-4 shadow-sm border flex flex-col justify-between hover:scale-[1.02] hover:shadow-md cursor-pointer transition-all duration-200 ${filterStage === 'QC' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-200 bg-white'}`}
           >
             <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wide">Slitting & QC Scrap</span>
+              <span className="text-xs font-bold uppercase tracking-wide">QC Scrap</span>
               <Scroll className="w-5 h-5 text-indigo-600" />
             </div>
             <div className="text-2xl font-black text-indigo-700">
-              {(totalSlittingScrapKg + totalQcScrapKg).toLocaleString()} <span className="text-xs font-semibold text-slate-500">KG</span>
+              {totalQcScrapKg.toLocaleString()} <span className="text-xs font-semibold text-slate-500">KG</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 m-0">Jumbo core & QC rejects (Click to filter)</p>
+            <p className="text-[11px] text-slate-400 mt-1 m-0">QC rejects & packing defects (Click to filter)</p>
           </div>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-emerald-200 bg-emerald-50/40 flex flex-col justify-between">
@@ -342,173 +462,147 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
           </div>
         </div>
 
-        {/* Cumulative Raw Material (Glue/Scrap) Analytics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-200">
-          
-          {/* Column 1: Adhesive Glue Consumption & Auditing */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                  <Droplets className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-wide text-slate-900 m-0">
-                    Adhesive Glue Consumption
-                  </h3>
-                  <p className="text-[11px] text-slate-500 m-0">Live adhesive brand consumption & log audit</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-blue-50/40 border border-blue-100 p-4 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-blue-800 font-extrabold uppercase tracking-wider block">Cumulative Glue Consumed</span>
-                    <span className="text-3xl font-black text-blue-950">{totalGlueConsumed.toFixed(1)} <span className="text-sm font-bold text-slate-500">KG</span></span>
-                  </div>
-                  <span className="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-1 rounded">
-                    Audit Tracked
+        {/* Section 2: Scrap Sale & Buyer Management & Stock Correction */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
+            {/* Column 1: Record Scrap Sale */}
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wide m-0 flex items-center gap-2">
+                  <span>Record Scrap Sale / Dispatch</span>
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                    Revenue Recovery
                   </span>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-slate-700 uppercase block">Consumption Breakdown by Brand:</span>
-                  {Object.keys(glueByBrand).length === 0 ? (
-                    <div className="text-center py-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs font-medium">
-                      No adhesive glue entries logged yet.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {Object.entries(glueByBrand).map(([brand, qty]) => (
-                        <div key={brand} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-between">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase truncate">{brand}</span>
-                          <span className="text-xs font-black text-slate-800 mt-1">{qty.toFixed(1)} KG</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                </h2>
+                <p className="text-xs text-slate-500 m-0">Sell accumulated scrap KG to scrap buyers and update inventory balance</p>
               </div>
-            </div>
-          </div>
 
-          {/* Column 2: Cumulative Raw Material Process Scrap & Wastage */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
-                  <Percent className="w-4 h-4" />
+              <form onSubmit={handleRecordScrapSale} className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">Party / Vendor Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={partyName}
+                    onChange={(e) => setPartyName(e.target.value)}
+                    placeholder="e.g. Balaji Traders"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
+                  />
                 </div>
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-wide text-slate-900 m-0">
-                    Raw Material Wastage & Efficiency
-                  </h3>
-                  <p className="text-[11px] text-slate-500 m-0">Overall paper processing yield & waste ratios</p>
+                  <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">Quantity (KG) *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={scrapSoldKg}
+                    onChange={(e) => setScrapSoldKg(e.target.value)}
+                    placeholder="e.g. 500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
+                  />
                 </div>
+                <div>
+                  <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">Rate (₹ / KG) *</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    required
+                    value={ratePerKg}
+                    onChange={(e) => setRatePerKg(e.target.value)}
+                    placeholder="18"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">Sale Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={saleDate}
+                    onChange={(e) => setSaleDate(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    <span>Record Sale (₹ {((parseFloat(scrapSoldKg) || 0) * (parseFloat(ratePerKg) || 0)).toLocaleString()})</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Column 2: Physical Stock Manual Adjustment (Admin Only) */}
+            <div className="pt-6 lg:pt-0 lg:pl-6 space-y-4">
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wide m-0 flex items-center gap-2">
+                  <span>Manual Inventory Adjustment</span>
+                  <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                    Admin Only
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500 m-0">Correct scrap stock discrepancies to match actual physical weighments</p>
               </div>
 
-              <div className="space-y-4">
-                <div className="bg-rose-50/40 border border-rose-100 p-4 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-rose-800 font-extrabold uppercase tracking-wider block">Overall Wastage Rate</span>
-                    <span className="text-3xl font-black text-rose-950">{overallWastagePct}%</span>
+              {currentUser?.username === 'admin' ? (
+                <form onSubmit={handleApplyStockAdjustment} className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">
+                      Current Available ERP Stock
+                    </label>
+                    <div className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-700">
+                      {netAvailableScrap.toFixed(2)} KG
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Total Process Scrap</span>
-                    <b className="text-rose-700 text-sm font-black">{cumulativeScrap.toFixed(1)} KG</b>
+                  <div className="col-span-2">
+                    <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">
+                      Actual Physical Stock (KG) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={targetPhysicalStock}
+                      onChange={(e) => setTargetPhysicalStock(e.target.value)}
+                      placeholder="Enter measured weighment weight"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-blue-600"
+                    />
                   </div>
+                  <div className="col-span-2">
+                    <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">
+                      Adjustment Reason / Remarks *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={adjustmentRemarks}
+                      onChange={(e) => setAdjustmentRemarks(e.target.value)}
+                      placeholder="e.g. Monthly physical weighment alignment"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <Cog className="w-4 h-4" />
+                      <span>Apply Stock Adjustment</span>
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="p-6 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center space-y-2">
+                  <span className="text-xl">🔒</span>
+                  <p className="text-xs text-slate-500 font-extrabold uppercase">Access Restricted</p>
+                  <p className="text-[11px] text-slate-400 m-0">Only the Admin is authorized to adjust scrap stock weights manually.</p>
                 </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Slitting</span>
-                    <span className="text-slate-800 font-black">{slittingScrap.toFixed(1)} KG</span>
-                  </div>
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Cutting</span>
-                    <span className="text-slate-800 font-black">{cuttingScrap.toFixed(1)} KG</span>
-                  </div>
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Forming</span>
-                    <span className="text-slate-800 font-black">{formingScrap.toFixed(1)} KG</span>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
-
-        </div>
-
-        {/* Section 2: Scrap Sale & Buyer Management */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wide m-0 flex items-center gap-2">
-                <span>Record Scrap Sale / Dispatch</span>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                  Revenue Recovery
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 m-0">Sell accumulated scrap KG to scrap buyers and update inventory balance</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleRecordScrapSale} className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">Party / Vendor Name *</label>
-              <input
-                type="text"
-                required
-                value={partyName}
-                onChange={(e) => setPartyName(e.target.value)}
-                placeholder="e.g. Balaji Traders"
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">Quantity (KG) *</label>
-              <input
-                type="number"
-                step="0.1"
-                required
-                value={scrapSoldKg}
-                onChange={(e) => setScrapSoldKg(e.target.value)}
-                placeholder="e.g. 500"
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">Rate (₹ / KG) *</label>
-              <input
-                type="number"
-                step="0.5"
-                required
-                value={ratePerKg}
-                onChange={(e) => setRatePerKg(e.target.value)}
-                placeholder="18"
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">Sale Date *</label>
-              <input
-                type="date"
-                required
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
-              />
-            </div>
-            <div>
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-              >
-                <DollarSign className="w-4 h-4" />
-                <span>Record Sale (₹ {((parseFloat(scrapSoldKg) || 0) * (parseFloat(ratePerKg) || 0)).toLocaleString()})</span>
-              </button>
-            </div>
-          </form>
 
           {/* Recent Sales History */}
           {scrapSales.length > 0 && (
@@ -544,13 +638,17 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                         <td className="p-2.5 text-right text-slate-600">₹{sale.ratePerKg || 0}</td>
                         <td className="p-2.5 text-right font-extrabold text-emerald-700">₹{(sale.totalAmount || ((sale.weightKg || sale.soldKg || 0) * (sale.ratePerKg || 0))).toLocaleString()}</td>
                         <td className="p-2.5 text-center">
-                          <button
-                            onClick={() => handleDeleteScrapSale(index)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition cursor-pointer"
-                            title="Delete Dispatch"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {currentUser?.username === 'admin' ? (
+                            <button
+                              onClick={() => handleDeleteScrapSale(index)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition cursor-pointer"
+                              title="Delete Dispatch"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-bold">🔒 Admin Only</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -581,7 +679,6 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                 <option value="ALL">All Stages</option>
                 <option value="Cutting">Cutting</option>
                 <option value="Forming">Forming</option>
-                <option value="Slitting">Slitting</option>
                 <option value="QC">QC / Packing</option>
               </select>
 

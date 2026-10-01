@@ -33,7 +33,9 @@ export type TimeRangeOption =
 export function parseAllProductionEvents(state: FactoryState): NormalizedProductionEvent[] {
   const events: NormalizedProductionEvent[] = [];
   const seenEventKeys = new Set<string>();
-  const deletedJobIds = new Set(state.deletedJobIds || []);
+  const deletedJobIds = new Set((state.deletedJobIds || []).map(id => id.trim().toUpperCase()));
+  const activeJobIds = new Set((state.jobs || []).map(j => j.id.trim().toUpperCase()));
+  const activePackJobIds = new Set((state.packJobs || []).map(pj => pj.id.trim().toUpperCase()));
 
   const logs: LogEntry[] = state.logs || [];
 
@@ -41,7 +43,36 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
   logs.forEach((log, index) => {
     if (!log.action) return;
     if (log.machine === 'ADMIN' || log.machine === 'MKT-ENTRY' || log.machine === 'RECYCLING-BAY') return;
-    if (log.jobId && deletedJobIds.has(log.jobId)) return;
+    if (log.action.includes('Shift Handover') || log.action.includes('Locked slice:')) return;
+
+    // Filter logs that belong to deleted jobs or are not in active jobs database
+    let inferredJobId = log.jobId;
+    if (!inferredJobId && log.action) {
+      const matchJob = log.action.match(/(?:JOB|PACK|SLIT|CUT|FORM|QC|SCR)-\d+/i);
+      if (matchJob) {
+        inferredJobId = matchJob[0];
+      }
+    }
+
+    if (inferredJobId) {
+      const cleanId = inferredJobId.trim().toUpperCase();
+      if (deletedJobIds.has(cleanId)) return;
+
+      const isMainJobActive = activeJobIds.has(cleanId);
+      const isPackJobActive = activePackJobIds.has(cleanId);
+      const hasActiveBase = Array.from(activeJobIds).some(id => cleanId.includes(id)) || 
+                            Array.from(activePackJobIds).some(id => cleanId.includes(id));
+
+      if (!isMainJobActive && !isPackJobActive && !hasActiveBase) {
+        return; // Skip logs for deleted/inactive jobs
+      }
+    } else {
+      // If there is no jobId associated with the log at all, and there are no active jobs in the DB,
+      // it is a legacy/test log - skip it to keep the scrap desk clean
+      if (activeJobIds.size === 0 && activePackJobIds.size === 0) {
+        return;
+      }
+    }
 
     // Determine stage
     const stage = log.stage || 'General';

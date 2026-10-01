@@ -38,6 +38,7 @@ export function calculateAvailableScrapKg(logs: LogEntry[], scrapSales: any[], d
   (logs || []).forEach((l) => {
     if (!l.action) return;
     if (l.jobId && deletedSet.has(l.jobId)) return;
+    if (l.stage === 'Slitting') return;
 
     let scrapKg = 0;
     let scrapPieces = 0;

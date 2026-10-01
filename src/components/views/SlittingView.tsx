@@ -1542,26 +1542,6 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                   />
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-rose-800 uppercase">
-                      Trim / Scrap (KG) (Auto Wastage):
-                    </label>
-                    {parsedOutWeight > 0 && (
-                      <span className="text-[10px] font-bold text-slate-500">
-                        Auto: {autoScrap} KG
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={scrapKgInput !== '' ? scrapKgInput : (parsedOutWeight > 0 ? autoScrap : '')}
-                    onChange={(e) => setScrapKgInput(e.target.value)}
-                    placeholder={parsedOutWeight > 0 ? `${autoScrap} KG` : 'Auto-calculated'}
-                    className="w-full px-3 py-2 bg-white border border-rose-300 rounded-lg text-xs font-bold text-rose-900 outline-none"
-                  />
-                </div>
-                <div>
                   <label className="block text-xs font-bold text-indigo-800 uppercase mb-1">
                     Actual Slit Length (Meters):
                   </label>
@@ -1590,42 +1570,6 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                     <div className="font-semibold text-red-800">
                       Output roll weight (<b>{parsedOutWeight} KG</b>) exceeds input jumbo reel (<b>{activeInputWeight} KG</b>)! 200kg raw material cannot produce 210kg goods. Entry cannot be saved. Please enter correct scale weight.
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Live Scrap & Wastage calculation banner */}
-              {parsedOutWeight > 0 && parsedOutWeight <= activeInputWeight && (
-                <div className="bg-emerald-50/80 border border-emerald-300 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2 text-xs">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-extrabold text-slate-800 uppercase flex items-center gap-1">
-                      <span>⚡ Auto Scrap Integration:</span>
-                    </span>
-                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200 font-medium text-slate-700">
-                      Jumbo Input: <b>{activeInputWeight} KG</b>
-                    </span>
-                    <span className="text-slate-400 font-bold">-</span>
-                    <span className="bg-white px-2 py-0.5 rounded border border-blue-200 font-medium text-blue-900">
-                      Rolls Output: <b>{parsedOutWeight} KG</b>
-                    </span>
-                    <span className="text-slate-400 font-bold">=</span>
-                    <span className="bg-white px-2 py-0.5 rounded border border-rose-300 font-bold text-rose-800">
-                      Scrap: <b>{effectiveScrap} KG</b>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-600">Calculated Wastage:</span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full font-black text-xs border ${
-                        effectiveWastagePercent <= 6
-                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                          : effectiveWastagePercent <= 8
-                          ? 'bg-amber-100 text-amber-800 border-amber-300'
-                          : 'bg-rose-100 text-rose-800 border-rose-300'
-                      }`}
-                    >
-                      {effectiveWastagePercent}% Wastage
-                    </span>
                   </div>
                 </div>
               )}

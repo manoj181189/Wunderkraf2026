@@ -34,13 +34,15 @@ interface ExecutiveManpowerViewProps {
   onBackToHub: () => void;
   onSaveState: (nextState: FactoryState) => void;
   onNavigateToView?: (view: CurrentView) => void;
+  currentUser?: { username: string; perms: string[] } | null;
 }
 
 export const ExecutiveManpowerView: React.FC<ExecutiveManpowerViewProps> = ({
   state,
   onBackToHub,
   onSaveState,
-  onNavigateToView
+  onNavigateToView,
+  currentUser
 }) => {
   const workers: FloorWorker[] =
     (state.floorWorkers !== undefined
@@ -327,6 +329,7 @@ export const ExecutiveManpowerView: React.FC<ExecutiveManpowerViewProps> = ({
             <LiveFloorManpowerTracker
               state={state}
               onSaveState={onSaveState}
+              currentUser={currentUser}
             />
           </div>
         </div>

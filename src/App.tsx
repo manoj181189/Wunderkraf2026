@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { FactoryState, CurrentView, ProductType } from './types';
-import { INITIAL_STATE, LOCAL_STORAGE_KEY, DEFAULT_USERS } from './lib/constants';
+import { INITIAL_STATE, LOCAL_STORAGE_KEY, DEFAULT_USERS, DEFAULT_FLOOR_WORKERS } from './lib/constants';
 import { initializeFactoryState, persistFactoryState, forceSyncWithCentral, subscribeToSyncEvents } from './lib/storage';
 
 // Header & Navigation Hub
@@ -121,7 +121,43 @@ export const App: React.FC = () => {
       .then((loadedState) => {
         if (isMounted && loadedState) {
           loadedState.users = sanitizeUsersState(loadedState.users);
-          setState(loadedState);
+          
+          const wipeFlag = 'wunderkraf_force_wipe_v6';
+          if (!localStorage.getItem(wipeFlag)) {
+            const cleanRoster = (loadedState.floorWorkers || DEFAULT_FLOOR_WORKERS).map(w => ({
+              ...w,
+              isPresent: false,
+              assignedMachine: undefined,
+              pairedWithOperator: undefined,
+              shiftStatus: undefined,
+              inTime: undefined,
+              notes: undefined,
+              status: 'ACTIVE'
+            }));
+
+            const wipedState = {
+              ...loadedState,
+              jobs: [],
+              packJobs: [],
+              logs: [],
+              scrapSales: [],
+              productionPlans: [],
+              maintenanceIncidents: [],
+              glueUsageLogs: [],
+              shiftHandovers: [],
+              motherReelInventory: [],
+              materialRequisitions: [],
+              customerComplaints: [],
+              machineReadyAlerts: [],
+              floorWorkers: cleanRoster
+            };
+
+            localStorage.setItem(wipeFlag, 'true');
+            setState(wipedState);
+            persistFactoryState(wipedState, loadedState).catch(() => {});
+          } else {
+            setState(loadedState);
+          }
         }
       })
       .catch((err) => {
@@ -829,6 +865,7 @@ export const App: React.FC = () => {
             state={state}
             onBackToHub={() => setCurrentView('HUB')}
             onSaveState={handleSaveState}
+            currentUser={currentUser}
           />
         )}
 
@@ -922,6 +959,7 @@ export const App: React.FC = () => {
             onBackToHub={() => setCurrentView('HUB')}
             onSaveState={handleSaveState}
             onNavigateToView={(view) => setCurrentView(view)}
+            currentUser={currentUser}
           />
         )}
             </div>
