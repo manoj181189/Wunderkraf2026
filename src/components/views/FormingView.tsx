@@ -19,6 +19,7 @@ interface FormingViewProps {
   onOpenHoldModal: (machineName: string) => void;
   onOpenAttendModal?: (machineName: string) => void;
   onNavigateToTraceability?: (query: string) => void;
+  currentUser?: { username: string; perms: string[] } | null;
 }
 
 export const FormingView: React.FC<FormingViewProps> = ({
@@ -27,10 +28,24 @@ export const FormingView: React.FC<FormingViewProps> = ({
   onSaveState,
   onOpenHoldModal,
   onOpenAttendModal,
-  onNavigateToTraceability
+  onNavigateToTraceability,
+  currentUser
 }) => {
   const { jobs, shiftConfig } = state;
-  const formWorkers = state.deptWorkers?.['Forming'] || DEPT_WORKERS['Forming'] || ['Operator'];
+  const formFloorWorkers = (state.floorWorkers || []).filter(w => w.department === 'Forming');
+  const formOperators = formFloorWorkers.filter(w => w.role === 'OPERATOR').map(w => w.name);
+  const formWorkers = formOperators.length > 0
+    ? formOperators
+    : (state.deptWorkers?.['Forming'] || DEPT_WORKERS['Forming'] || ['Operator']);
+
+  const currentSupervisor = currentUser?.username || 'forming_supervisor';
+
+  // Daily Production Log Sheet Manual Time/Date Overrides (For delayed supervisor entry)
+  const [logSheetStartTime, setLogSheetStartTime] = useState('');
+  const [logSheetStopTime, setLogSheetStopTime] = useState('');
+  const [logSheetDate, setLogSheetDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [showManualTimeOverride, setShowManualTimeOverride] = useState(false);
+  const [showManualStopTimeOverride, setShowManualStopTimeOverride] = useState(false);
 
   const [filterProduct, setFilterProduct] = useState<string>('');
   const [selectedMachine, setSelectedMachine] = useState('Forming-1');
@@ -244,7 +259,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return;
     }
 
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const effectiveStartTime = showManualTimeOverride && logSheetStartTime.trim() ? logSheetStartTime.trim() : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const effectiveDate = showManualTimeOverride && logSheetDate.trim() ? logSheetDate.trim() : new Date().toISOString().split('T')[0];
+    const nowTime = effectiveStartTime;
     const jobMetrics = getJobCuttingMetrics(job);
     let netCutPcsPerCrate = jobMetrics.netPcsPerCrate;
 
@@ -461,7 +478,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
         producedQty: 0,
         pcsPerCrate: netCutPcsPerCrate,
         worker: operatorName.trim().toUpperCase(),
-        user: 'form_user'
+        user: currentSupervisor,
+        supervisor: currentSupervisor
       };
       updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
@@ -472,7 +490,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
           runningBatches: [...modifiedCuttingBatches, newBatch]
         };
       });
-      logMessage = `Started Forming on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks Issued from ${selectedCuttingLotWorker ? `${selectedCuttingLotWorker}'s Cut Lot` : 'Cut Queue'} @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate) | Worker: ${operatorName.toUpperCase()}`;
+      logMessage = `Started Forming on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks Issued from ${selectedCuttingLotWorker ? `${selectedCuttingLotWorker}'s Cut Lot` : 'Cut Queue'} @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate) | Op: ${operatorName.toUpperCase()} | Sup: ${currentSupervisor}`;
       setSelectedActiveBatchId(batchId);
       alert(`✅ Forming Job ${job.id} Loaded on ${selectedMachine} (${cratesCount} Crates = ${issuedInputPieces.toLocaleString()} Net Blanks @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate)!`);
     }
@@ -485,9 +503,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
       shift,
       action: logMessage,
       worker: operatorName.toUpperCase(),
-      user: 'form_user',
+      user: currentSupervisor,
       startTime: nowTime,
-      rawDate: new Date().toISOString().split('T')[0],
+      rawDate: effectiveDate,
       timestamp: new Date().toLocaleString()
     };
 
@@ -504,6 +522,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
     setIssueCratesQty('');
     setSelectedPendingJobId('');
+    setLogSheetStartTime('');
+    setShowManualTimeOverride(false);
+    setShowManualStopTimeOverride(false);
   };
 
   const handleConfirmForwardToQC = () => {
@@ -1233,7 +1254,8 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
     const totalFormedPcs = Math.round(cratesDone * effectiveFormPcs) + looseDone;
     const finalScrapPcs = scrapPcsVal;
-    const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const effectiveStopTime = showManualStopTimeOverride && logSheetStopTime.trim() ? logSheetStopTime.trim() : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const stopTime = effectiveStopTime;
 
     let logAction = `⏹️ Finished Forming Batch ${batch.batchId} (${cratesDone} Crates = ${(totalFormedPcs ?? 0).toLocaleString()} 3D Pieces)`;
     if (unusedCrates > 0) {
@@ -1254,7 +1276,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
       shift: batch.shift,
       action: logAction,
       worker: batch.worker,
-      user: 'form_user',
+      user: currentSupervisor,
       startTime: batch.startTime,
       endTime: stopTime,
       rawDate: new Date().toISOString().split('T')[0],
@@ -1279,6 +1301,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
     setPcsPerCrateOverride('');
     setScrapPcs('0');
     setScrapKg('0');
+    setLogSheetStopTime('');
+    setShowManualTimeOverride(false);
+    setShowManualStopTimeOverride(false);
     setSelectedActiveBatchId('');
   };
 
@@ -1924,6 +1949,48 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 </div>
               </div>
 
+              {/* Optional: Log Sheet Completion Stop Time */}
+              <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-2.5 text-xs space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={showManualStopTimeOverride}
+                    onChange={(e) => setShowManualStopTimeOverride(e.target.checked)}
+                    className="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
+                  />
+                  <span className="text-[11px] font-extrabold text-amber-950 flex items-center gap-1.5">
+                    <span>📋</span>
+                    <span>लॉग शीट से वास्तविक समाप्ति समय भरें (Backdated Stop Time Mode)</span>
+                  </span>
+                </label>
+
+                {showManualStopTimeOverride && (
+                  <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-amber-200/50">
+                    <div className="text-[10px] text-amber-800 font-bold">
+                      Enter Stop Time (e.g. 01:15 PM):
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={logSheetStopTime}
+                        onChange={(e) => setLogSheetStopTime(e.target.value)}
+                        placeholder={`Current (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
+                        className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none w-36 uppercase focus:border-amber-500"
+                      />
+                      {logSheetStopTime && (
+                        <button
+                          type="button"
+                          onClick={() => setLogSheetStopTime('')}
+                          className="text-[10px] text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1">
                 <button
                   type="button"
@@ -2012,10 +2079,16 @@ export const FormingView: React.FC<FormingViewProps> = ({
       {/* START / ISSUE CUT CRATES TO WORKSTATION FORM */}
       {/* ======================================================== */}
       <div className="border-t border-slate-200 pt-4">
-        <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-          <Play className="w-4 h-4 text-indigo-600" />
-          Start or Top-up Forming Run on [{selectedMachine}]:
-        </h4>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-1.5 m-0">
+            <Play className="w-4 h-4 text-indigo-600" />
+            Start or Top-up Forming Run on [{selectedMachine}]:
+          </h4>
+          <span className="text-[11px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+            <span>🛡️ Supervisor on Duty:</span>
+            <span className="font-mono text-indigo-950 font-black">{currentSupervisor}</span>
+          </span>
+        </div>
 
         <form onSubmit={handleStartOrTopup} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2343,6 +2416,46 @@ export const FormingView: React.FC<FormingViewProps> = ({
               placeholder="Enter Crates Quantity"
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
             />
+          </div>
+
+          {/* Optional: Daily Log Sheet Start Time & Date Override */}
+          <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-2.5 text-xs space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showManualTimeOverride}
+                onChange={(e) => setShowManualTimeOverride(e.target.checked)}
+                className="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
+              />
+              <span className="text-[11px] font-extrabold text-amber-950 flex items-center gap-1.5">
+                <span>📋</span>
+                <span>लॉग शीट से पुरानी एंट्री भरें (Backdated Log Sheet Mode)</span>
+              </span>
+            </label>
+
+            {showManualTimeOverride && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-amber-200/50">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-700 uppercase block mb-0.5">Machine Start Time (e.g. 10:30 AM):</label>
+                  <input
+                    type="text"
+                    value={logSheetStartTime}
+                    onChange={(e) => setLogSheetStartTime(e.target.value)}
+                    placeholder={`Default: Current Time (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-amber-500 uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-700 uppercase block mb-0.5">Log Date (तारीख):</label>
+                  <input
+                    type="date"
+                    value={logSheetDate}
+                    onChange={(e) => setLogSheetDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <button

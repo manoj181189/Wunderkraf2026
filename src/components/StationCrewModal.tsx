@@ -41,15 +41,21 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter available helpers from floor roster or matching department
-  const helperPool = allWorkers
-    .filter((w) => w.role === 'HELPER')
+  // Filter available helpers matching this machine's stage / department first
+  const deptHelpers = allWorkers
+    .filter((w) => w.role === 'HELPER' && (!stage || w.department?.toLowerCase() === stage.toLowerCase()))
     .map((w) => w.name);
+  const helperPool = deptHelpers.length > 0
+    ? deptHelpers
+    : allWorkers.filter((w) => w.role === 'HELPER').map((w) => w.name);
 
-  // Filter available operators
-  const operatorPool = allWorkers
-    .filter((w) => w.role === 'OPERATOR')
+  // Filter available operators matching this machine's stage / department first
+  const deptOperators = allWorkers
+    .filter((w) => w.role === 'OPERATOR' && (!stage || w.department?.toLowerCase() === stage.toLowerCase()))
     .map((w) => w.name);
+  const operatorPool = deptOperators.length > 0
+    ? deptOperators
+    : allWorkers.filter((w) => w.role === 'OPERATOR').map((w) => w.name);
 
   const toggleHelper = (name: string) => {
     if (selectedHelpers.includes(name)) {
@@ -136,7 +142,7 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
                 <Users className="w-4 h-4 text-indigo-600" />
-                <span>Assigned Helpers on this Machine</span>
+                <span>Assigned Helpers on this Machine ({stage || 'Department'})</span>
               </label>
               <span className="text-[11px] font-extrabold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
                 {selectedHelpers.length} Helper{selectedHelpers.length !== 1 ? 's' : ''} Selected

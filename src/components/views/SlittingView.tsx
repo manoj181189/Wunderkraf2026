@@ -41,6 +41,7 @@ interface SlittingViewProps {
   onOpenVoiceModalForTarget?: (callback: (text: string) => void) => void;
   onNavigateToTraceability?: (query: string) => void;
   preSelectedPlanId?: string;
+  currentUser?: { username: string; perms: string[] } | null;
 }
 
 export const SlittingView: React.FC<SlittingViewProps> = ({
@@ -51,12 +52,26 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
   onOpenAttendModal,
   onOpenVoiceModalForTarget,
   onNavigateToTraceability,
-  preSelectedPlanId
+  preSelectedPlanId,
+  currentUser
 }) => {
   const { jobs, seriesConfig, shiftConfig, productionPlans = [], motherReelInventory = [] } = state;
   const productList = state.products && state.products.length > 0 ? state.products : PRODUCTS;
   const paperBrandList = state.paperBrands && state.paperBrands.length > 0 ? state.paperBrands : PAPER_BRANDS;
-  const slitWorkers = state.deptWorkers?.['Slitting'] || DEPT_WORKERS['Slitting'] || ['SLIT_RAMESH', 'SLIT_SURESH'];
+  const slitFloorWorkers = (state.floorWorkers || []).filter(w => w.department === 'Slitting');
+  const slitOperators = slitFloorWorkers.filter(w => w.role === 'OPERATOR').map(w => w.name);
+  const slitWorkers = slitOperators.length > 0
+    ? slitOperators
+    : (state.deptWorkers?.['Slitting'] || DEPT_WORKERS['Slitting'] || ['SLIT_RAMESH', 'SLIT_SURESH']);
+
+  const currentSupervisor = currentUser?.username || 'slit_supervisor';
+
+  // Daily Production Log Sheet Manual Time/Date Overrides (For delayed supervisor entry)
+  const [logSheetStartTime, setLogSheetStartTime] = useState('');
+  const [logSheetStopTime, setLogSheetStopTime] = useState('');
+  const [logSheetDate, setLogSheetDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [showManualTimeOverride, setShowManualTimeOverride] = useState(false);
+  const [showManualStopTimeOverride, setShowManualStopTimeOverride] = useState(false);
 
   // Planning & Mother Reel Link
   const [selectedPlanId, setSelectedPlanId] = useState<string>(preSelectedPlanId || '');
@@ -383,7 +398,9 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     }
 
     const batchId = generateSlittingBatchId(newJobId, [], master);
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const effectiveStartTime = showManualTimeOverride && logSheetStartTime.trim() ? logSheetStartTime.trim() : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const effectiveDate = showManualTimeOverride && logSheetDate.trim() ? logSheetDate.trim() : new Date().toISOString().split('T')[0];
+    const nowTime = effectiveStartTime;
 
     // Effective GSM dynamically bound from selected PPC plan or target master
     const effectiveGsm = gsm === 'Custom'
@@ -416,7 +433,8 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       scrapKg: 0,
       scrapPercent: 0,
       worker: operatorName.trim().toUpperCase(),
-      user: 'slit_user',
+      user: currentSupervisor,
+      supervisor: currentSupervisor,
       isHotFoilLayer: isHotFoilLayer || undefined,
       isPrintedRoll: isPrintedRoll || undefined,
       printedRollDesign: isPrintedRoll ? printedRollDesign : undefined,
@@ -481,9 +499,9 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
         ? `🚀 Started Specialty Hot Foil / Hot Layer Reel [${effectiveReelNo}] | Weight: ${parsedJumboWeight} KG | Job: ${newJobId} | Worker: ${operatorName.toUpperCase()}`
         : `🚀 Started New Slitting Reel [${effectiveReelNo}] | Jumbo Weight: ${parsedJumboWeight} KG | GSM: ${effectiveGsm} | Mill: ${paperBrand} (${reelRemarks || 'Standard Reel'}) | Job: ${newJobId} | Worker: ${operatorName.toUpperCase()}` + (selectedPlanId ? ` | Linked Plan: ${selectedPlanId}` : ''),
       worker: operatorName.toUpperCase(),
-      user: 'slit_user',
+      user: currentSupervisor,
       startTime: nowTime,
-      rawDate: new Date().toISOString().split('T')[0],
+      rawDate: effectiveDate,
       timestamp: new Date().toLocaleString()
     };
 
@@ -543,6 +561,9 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     setSelectedPlanId('');
     setSelectedMotherReelId('');
     setIsHotFoilLayer(false);
+    setLogSheetStartTime('');
+    setShowManualTimeOverride(false);
+    setShowManualStopTimeOverride(false);
     setSelectedActiveBatchId(batchId);
     alert(`✅ New Slitting Reel Started!\nJob ID: [${newJobId}]\nReel No: [${effectiveReelNo}]\nGSM: [${effectiveGsm}]\non ${selectedMachine}.`);
   };
@@ -987,7 +1008,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       return;
     }
 
-    const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const effectiveStopTime = showManualStopTimeOverride && logSheetStopTime.trim() ? logSheetStopTime.trim() : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const stopTime = effectiveStopTime;
     const finalScrapPercent = inputWeight > 0 ? Number(((finalScrapKg / inputWeight) * 100).toFixed(2)) : 0;
 
     const updatedJobs = jobs.map((j) => {
@@ -1068,7 +1090,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       shift: batch.shift,
       action: `⏹ Slitting Finished (${rollsCount} Rolls, ${weightKg} KG Output | Jumbo In: ${inputWeight} KG | Scrap: ${finalScrapKg} KG (${finalScrapPercent}% Wastage))`,
       worker: batch.worker,
-      user: 'slit_user',
+      user: currentSupervisor,
       startTime: batch.startTime,
       endTime: stopTime,
       rawDate: new Date().toISOString().split('T')[0],
@@ -1124,6 +1146,9 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     setActualSlitLengthMeters('');
     setIsLengthWarningModalOpen(false);
     setIsExceedOutputModalOpen(false);
+    setLogSheetStopTime('');
+    setShowManualTimeOverride(false);
+    setShowManualStopTimeOverride(false);
     setSelectedActiveBatchId('');
     alert(`✅ Slitting Finished!\n• Output: ${rollsCount} Rolls (${weightKg} KG)\n• Jumbo Loaded: ${inputWeight} KG\n• Scrap Wastage: ${finalScrapKg} KG (${finalScrapPercent}%)\nLogged to Total Traceability and Inventory!`);
   };
@@ -1574,6 +1599,48 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 </div>
               )}
 
+              {/* Optional: Log Sheet Completion Stop Time */}
+              <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-2.5 text-xs space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={showManualStopTimeOverride}
+                    onChange={(e) => setShowManualStopTimeOverride(e.target.checked)}
+                    className="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
+                  />
+                  <span className="text-[11px] font-extrabold text-amber-950 flex items-center gap-1.5">
+                    <span>📋</span>
+                    <span>लॉग शीट से वास्तविक समाप्ति समय भरें (Backdated Stop Time Mode)</span>
+                  </span>
+                </label>
+
+                {showManualStopTimeOverride && (
+                  <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-amber-200/50">
+                    <div className="text-[10px] text-amber-800 font-bold">
+                      Enter Stop Time (e.g. 01:15 PM):
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={logSheetStopTime}
+                        onChange={(e) => setLogSheetStopTime(e.target.value)}
+                        placeholder={`Current (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
+                        className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none w-36 uppercase focus:border-amber-500"
+                      />
+                      {logSheetStopTime && (
+                        <button
+                          type="button"
+                          onClick={() => setLogSheetStopTime('')}
+                          className="text-[10px] text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 <button
                   type="button"
@@ -2007,9 +2074,14 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <label className="block text-xs font-bold text-slate-700 uppercase">
-              Operator & Crew <span className="text-rose-600">*</span>:
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-700 uppercase">
+                Operator & Crew <span className="text-rose-600">*</span>:
+              </label>
+              <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-md">
+                🛡️ Supervisor: <b>{currentSupervisor}</b>
+              </span>
+            </div>
             <div className="flex items-center justify-between bg-white border border-slate-300 px-3 py-2 rounded-lg">
               <div className="flex flex-col">
                 <span className="font-bold text-slate-800">{operatorName || 'Select Operator'}</span>
@@ -2181,6 +2253,46 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
             />
           </div>
+        </div>
+
+        {/* Optional: Daily Log Sheet Start Time & Date Override */}
+        <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-2.5 text-xs space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showManualTimeOverride}
+              onChange={(e) => setShowManualTimeOverride(e.target.checked)}
+              className="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
+            />
+            <span className="text-[11px] font-extrabold text-amber-950 flex items-center gap-1.5">
+              <span>📋</span>
+              <span>लॉग शीट से पुरानी एंट्री भरें (Backdated Log Sheet Mode)</span>
+            </span>
+          </label>
+
+          {showManualTimeOverride && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-amber-200/50">
+              <div>
+                <label className="text-[10px] font-bold text-slate-700 uppercase block mb-0.5">Machine Start Time (e.g. 10:30 AM):</label>
+                <input
+                  type="text"
+                  value={logSheetStartTime}
+                  onChange={(e) => setLogSheetStartTime(e.target.value)}
+                  placeholder={`Default: Current Time (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-amber-500 uppercase"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-700 uppercase block mb-0.5">Log Date (तारीख):</label>
+                <input
+                  type="date"
+                  value={logSheetDate}
+                  onChange={(e) => setLogSheetDate(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">

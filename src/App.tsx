@@ -781,6 +781,7 @@ export const App: React.FC = () => {
               setAuditSearchQuery(q);
               setCurrentView('AUDIT');
             }}
+            currentUser={currentUser}
           />
         )}
 
@@ -794,6 +795,7 @@ export const App: React.FC = () => {
               setAuditSearchQuery(q);
               setCurrentView('AUDIT');
             }}
+            currentUser={currentUser}
           />
         )}
 
@@ -807,6 +809,7 @@ export const App: React.FC = () => {
               setAuditSearchQuery(q);
               setCurrentView('AUDIT');
             }}
+            currentUser={currentUser}
           />
         )}
 
@@ -820,6 +823,7 @@ export const App: React.FC = () => {
               setAuditSearchQuery(q);
               setCurrentView('AUDIT');
             }}
+            currentUser={currentUser}
           />
         )}
 
@@ -830,6 +834,7 @@ export const App: React.FC = () => {
             onSaveState={handleSaveState}
             onOpenHoldModal={(m) => setHoldModalStation(m)}
             onOpenOrderSpecModal={(ordId) => setOrderSpecId(ordId)}
+            currentUser={currentUser}
           />
         )}
 

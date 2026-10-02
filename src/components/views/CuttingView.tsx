@@ -21,6 +21,7 @@ interface CuttingViewProps {
   onOpenHoldModal: (machineName: string) => void;
   onOpenAttendModal?: (machineName: string) => void;
   onNavigateToTraceability?: (query: string) => void;
+  currentUser?: { username: string; perms: string[] } | null;
 }
 
 const DEFAULT_PCS_PER_KG_MAP: Record<string, number> = {
@@ -37,10 +38,17 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
   onSaveState,
   onOpenHoldModal,
   onOpenAttendModal,
-  onNavigateToTraceability
+  onNavigateToTraceability,
+  currentUser
 }) => {
   const { jobs, shiftConfig } = state;
-  const cutWorkers = state.deptWorkers?.['Cutting'] || DEPT_WORKERS['Cutting'] || ['Operator'];
+  const cutFloorWorkers = (state.floorWorkers || []).filter(w => w.department === 'Cutting');
+  const cutOperators = cutFloorWorkers.filter(w => w.role === 'OPERATOR').map(w => w.name);
+  const cutWorkers = cutOperators.length > 0
+    ? cutOperators
+    : (state.deptWorkers?.['Cutting'] || DEPT_WORKERS['Cutting'] || ['Operator']);
+
+  const currentSupervisor = currentUser?.username || 'cut_supervisor';
 
   const [filterProduct, setFilterProduct] = useState<string>('');
   const [selectedMachine, setSelectedMachine] = useState('Cutting-1');
@@ -58,6 +66,14 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
   const [pcsPerKgInput, setPcsPerKgInput] = useState<string>('');
   const [rejectedPcsInput, setRejectedPcsInput] = useState<string>('');
   const [selectedActiveBatchId, setSelectedActiveBatchId] = useState('');
+
+  // Daily Production Log Sheet Manual Time/Date Overrides (For delayed supervisor entry)
+  const [logSheetStartTime, setLogSheetStartTime] = useState('');
+  const [logSheetStopTime, setLogSheetStopTime] = useState('');
+  const [logSheetDate, setLogSheetDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [showManualTimeOverride, setShowManualTimeOverride] = useState(false);
+  const [showManualStopTimeOverride, setShowManualStopTimeOverride] = useState(false);
+
   const [tableSearch, setTableSearch] = useState('');
   const [sortColumn, setSortColumn] = useState<string>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -608,7 +624,9 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       return;
     }
 
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const effectiveStartTime = showManualTimeOverride && logSheetStartTime.trim() ? logSheetStartTime.trim() : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const effectiveDate = showManualTimeOverride && logSheetDate.trim() ? logSheetDate.trim() : new Date().toISOString().split('T')[0];
+    const nowTime = effectiveStartTime;
 
     let updatedJobs: Job[] = [];
     let logMessage = '';
@@ -658,7 +676,8 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         worker: operatorName.trim().toUpperCase(),
         helpers: assignedHelpers,
         helperCount: assignedHelpers.length,
-        user: 'cut_user'
+        user: currentSupervisor,
+        supervisor: currentSupervisor
       };
 
       updatedJobs = jobs.map((j) => {
@@ -677,7 +696,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         return updatedJ;
       });
 
-      logMessage = `Started Cutting on ${selectedMachine} (${rollsCount} Rolls Issued) | Worker: ${operatorName.toUpperCase()}`;
+      logMessage = `Started Cutting on ${selectedMachine} (${rollsCount} Rolls Issued) | Op: ${operatorName.toUpperCase()} | Sup: ${currentSupervisor}`;
       setSelectedActiveBatchId(batchId);
       alert(`✅ Cutting Job ${job.id} Loaded on ${selectedMachine} (${rollsCount} Rolls)!`);
     }
@@ -690,9 +709,9 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       shift,
       action: logMessage,
       worker: operatorName.toUpperCase(),
-      user: 'cut_user',
+      user: currentSupervisor,
       startTime: nowTime,
-      rawDate: new Date().toISOString().split('T')[0],
+      rawDate: effectiveDate,
       timestamp: new Date().toLocaleString()
     };
 
@@ -708,6 +727,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
 
     setIssueRollsQty('');
     setSelectedPendingJobId('');
+    setLogSheetStartTime('');
   };
 
   const handleConfirmForwardPartial = () => {
@@ -1238,7 +1258,8 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         return;
       }
 
-      const stopTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const effectiveStopTime = showManualStopTimeOverride && logSheetStopTime.trim() ? logSheetStopTime.trim() : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const stopTime = effectiveStopTime;
       const brandToDeduct = job.targetGlueBrand || 'Pidilite W-10 (Food Grade Adhesive)';
 
       const updatedJobs = jobs.map((j) => {
@@ -1376,7 +1397,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
         shift: batch.shift,
         action: `⏹️ Finished Cutting Batch ${batch.batchId} (${cratesDone} Crates + ${looseDone} Loose = ${grossCutPcs.toLocaleString()} Gross - ${rejectedPcsVal.toLocaleString()} Rejected Pcs = ${totalCutPcs.toLocaleString()} Net Passed Cut Blanks | Extra Paper Scrap: ${materialScrapKgVal} KG [Added separately to scrap, not minus from pieces])${finalBatchGlueKg > 0 ? ` | Adhesive Glue: ${finalBatchGlueKg} KG of ${brandToDeduct}${glueDeductedMsg}` : ''}`,
         worker: batch.worker,
-        user: 'cut_user',
+        user: currentSupervisor,
         startTime: batch.startTime,
         endTime: stopTime,
         rawDate: dateStr,
@@ -1401,6 +1422,9 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       setActualGlueConsumed('');
       setGlueIssueInput('');
       setGlueSuccessMsg('');
+      setLogSheetStopTime('');
+      setShowManualTimeOverride(false);
+      setShowManualStopTimeOverride(false);
       setSelectedActiveBatchId('');
       alert(`✅ Cutting Run Finished!\nMain Counter: ${totalCutPcs.toLocaleString()} Net Flat Blanks (${cratesDone} Crates + ${looseDone} Loose - ${rejectedPcsVal.toLocaleString()} Rejected Pcs). Added to inventory.${finalBatchGlueKg > 0 ? `\n• Total Glue Consumed: ${finalBatchGlueKg} KG of ${brandToDeduct} recorded.` : ''}`);
     } catch (err: any) {
@@ -2567,6 +2591,48 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 </div>
               </div>
 
+              {/* Optional: Log Sheet Completion Stop Time */}
+              <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-2.5 text-xs space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={showManualStopTimeOverride}
+                    onChange={(e) => setShowManualStopTimeOverride(e.target.checked)}
+                    className="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
+                  />
+                  <span className="text-[11px] font-extrabold text-amber-950 flex items-center gap-1.5">
+                    <span>📋</span>
+                    <span>लॉग शीट से वास्तविक समाप्ति समय भरें (Backdated Stop Time Mode)</span>
+                  </span>
+                </label>
+
+                {showManualStopTimeOverride && (
+                  <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-amber-200/50">
+                    <div className="text-[10px] text-amber-800 font-bold">
+                      Enter Stop Time (e.g. 01:15 PM):
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={logSheetStopTime}
+                        onChange={(e) => setLogSheetStopTime(e.target.value)}
+                        placeholder={`Current (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
+                        className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none w-36 uppercase focus:border-amber-500"
+                      />
+                      {logSheetStopTime && (
+                        <button
+                          type="button"
+                          onClick={() => setLogSheetStopTime('')}
+                          className="text-[10px] text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Action Buttons */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-1">
                 <button
@@ -2657,10 +2723,16 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       {/* START / ISSUE SLIT ROLLS TO WORKSTATION FORM */}
       {/* ======================================================== */}
       <div className="border-t border-slate-200 pt-4">
-        <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-          <Play className="w-4 h-4 text-blue-600" />
-          Start or Top-up Cutting Run on [{selectedMachine}]:
-        </h4>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-1.5 m-0">
+            <Play className="w-4 h-4 text-blue-600" />
+            Start or Top-up Cutting Run on [{selectedMachine}]:
+          </h4>
+          <span className="text-[11px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+            <span>🛡️ Supervisor on Duty:</span>
+            <span className="font-mono text-indigo-950 font-black">{currentSupervisor}</span>
+          </span>
+        </div>
 
         <form onSubmit={handleStartRun} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2678,7 +2750,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 required
               />
               <datalist id="cutWorkerList">
-                {(state.floorWorkers || []).map(w => w.name).map((w) => (
+                {cutWorkers.map((w) => (
                   <option key={w} value={w} />
                 ))}
               </datalist>
@@ -2994,6 +3066,46 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
               placeholder="Enter Rolls Quantity"
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
             />
+          </div>
+
+          {/* Optional: Daily Log Sheet Start Time & Date Override */}
+          <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-2.5 text-xs space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showManualTimeOverride}
+                onChange={(e) => setShowManualTimeOverride(e.target.checked)}
+                className="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
+              />
+              <span className="text-[11px] font-extrabold text-amber-950 flex items-center gap-1.5">
+                <span>📋</span>
+                <span>लॉग शीट से पुरानी एंट्री भरें (Backdated Log Sheet Mode)</span>
+              </span>
+            </label>
+
+            {showManualTimeOverride && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-amber-200/50">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-700 uppercase block mb-0.5">Machine Start Time (e.g. 10:30 AM):</label>
+                  <input
+                    type="text"
+                    value={logSheetStartTime}
+                    onChange={(e) => setLogSheetStartTime(e.target.value)}
+                    placeholder={`Default: Current Time (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-amber-500 uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-700 uppercase block mb-0.5">Log Date (तारीख):</label>
+                  <input
+                    type="date"
+                    value={logSheetDate}
+                    onChange={(e) => setLogSheetDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <button

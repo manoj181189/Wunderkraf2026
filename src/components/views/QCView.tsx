@@ -14,6 +14,7 @@ interface QCViewProps {
   onOpenHoldModal: (machineName: string) => void;
 
   onNavigateToTraceability?: (query: string) => void;
+  currentUser?: { username: string; perms: string[] } | null;
 }
 
 export const QCView: React.FC<QCViewProps> = ({
@@ -21,10 +22,17 @@ export const QCView: React.FC<QCViewProps> = ({
   onBackToHub,
   onSaveState,
   onOpenHoldModal,
-  onNavigateToTraceability
+  onNavigateToTraceability,
+  currentUser
 }) => {
   const { jobs, shiftConfig } = state;
-  const qcWorkers = state.deptWorkers?.['QC'] || DEPT_WORKERS['QC'] || ['QC_RAMESH', 'QC_DINESH', 'QC_ANIL'];
+  const qcFloorWorkers = (state.floorWorkers || []).filter(w => w.department === 'QC');
+  const qcInspectors = qcFloorWorkers.map(w => w.name);
+  const qcWorkers = qcInspectors.length > 0
+    ? qcInspectors
+    : (state.deptWorkers?.['QC'] || DEPT_WORKERS['QC'] || ['QC_RAMESH', 'QC_DINESH', 'QC_ANIL']);
+
+  const currentSupervisor = currentUser?.username || 'qc_supervisor';
 
   const [filterProduct, setFilterProduct] = useState<string>('');
   const [shift, setShift] = useState<'DAY' | 'NIGHT'>(() => getCurrentExpectedShift(shiftConfig));
@@ -1686,7 +1694,7 @@ export const QCView: React.FC<QCViewProps> = ({
                     required
                   />
                   <datalist id="qcWorkerList">
-                    {(state.floorWorkers || []).map(w => w.name).map((w) => (
+                    {qcWorkers.map((w) => (
                       <option key={w} value={w} />
                     ))}
                   </datalist>

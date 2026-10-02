@@ -464,7 +464,76 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
         </div>
       </div>
 
-      {/* 2. Station Allocation Grid - Showing Operator + Helper attribution */}
+      {/* 2. Department-wise Manpower & Deployment Matrix */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide m-0 flex items-center gap-1.5">
+              <span>🏢 Department-wise Deployment (डिपार्टमेंट-वाइज़ स्थिति)</span>
+            </h4>
+            <p className="text-xs text-slate-500 mt-0.5 m-0">
+              Roster count, active workers on running machines, and free available workforce per department (Click to filter)
+            </p>
+          </div>
+          {selectedDeptFilter !== 'ALL' && (
+            <button
+              onClick={() => setSelectedDeptFilter('ALL')}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg cursor-pointer transition"
+            >
+              Clear Filter ({selectedDeptFilter}) ✕
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {[
+            { name: 'Slitting', icon: '🌀' },
+            { name: 'Cutting', icon: '✂️' },
+            { name: 'Forming', icon: '🏗️' },
+            { name: 'QC', icon: '🔬' },
+            { name: 'Packing', icon: '📦' },
+            { name: 'Maintenance', icon: '🔧' }
+          ].map((d) => {
+            const deptWorkersList = workers.filter((w) => w.department?.toLowerCase() === d.name.toLowerCase());
+            const activeList = deptWorkersList.filter((w) => activeWorkerNames.has(w.name));
+            const freeCount = Math.max(0, deptWorkersList.length - activeList.length);
+            const isSelected = selectedDeptFilter.toLowerCase() === d.name.toLowerCase();
+
+            return (
+              <div
+                key={d.name}
+                onClick={() => setSelectedDeptFilter(isSelected ? 'ALL' : d.name)}
+                className={`p-3 rounded-xl border transition cursor-pointer text-left ${
+                  isSelected
+                    ? 'border-indigo-600 bg-indigo-50/80 shadow-xs ring-2 ring-indigo-300'
+                    : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100/90'
+                }`}
+                title={`Click to filter table by ${d.name}`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1">
+                    <span>{d.icon}</span>
+                    <span>{d.name}</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-700">
+                    {deptWorkersList.length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-bold mt-1">
+                  <span className="text-emerald-700 flex items-center gap-0.5">
+                    <span className="text-[8px]">🟢</span> {activeList.length} Active
+                  </span>
+                  <span className="text-amber-800 flex items-center gap-0.5">
+                    <span className="text-[8px]">🟡</span> {freeCount} Free
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Station Allocation Grid - Showing Operator + Helper attribution */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>

@@ -40,6 +40,7 @@ interface PackingViewProps {
   onOpenHoldModal: (machineName: string) => void;
   onOpenOrderSpecModal: (orderId: string) => void;
   onOpenAttendModal?: (machineName: string) => void;
+  currentUser?: { username: string; perms: string[] } | null;
 }
 
 export const PackingView: React.FC<PackingViewProps> = ({
@@ -48,13 +49,20 @@ export const PackingView: React.FC<PackingViewProps> = ({
   onSaveState,
   onOpenHoldModal,
   onOpenOrderSpecModal,
-  onOpenAttendModal
+  onOpenAttendModal,
+  currentUser
 }) => {
   const { packJobs, jobs, shiftConfig } = state;
 
+  const packFloorWorkers = (state.floorWorkers || []).filter(w => w.department === 'Packing');
+  const packWorkers = packFloorWorkers.length > 0
+    ? packFloorWorkers.map(w => w.name)
+    : (state.deptWorkers?.['Packing'] || ['Operator']);
+  const currentSupervisor = currentUser?.username || 'pack_supervisor';
+
   const [selectedMachine, setSelectedMachine] = useState('Packing-1');
   const [shift, setShift] = useState<'DAY' | 'NIGHT'>(() => getCurrentExpectedShift(shiftConfig));
-  const [packerName, setPackerName] = useState((state.floorWorkers || []).filter(w => w.department === 'Packing')[0]?.name || 'Operator');
+  const [packerName, setPackerName] = useState(packWorkers[0] || 'Operator');
   const [selectedHelpers, setSelectedHelpers] = useState<string[]>([]);
   const [helperInput, setHelperInput] = useState('');
   const [filterCust, setFilterCust] = useState('');
@@ -1426,7 +1434,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
                     className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold outline-none"
                   />
                   <datalist id="crewHelperList">
-                    {(state.floorWorkers || [])
+                    {packFloorWorkers
                       .filter(w => w.name !== activeJob.worker && !(activeJob.helpers || []).includes(w.name))
                       .map(w => (
                         <option key={w.name} value={w.name} />
@@ -1630,8 +1638,8 @@ export const PackingView: React.FC<PackingViewProps> = ({
                 required
               />
               <datalist id="packWorkerList">
-                { (state.floorWorkers || []).map((w) => (
-                  <option key={w.name} value={w.name} />
+                {packWorkers.map((w) => (
+                  <option key={w} value={w} />
                 ))}
               </datalist>
             </div>
