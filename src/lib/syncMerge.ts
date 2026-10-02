@@ -41,6 +41,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   const deletedLogIds = Array.from(new Set([...(base.deletedLogIds || []), ...(incoming.deletedLogIds || [])]));
   const deletedPlanIds = Array.from(new Set([...(base.deletedPlanIds || []), ...(incoming.deletedPlanIds || [])]));
   const deletedWorkerIds = Array.from(new Set([...(base.deletedWorkerIds || []), ...(incoming.deletedWorkerIds || [])]));
+  const deletedHandoverIds = Array.from(new Set([...(base.deletedHandoverIds || []), ...(incoming.deletedHandoverIds || [])]));
 
   // 1. Merge Production Jobs
   const jobMap = new Map<string, Job>();
@@ -189,12 +190,23 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
 
   // 4. Merge Audit Logs
   const logMap = new Map<string, LogEntry>();
-  const makeLogKey = (l: LogEntry) => `${l.jobId || ''}_${l.timestamp}_${l.action}_${l.stage}_${l.machine}`;
+  const makeLogKey = (l: LogEntry) => `${l.jobId || ''}_${l.timestamp || ''}_${l.action || ''}_${l.stage || ''}_${l.machine || ''}`;
+  const deletedLogKeys = new Set(deletedLogIds);
   (base.logs || []).forEach((l) => {
-    if (l) logMap.set(makeLogKey(l), l);
+    if (l) {
+      const key = makeLogKey(l);
+      if (!deletedLogKeys.has(key)) {
+        logMap.set(key, l);
+      }
+    }
   });
   (incoming.logs || []).forEach((l) => {
-    if (l) logMap.set(makeLogKey(l), l);
+    if (l) {
+      const key = makeLogKey(l);
+      if (!deletedLogKeys.has(key)) {
+        logMap.set(key, l);
+      }
+    }
   });
   const mergedLogs = Array.from(logMap.values()).sort((a, b) => {
     const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
@@ -222,13 +234,18 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
 
   // 7. Merge Shift Handovers
   const handoverMap = new Map<string, ShiftHandoverRecord>();
+  const deletedHandoverIdsSet = new Set(deletedHandoverIds);
   (base.shiftHandovers || []).forEach((h) => {
-    const key = h.id || `${h.department}_${h.currentShift}_${h.date}`;
-    handoverMap.set(key, { ...h });
+    if (h && h.id && !deletedHandoverIdsSet.has(h.id)) {
+      const key = h.id || `${h.department}_${h.currentShift}_${h.date}`;
+      handoverMap.set(key, { ...h });
+    }
   });
   (incoming.shiftHandovers || []).forEach((h) => {
-    const key = h.id || `${h.department}_${h.currentShift}_${h.date}`;
-    handoverMap.set(key, { ...(handoverMap.get(key) || {}), ...h });
+    if (h && h.id && !deletedHandoverIdsSet.has(h.id)) {
+      const key = h.id || `${h.department}_${h.currentShift}_${h.date}`;
+      handoverMap.set(key, { ...(handoverMap.get(key) || {}), ...h });
+    }
   });
 
   // 8. Merge Maintenance Incidents
@@ -356,6 +373,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       return combinedUsers;
     })(),
     deletedWorkerIds,
+    deletedHandoverIds,
     floorWorkers: (() => {
       const map = new Map();
       (base.floorWorkers || []).forEach(w => {

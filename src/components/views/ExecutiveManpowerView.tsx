@@ -44,14 +44,35 @@ export const ExecutiveManpowerView: React.FC<ExecutiveManpowerViewProps> = ({
   onNavigateToView,
   currentUser
 }) => {
+  // Dynamically extract currently working operator and helper names across all running operations
+  const activeWorkerNames = new Set<string>();
+
+  (state.jobs || []).forEach((job) => {
+    (job.runningBatches || []).forEach((b) => {
+      if (b.status === 'Running' || b.status === 'Held') {
+        if (b.worker) activeWorkerNames.add(b.worker);
+        if (b.helpers) {
+          b.helpers.forEach(h => activeWorkerNames.add(h));
+        }
+      }
+    });
+  });
+
+  (state.packJobs || []).forEach((pj) => {
+    if (pj.status === 'Running' || pj.status === 'Active') {
+      if (pj.packer) activeWorkerNames.add(pj.packer);
+      if (pj.helper) activeWorkerNames.add(pj.helper);
+    }
+  });
+
   const workers: FloorWorker[] =
     (state.floorWorkers !== undefined
       ? state.floorWorkers
       : DEFAULT_FLOOR_WORKERS).filter(w => w.status !== 'INACTIVE');
 
   const totalWorkers = workers.length;
-  const presentWorkers = workers.filter((w) => w.shiftStatus === 'PRESENT').length;
-  const onLeaveWorkers = workers.filter((w) => w.shiftStatus === 'ON_LEAVE').length;
+  const presentWorkers = activeWorkerNames.size; // Active
+  const onLeaveWorkers = Math.max(0, totalWorkers - presentWorkers); // Free
   const dayShiftWorkers = workers.filter((w) => w.shift === 'DAY').length;
   const nightShiftWorkers = workers.filter((w) => w.shift === 'NIGHT').length;
 
@@ -190,7 +211,7 @@ export const ExecutiveManpowerView: React.FC<ExecutiveManpowerViewProps> = ({
             </div>
             <div className="text-2xl font-black text-slate-900">{totalWorkers}</div>
             <div className="text-[11px] text-emerald-700 font-bold mt-1">
-              {presentWorkers} Present • {onLeaveWorkers} On Leave
+              {presentWorkers} Active (🟢 मशीन पर) • {onLeaveWorkers} Free (🟡 उपलब्ध)
             </div>
           </div>
 

@@ -87,6 +87,29 @@ export const NavigationHub: React.FC<NavigationHubProps> = ({
   const arrivedRequisitionsCount =
     state?.materialRequisitions?.filter((r) => r.status === 'RECEIVED' && !r.acknowledgedByRequester).length || 0;
 
+  // Dynamically extract currently working operator and helper names across all running operations
+  const activeWorkerNamesSet = new Set<string>();
+  if (state) {
+    (state.jobs || []).forEach((job) => {
+      (job.runningBatches || []).forEach((b) => {
+        if (b.status === 'Running' || b.status === 'Held') {
+          if (b.worker) activeWorkerNamesSet.add(b.worker);
+          if (b.helpers) {
+            b.helpers.forEach(h => activeWorkerNamesSet.add(h));
+          }
+        }
+      });
+    });
+
+    (state.packJobs || []).forEach((pj) => {
+      if (pj.status === 'Running' || pj.status === 'Active') {
+        if (pj.packer) activeWorkerNamesSet.add(pj.packer);
+        if (pj.helper) activeWorkerNamesSet.add(pj.helper);
+      }
+    });
+  }
+  const activeWorkforceCount = activeWorkerNamesSet.size;
+
   // Daily Factory Inspiration Poem State
   const DEFAULT_POEM = `With hard work and dedication, we give a new shape to every roll,
     We increase the factory\'s pride with exact measurements and pure quality.
@@ -456,8 +479,8 @@ export const NavigationHub: React.FC<NavigationHubProps> = ({
               <div>
                 <div className="text-xs font-bold text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
                   <span>Floor Manpower Tracker</span>
-                  <span className="bg-amber-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-extrabold">
-                    {state?.floorWorkers ? `${state.floorWorkers.filter((w) => w.isPresent).length} On Duty` : 'Live'}
+                  <span className="bg-amber-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-extrabold animate-pulse">
+                    {activeWorkforceCount} Active
                   </span>
                 </div>
                 <div className="text-xs text-amber-800 mt-0.5">

@@ -37,9 +37,37 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   compact = false,
   currentUser
 }) => {
-  const workers: FloorWorker[] = (state.floorWorkers !== undefined
+  // Dynamically extract currently working operator and helper names across all running operations
+  const activeWorkerNames = new Set<string>();
+
+  (state.jobs || []).forEach((job) => {
+    (job.runningBatches || []).forEach((b) => {
+      if (b.status === 'Running' || b.status === 'Held') {
+        if (b.worker) activeWorkerNames.add(b.worker);
+        if (b.helpers) {
+          b.helpers.forEach(h => activeWorkerNames.add(h));
+        }
+      }
+    });
+  });
+
+  // Also include Packers & Helpers from active packing jobs
+  (state.packJobs || []).forEach((pj) => {
+    if (pj.status === 'Running' || pj.status === 'Active') {
+      if (pj.packer) activeWorkerNames.add(pj.packer);
+      if (pj.helper) activeWorkerNames.add(pj.helper);
+    }
+  });
+
+  const rawWorkers: FloorWorker[] = (state.floorWorkers !== undefined
     ? state.floorWorkers
     : DEFAULT_FLOOR_WORKERS).filter(w => w.status !== 'INACTIVE');
+
+  // Roster mapped with dynamic active status
+  const workers: FloorWorker[] = rawWorkers.map(w => ({
+    ...w,
+    isPresent: activeWorkerNames.has(w.name)
+  }));
 
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('ALL');
@@ -64,12 +92,17 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   const [newWorkerPairedOp, setNewWorkerPairedOp] = useState('Operator');
 
   // Real-time calculation from workers list
-  const presentWorkers = workers.filter((w) => w.isPresent);
-  const totalFloorCount = presentWorkers.length;
+  const presentWorkers = workers.filter((w) => w.isPresent); // Active
+  const freeWorkers = workers.filter((w) => !w.isPresent); // Free
+  
+  const totalFloorCount = workers.length; // Total roster size
+  const activeCount = presentWorkers.length; // Active count
+  const freeCount = freeWorkers.length; // Free count
+
   const operatorCount = presentWorkers.filter((w) => w.role === 'OPERATOR').length;
   const helperCount = presentWorkers.filter((w) => w.role === 'HELPER').length;
-  const supervisorCount = presentWorkers.filter((w) => w.role === 'SUPERVISOR').length;
-  const maintenanceCount = presentWorkers.filter((w) => w.role === 'MAINTENANCE').length;
+  const supervisorCount = workers.filter((w) => w.role === 'SUPERVISOR').length;
+  const maintenanceCount = workers.filter((w) => w.role === 'MAINTENANCE').length;
   const qcCount = presentWorkers.filter((w) => w.role === 'QC_INSPECTOR').length;
 
   // Real-time Station Manpower Map (combining running batches and registered workers)
@@ -283,25 +316,25 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
 
   const generateWhatsAppAudit = () => {
     const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-    const dateStr = new Date().toISOString().split('T')[0];
-    let msg = `🏭 *SUNRISE PAPER PRODUCTS - LIVE FLOOR MANPOWER AUDIT*\n`;
+    const dateStr = new Date().toLocaleTimeString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    let msg = `📊 *WUNDERKRAF ERP: DAILY MANPOWER UTILIZATION REPORT* 📊\n`;
     msg += `📅 Date: ${dateStr} | ⏰ Time: ${timeStr}\n`;
     msg += `-------------------------------------------\n`;
-    msg += `👥 *TOTAL FLOOR WORKFORCE: ${totalFloorCount} MEN*\n`;
-    msg += `👨‍🔧 Operators: ${operatorCount}\n`;
-    msg += `🤝 Helpers: ${helperCount}\n`;
-    msg += `🔬 QC Inspectors: ${qcCount}\n`;
-    msg += `👔 Supervisors: ${supervisorCount}\n`;
-    msg += `🔧 Maintenance Engineers: ${maintenanceCount}\n`;
+    msg += `👥 *Total Plant Manpower:* ${totalFloorCount} Workers\n`;
+    msg += `🟢 *Active on Machines:* ${activeCount} Workers\n`;
+    msg += `🟡 *Free/Available:* ${freeCount} Workers\n`;
     msg += `-------------------------------------------\n`;
-    msg += `📍 *STATION ALLOCATION & OPERATOR-HELPER PAIRING:*\n`;
+    msg += `⚙️ *STATION-WISE LIVE DEPLOYMENT:*\n`;
 
     Object.values(stationMap).forEach((st) => {
       msg += `• *${st.machine}* [${st.dept}]:\n`;
-      msg += `  👨‍🔧 Operator: ${st.operator}\n`;
+      msg += `  👨‍🔧 Operator: ${st.operator} (🟢 Active)\n`;
       msg += `  🤝 Helpers (${st.helpers.length}): ${st.helpers.length > 0 ? st.helpers.join(', ') : 'None'}\n`;
-      if (st.jobId) msg += `  📦 Job: ${st.jobId} (${st.product || 'Standard'})\n`;
+      if (st.jobId) msg += `  📦 Active Job ID: ${st.jobId}\n`;
     });
+
+    msg += `-------------------------------------------\n`;
+    msg += `✓ *This report is 100% automatically generated from active running machines.*`;
 
     const encoded = encodeURIComponent(msg);
     window.open(`https://wa.me/?text=${encoded}`, '_blank');
@@ -367,21 +400,38 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
           </div>
         </div>
 
-        {/* 5 Distinct Live Counter Badges */}
+        {/* 6 Distinct Live Counter Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 pt-4 text-slate-800">
           {/* Total Floor Men */}
-          <div className="col-span-2 sm:col-span-2 bg-white rounded-xl p-3 shadow-md border-2 border-indigo-400 flex items-center gap-3">
-            <div className="p-3 bg-indigo-100 text-indigo-800 rounded-xl font-black">
-              <Users className="w-6 h-6" />
+          <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-200">
+            <span className="text-[10px] uppercase font-black text-slate-500 block">
+              Total Staff
+            </span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-black text-slate-900 font-mono">{totalFloorCount}</span>
+              <span className="text-[11px] text-slate-400 font-bold">Roster</span>
             </div>
-            <div>
-              <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500 block">
-                Total On Floor
-              </span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-indigo-950 font-mono">{totalFloorCount}</span>
-                <span className="text-xs font-bold text-emerald-700">Employee Active</span>
-              </div>
+          </div>
+
+          {/* Active Workers */}
+          <div className="bg-emerald-50 rounded-xl p-3 shadow-md border-2 border-emerald-400">
+            <span className="text-[10px] uppercase font-black text-emerald-800 block">
+              🟢 ON DUTY / ACTIVE
+            </span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-black text-emerald-950 font-mono">{activeCount}</span>
+              <span className="text-[11px] text-emerald-700 font-bold">मशीन पर</span>
+            </div>
+          </div>
+
+          {/* Free Workers */}
+          <div className="bg-amber-50 rounded-xl p-3 shadow-md border-2 border-amber-400">
+            <span className="text-[10px] uppercase font-black text-amber-800 block">
+              🟡 FREE / IDLE
+            </span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-black text-amber-950 font-mono">{freeCount}</span>
+              <span className="text-[11px] text-amber-700 font-bold">खाली बैठे</span>
             </div>
           </div>
 
@@ -390,34 +440,25 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
             <span className="text-[10px] uppercase font-bold text-slate-500 block">Operators</span>
             <div className="flex items-baseline gap-1 mt-0.5">
               <span className="text-xl font-black text-blue-900 font-mono">{operatorCount}</span>
-              <span className="text-[11px] text-slate-400 font-bold">On Machine</span>
+              <span className="text-[11px] text-slate-400 font-bold">Active</span>
             </div>
           </div>
 
           {/* Helpers */}
-          <div className="bg-white rounded-xl p-3 shadow-sm border border-amber-200 bg-amber-50/40">
-            <span className="text-[10px] uppercase font-bold text-amber-900 block">Helpers</span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-xl font-black text-amber-950 font-mono">{helperCount}</span>
-              <span className="text-[11px] text-amber-700 font-bold">Paired</span>
-            </div>
-          </div>
-
-          {/* QC Inspectors */}
-          <div className="bg-white rounded-xl p-3 shadow-sm border border-purple-200">
-            <span className="text-[10px] uppercase font-bold text-purple-900 block">QC Team</span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-xl font-black text-purple-950 font-mono">{qcCount}</span>
-              <span className="text-[11px] text-purple-700 font-bold">Inspector</span>
-            </div>
-          </div>
-
-          {/* Supervisors & Maintenance */}
           <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-200">
-            <span className="text-[10px] uppercase font-bold text-slate-500 block">Supervisor + Maintenance</span>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Helpers</span>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-xl font-black text-slate-900 font-mono">{supervisorCount + maintenanceCount}</span>
-              <span className="text-[10px] text-slate-500 font-medium">({supervisorCount} Sup / {maintenanceCount} Mnt)</span>
+              <span className="text-xl font-black text-slate-900 font-mono">{helperCount}</span>
+              <span className="text-[11px] text-slate-400 font-bold">Active</span>
+            </div>
+          </div>
+
+          {/* Supervisors & QC */}
+          <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-200">
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Supervisors & QC</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-black text-indigo-900 font-mono">{supervisorCount + qcCount}</span>
+              <span className="text-[10px] text-slate-500 font-medium">({supervisorCount} Sup / {qcCount} QC)</span>
             </div>
           </div>
         </div>
@@ -736,26 +777,13 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
                         </button>
                       )}
 
-                      {currentUser?.username === 'admin' ? (
-                        <button
-                          onClick={() => handleToggleAttendance(w.id)}
-                          className={`px-3 py-1 rounded-full text-xs font-extrabold transition cursor-pointer active:scale-95 ${
-                            w.isPresent
-                              ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200 border border-emerald-300'
-                              : 'bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300'
-                          }`}
-                        >
-                          {w.isPresent ? '● Present' : '○ Absent'}
-                        </button>
-                      ) : (
-                        <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${
-                          w.isPresent
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-slate-50 text-slate-500 border-slate-200'
-                        }`}>
-                          {w.isPresent ? '● Present' : '○ Absent'}
-                        </span>
-                      )}
+                      <span className={`px-3 py-1 rounded-full text-xs font-black border ${
+                        w.isPresent
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300 animate-pulse'
+                          : 'bg-amber-100 text-amber-950 border-amber-300'
+                      }`}>
+                        {w.isPresent ? '🟢 Active (कार्यरत)' : '🟡 Free (फ्री)'}
+                      </span>
                     </td>
                   </tr>
                 ))

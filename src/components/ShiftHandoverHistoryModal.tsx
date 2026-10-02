@@ -35,6 +35,7 @@ export const ShiftHandoverHistoryModal: React.FC<ShiftHandoverHistoryModalProps>
   const [filterDept, setFilterDept] = useState<string>('ALL');
   const [filterShift, setFilterShift] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -189,34 +190,55 @@ export const ShiftHandoverHistoryModal: React.FC<ShiftHandoverHistoryModalProps>
                         Flagged
                       </span>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!confirm(`Are you sure you want to delete shift handover [${record.id}]? It will be moved to the Admin Deletion Vault.`)) return;
-                        const nextHandovers = (state.shiftHandovers || []).filter((h) => h.id !== record.id);
-                        const vaultItem = {
-                          id: `VAULT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                          originalId: record.id,
-                          type: 'SHIFT_HANDOVER' as const,
-                          title: `Shift Handover [${record.id}] - ${record.department} (${record.machine})`,
-                          deletedBy: 'admin',
-                          deletedAt: new Date().toLocaleString(),
-                          data: record
-                        };
-                        const nextVault = [vaultItem, ...(state.deletedVaultItems || [])];
-                        if (onSaveState) {
-                          onSaveState({
-                            ...state,
-                            shiftHandovers: nextHandovers,
-                            deletedVaultItems: nextVault
-                          });
-                        }
-                      }}
-                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-extrabold transition cursor-pointer"
-                      title="Delete Shift Handover Record"
-                    >
-                      🗑️ Delete
-                    </button>
+                    {pendingDeleteId === record.id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextHandovers = (state.shiftHandovers || []).filter((h) => h.id !== record.id);
+                            const nextDeletedHandoverIds = Array.from(new Set([...(state.deletedHandoverIds || []), record.id]));
+                            const vaultItem = {
+                              id: `VAULT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                              originalId: record.id,
+                              type: 'SHIFT_HANDOVER' as const,
+                              title: `Shift Handover [${record.id}] - ${record.department} (${record.machine})`,
+                              deletedBy: 'admin',
+                              deletedAt: new Date().toLocaleString(),
+                              data: record
+                            };
+                            const nextVault = [vaultItem, ...(state.deletedVaultItems || [])];
+                            if (onSaveState) {
+                              onSaveState({
+                                ...state,
+                                shiftHandovers: nextHandovers,
+                                deletedVaultItems: nextVault,
+                                deletedHandoverIds: nextDeletedHandoverIds
+                              });
+                            }
+                            setPendingDeleteId(null);
+                          }}
+                          className="px-2 py-1 bg-red-600 hover:bg-red-750 text-white rounded text-[10px] font-black transition cursor-pointer shrink-0"
+                        >
+                          Confirm Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteId(null)}
+                          className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[10px] font-bold transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteId(record.id)}
+                        className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-extrabold transition cursor-pointer"
+                        title="Delete Shift Handover Record"
+                      >
+                        🗑️ Delete
+                      </button>
+                    )}
                   </div>
                 </div>
 

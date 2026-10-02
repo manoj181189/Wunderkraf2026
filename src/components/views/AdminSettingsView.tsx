@@ -94,7 +94,7 @@ interface AdminSettingsViewProps {
 }
 
 type AdminTab = 'brand_items_paper' | 'crate_master' | 'machines' | 'scrap_yield' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward' | 'employee_master';
-type MasterDataSubTab = 'plans' | 'jobs' | 'reconcile' | 'batches' | 'orders' | 'logs' | 'numbering' | 'vault';
+type MasterDataSubTab = 'plans' | 'jobs' | 'reconcile' | 'batches' | 'orders' | 'logs' | 'numbering' | 'vault' | 'handovers';
 
 export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   state,
@@ -116,6 +116,7 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   const [masterPasswordInput, setMasterPasswordInput] = useState(state.adminPassword || '1234');
   const [masterSubTab, setMasterSubTab] = useState<MasterDataSubTab>('jobs');
   const [deletePassword, setDeletePassword] = useState('');
+  const [pendingDeleteHandoverId, setPendingDeleteHandoverId] = useState<string | null>(null);
 
   // Coordination Matrix State
   const [coordinationMatrixList, setCoordinationMatrixList] = useState<CoordinationMatrixItem[]>(() => {
@@ -3075,6 +3076,12 @@ ${formLines.join('\n')}
           logs: state.logs.filter(l => l.stage !== 'Maintenance')
         };
         break;
+      case 'handovers':
+        newState = {
+          ...state,
+          shiftHandovers: []
+        };
+        break;
       case 'full':
         newState = {
           ...state,
@@ -4555,6 +4562,16 @@ ${formLines.join('\n')}
                 }`}
               >
                 Audit History Logs
+              </button>
+              <button
+                type="button"
+                onClick={() => setMasterSubTab('handovers')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  masterSubTab === 'handovers' ? 'bg-amber-600 text-white shadow-xs' : 'text-amber-800 hover:text-amber-950 hover:bg-amber-50'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                Shift Custody Handovers ({(state.shiftHandovers || []).length})
               </button>
               <button
                 type="button"
@@ -6839,6 +6856,156 @@ ${formLines.join('\n')}
               )}
             </div>
           )}
+
+          {/* ------------------------------------------------------------- */}
+          {/* SUB-TAB: SHIFT CUSTODY HANDOVERS */}
+          {/* ------------------------------------------------------------- */}
+          {masterSubTab === 'handovers' && (
+            <div className="space-y-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 m-0 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-amber-600" />
+                      <span>Shift Custody & Operator Handovers</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 m-0 mt-0.5">
+                      Official supervisor & operator custody handovers, checklist statuses, and production run outputs.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rows = (state.shiftHandovers || []).map((h) => ({
+                        ID: h.id,
+                        Date: h.date,
+                        Department: h.department,
+                        Machine: h.machine,
+                        OutgoingOperator: h.outgoingOperator,
+                        RelievingOperator: h.relievedByOperator,
+                        ProducedQty: h.producedQty,
+                        ScrapQty: h.scrapQty,
+                        ChecklistPassed: h.checklistPassed ? 'YES' : 'NO'
+                      }));
+                      exportToCSV(`shift_handovers_audit_${new Date().toISOString().split('T')[0]}.csv`, rows);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export Handovers
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(state.shiftHandovers || []).length === 0 ? (
+                    <div className="col-span-full text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs font-semibold">
+                      No shift handovers logged yet in the system.
+                    </div>
+                  ) : (
+                    (state.shiftHandovers || []).map((ho) => (
+                      <div key={ho.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3 hover:border-blue-300 hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-black text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[11px]">
+                            {ho.id}
+                          </span>
+                          <div className="flex items-center gap-1 text-[11px] text-slate-400 font-bold">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>{ho.date}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">
+                            {ho.department} • {ho.machine}
+                          </span>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${
+                            ho.checklistPassed 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                          }`}>
+                            {ho.checklistPassed ? '✓ Checklist Passed' : '✗ Audit Flagged'}
+                          </span>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-medium">
+                          <div className="text-slate-600">
+                            Outgoing: <b className="text-slate-950 font-bold">{ho.outgoingOperator}</b>
+                          </div>
+                          <span className="text-slate-400 text-[10px]">➔</span>
+                          <div className="text-slate-600">
+                            Relieving: <b className="text-blue-700 font-bold">{ho.relievedByOperator}</b>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-xs text-slate-500 font-bold">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase">Produced</span>
+                            <span className="text-slate-800">{ho.producedQty} {ho.department === 'Slitting' ? 'Rolls' : 'Crates'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase">Scrap</span>
+                            <span className="text-rose-600">{ho.scrapQty} KG</span>
+                          </div>
+                        </div>
+
+                        {/* Actions Section inside Handover Card */}
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                          {pendingDeleteHandoverId === ho.id ? (
+                            <div className="flex items-center gap-1.5 w-full">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedHandovers = (state.shiftHandovers || []).filter(h => h.id !== ho.id);
+                                  const nextDeletedHandoverIds = Array.from(new Set([...(state.deletedHandoverIds || []), ho.id]));
+                                  
+                                  // Archive to vault
+                                  const vaultItem = {
+                                    id: `VAULT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                                    originalId: ho.id,
+                                    type: 'SHIFT_HANDOVER' as const,
+                                    title: `Shift Handover [${ho.id}] - ${ho.department} (${ho.machine})`,
+                                    deletedBy: 'admin',
+                                    deletedAt: new Date().toLocaleString(),
+                                    data: ho
+                                  };
+                                  const nextVault = [vaultItem, ...(state.deletedVaultItems || [])];
+
+                                  onSaveState({
+                                    ...state,
+                                    shiftHandovers: updatedHandovers,
+                                    deletedHandoverIds: nextDeletedHandoverIds,
+                                    deletedVaultItems: nextVault
+                                  });
+                                  setPendingDeleteHandoverId(null);
+                                }}
+                                className="flex-1 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-black transition cursor-pointer text-center"
+                              >
+                                Confirm Delete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPendingDeleteHandoverId(null)}
+                                className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[11px] font-bold transition cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setPendingDeleteHandoverId(ho.id)}
+                              className="w-full py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[11px] font-extrabold transition cursor-pointer text-center"
+                            >
+                              🗑️ Delete Shift Handover
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -8343,6 +8510,7 @@ ${formLines.join('\n')}
                 { id: 'forming', title: 'Forming Floor Data', desc: 'Clear Forming batches, line logs FM-01 to FM-04, and heater telemetry.' },
                 { id: 'qc', title: 'QC & Inspection Data', desc: 'Clear QC vouchers, inspected crate balances, and defect Pareto logs.' },
                 { id: 'packing', title: 'Packing & Dispatch Data', desc: 'Clear packed cartons, pallet records, and dispatch challan logs.' },
+                { id: 'handovers', title: 'Shift Handovers & Signatures', desc: 'Wipe all operator shift custody handovers and locked slices.' },
                 { id: 'master', title: 'Master Configs & Brands', desc: 'Reset glue/paper brands, custom GSMs, spare parts to defaults.' },
                 { id: 'maintenance', title: 'Maintenance & Incidents', desc: 'Clear breakdown history, technician attend logs, and tickets.' },
               ].map(cat => (

@@ -38,7 +38,7 @@ interface MaintenanceAuditViewProps {
   initialSearchQuery?: string;
 }
 
-type AuditTab = 'traceability' | 'batch_report' | 'complaints' | 'logs' | 'handovers';
+type AuditTab = 'traceability' | 'batch_report' | 'complaints';
 
 export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
   state,
@@ -73,6 +73,12 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
   // Logs table state
   const [logSearch, setLogSearch] = useState('');
   const [logStageFilter, setLogStageFilter] = useState('ALL');
+  const [selectedLogKeys, setSelectedLogKeys] = useState<string[]>([]);
+  const [isBulkLogDeletePending, setIsBulkLogDeletePending] = useState(false);
+
+  // Deletion pending states
+  const [pendingDeleteLogKey, setPendingDeleteLogKey] = useState<string | null>(null);
+  const [pendingDeleteHandoverId, setPendingDeleteHandoverId] = useState<string | null>(null);
 
   // =========================================================================
   // TRACEABILITY RESOLVER ENGINE (Connects Customer Box -> Raw Material)
@@ -249,6 +255,22 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
     return true;
   });
 
+  // Select All and Toggle All Logic for currently shown (first 100 shown logs)
+  const makeLogKey = (logItem: LogEntry) => `${logItem.jobId || ''}_${logItem.timestamp || ''}_${logItem.action || ''}_${logItem.stage || ''}_${logItem.machine || ''}`;
+  const renderedLogs = filteredLogs.slice(0, 100);
+  const allRenderedKeys = renderedLogs.map(makeLogKey);
+  const isAllSelected = allRenderedKeys.length > 0 && allRenderedKeys.every(k => selectedLogKeys.includes(k));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      // Unselect all keys in the current rendered list
+      setSelectedLogKeys(prev => prev.filter(k => !allRenderedKeys.includes(k)));
+    } else {
+      // Select all keys in the current rendered list
+      setSelectedLogKeys(prev => Array.from(new Set([...prev, ...allRenderedKeys])));
+    }
+  };
+
   const stagesList = Array.from(new Set(logs.map((l) => l.stage).filter(Boolean)));
 
   const handleExportAuditLogs = () => {
@@ -351,30 +373,6 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
         >
           <Printer className="w-4 h-4 text-emerald-600" />
           <span>Single Batch Report & Certificate</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('logs')}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'logs'
-              ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <FileText className="w-4 h-4 text-slate-600" />
-          <span>Immutable Shift Logs ({logs.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('handovers')}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'handovers'
-              ? 'border-blue-600 text-blue-700 bg-blue-50/50'
-              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <Clock className="w-4 h-4 text-amber-600" />
-          <span>Shift Custody Handovers ({(state.shiftHandovers || []).length})</span>
         </button>
       </div>
 
@@ -752,19 +750,9 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-blue-700 font-bold uppercase block">QC Scrap Culled</span>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('logs');
-                        setLogStageFilter('QC');
-                        setLogSearch('Scrap');
-                      }}
-                      className="font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-200 transition cursor-pointer text-left flex items-center gap-1"
-                      title="Click to view QC scrap logs"
-                    >
-                      <span>2 KG defective rejected</span>
-                      <span className="text-[9px] text-rose-600 underline">Trace</span>
-                    </button>
+                    <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 block text-center text-xs">
+                      2 KG defective rejected
+                    </span>
                   </div>
                 </div>
               </div>
@@ -795,19 +783,9 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Forming Scrap</span>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('logs');
-                        setLogStageFilter('Forming');
-                        setLogSearch('Scrap');
-                      }}
-                      className="font-bold text-slate-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 transition cursor-pointer text-left flex items-center gap-1"
-                      title="Click to filter Forming scrap logs"
-                    >
-                      <span>2 KG trim scrap</span>
-                      <span className="text-[9px] text-amber-700 underline">Trace</span>
-                    </button>
+                    <span className="font-bold text-slate-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 block text-center text-xs">
+                      2 KG trim scrap
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Shift & Time</span>
@@ -844,19 +822,9 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Punch Scrap</span>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('logs');
-                        setLogStageFilter('Cutting');
-                        setLogSearch('Scrap');
-                      }}
-                      className="font-bold text-slate-800 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded border border-violet-200 transition cursor-pointer text-left flex items-center gap-1"
-                      title="Click to filter Cutting punch scrap logs"
-                    >
-                      <span>14 KG skeleton matrix</span>
-                      <span className="text-[9px] text-violet-700 underline">Trace</span>
-                    </button>
+                    <span className="font-bold text-slate-800 bg-violet-50 px-2 py-0.5 rounded border border-violet-200 block text-center text-xs">
+                      14 KG skeleton matrix
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Shift & Time</span>
@@ -893,19 +861,9 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Edge Trim Scrap</span>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('logs');
-                        setLogStageFilter('Slitting');
-                        setLogSearch('Scrap');
-                      }}
-                      className="font-bold text-slate-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 transition cursor-pointer text-left flex items-center gap-1"
-                      title="Click to filter Slitting edge trim scrap logs"
-                    >
-                      <span>6 KG edge trim</span>
-                      <span className="text-[9px] text-amber-800 underline">Trace</span>
-                    </button>
+                    <span className="font-bold text-slate-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 block text-center text-xs">
+                      6 KG edge trim
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase block">Shift & Time</span>
@@ -1250,31 +1208,161 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
             </div>
           </div>
 
+          {selectedLogKeys.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between flex-wrap gap-2 animate-fadeIn shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black bg-amber-500 text-slate-950 px-2.5 py-1 rounded-lg">
+                  Selected: {selectedLogKeys.length} logs
+                </span>
+                <span className="text-xs text-amber-900 font-bold hidden md:inline">
+                  क्या आप इन सभी चुनिंदा {selectedLogKeys.length} प्रविष्टियों को एक साथ मिटाना चाहते हैं?
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {isBulkLogDeletePending ? (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedLogs = (state.logs || []).filter(logItem => {
+                          const key = makeLogKey(logItem);
+                          return !selectedLogKeys.includes(key);
+                        });
+                        const nextDeletedLogIds = Array.from(new Set([...(state.deletedLogIds || []), ...selectedLogKeys]));
+                        if (onSaveState) {
+                          onSaveState({
+                            ...state,
+                            logs: updatedLogs,
+                            deletedLogIds: nextDeletedLogIds
+                          });
+                        }
+                        setSelectedLogKeys([]);
+                        setIsBulkLogDeletePending(false);
+                      }}
+                      className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition cursor-pointer"
+                    >
+                      ⚠️ Yes, Delete All Selected
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsBulkLogDeletePending(false)}
+                      className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsBulkLogDeletePending(true)}
+                    className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1 shadow-sm"
+                  >
+                    🗑️ Bulk Delete Selected
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedLogKeys([])}
+                  className="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition cursor-pointer"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto border border-slate-200 rounded-xl">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-extrabold uppercase">
+                  <th className="p-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                    />
+                  </th>
                   <th className="p-3">Timestamp</th>
                   <th className="p-3">Job / Order</th>
                   <th className="p-3">Stage / Station</th>
                   <th className="p-3">Operator</th>
                   <th className="p-3">Action Description</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                {filteredLogs.slice(0, 100).map((l, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 transition">
-                    <td className="p-3 whitespace-nowrap text-[11px] text-slate-500">{l.timestamp}</td>
-                    <td className="p-3 font-bold text-blue-900 whitespace-nowrap">{l.jobId || '—'}</td>
-                    <td className="p-3 whitespace-nowrap">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-bold">
-                        {l.stage} {l.machine ? `(${l.machine})` : ''}
-                      </span>
-                    </td>
-                    <td className="p-3 font-bold text-purple-900 whitespace-nowrap">{l.worker || l.user || '—'}</td>
-                    <td className="p-3 text-slate-800">{l.action}</td>
-                  </tr>
-                ))}
+                {filteredLogs.slice(0, 100).map((l, idx) => {
+                  const makeLogKey = (logItem: LogEntry) => `${logItem.jobId || ''}_${logItem.timestamp || ''}_${logItem.action || ''}_${logItem.stage || ''}_${logItem.machine || ''}`;
+                  const logKey = makeLogKey(l);
+                  const isRowSelected = selectedLogKeys.includes(logKey);
+                  return (
+                    <tr key={idx} className={`hover:bg-slate-50 transition ${isRowSelected ? 'bg-blue-50/40 hover:bg-blue-50/60' : ''}`}>
+                      <td className="p-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={isRowSelected}
+                          onChange={() => {
+                            if (isRowSelected) {
+                              setSelectedLogKeys(prev => prev.filter(k => k !== logKey));
+                            } else {
+                              setSelectedLogKeys(prev => [...prev, logKey]);
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                        />
+                      </td>
+                      <td className="p-3 whitespace-nowrap text-[11px] text-slate-500">{l.timestamp}</td>
+                      <td className="p-3 font-bold text-blue-900 whitespace-nowrap">{l.jobId || '—'}</td>
+                      <td className="p-3 whitespace-nowrap">
+                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-bold">
+                          {l.stage} {l.machine ? `(${l.machine})` : ''}
+                        </span>
+                      </td>
+                      <td className="p-3 font-bold text-purple-900 whitespace-nowrap">{l.worker || l.user || '—'}</td>
+                      <td className="p-3 text-slate-800">{l.action}</td>
+                      <td className="p-3 text-right whitespace-nowrap">
+                        {pendingDeleteLogKey === logKey ? (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedLogs = (state.logs || []).filter(logItem => makeLogKey(logItem) !== logKey);
+                                const nextDeletedLogIds = Array.from(new Set([...(state.deletedLogIds || []), logKey]));
+                                if (onSaveState) {
+                                  onSaveState({
+                                    ...state,
+                                    logs: updatedLogs,
+                                    deletedLogIds: nextDeletedLogIds
+                                  });
+                                }
+                                setPendingDeleteLogKey(null);
+                              }}
+                              className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-black transition cursor-pointer"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPendingDeleteLogKey(null)}
+                              className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[10px] font-bold transition cursor-pointer"
+                            >
+                              X
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setPendingDeleteLogKey(logKey)}
+                            className="text-[11px] font-black text-rose-600 hover:text-rose-800 transition cursor-pointer bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-200"
+                          >
+                            🗑️ Delete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1364,6 +1452,47 @@ export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
                       <span className="text-[10px] text-slate-400 block font-bold uppercase">Scrap</span>
                       <span className="text-rose-600">{ho.scrapQty} KG</span>
                     </div>
+                  </div>
+
+                  {/* Actions Section inside Handover Card */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                    {pendingDeleteHandoverId === ho.id ? (
+                      <div className="flex items-center gap-1.5 w-full">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updatedHandovers = (state.shiftHandovers || []).filter(h => h.id !== ho.id);
+                            const nextDeletedHandoverIds = Array.from(new Set([...(state.deletedHandoverIds || []), ho.id]));
+                            if (onSaveState) {
+                              onSaveState({
+                                ...state,
+                                shiftHandovers: updatedHandovers,
+                                deletedHandoverIds: nextDeletedHandoverIds
+                              });
+                            }
+                            setPendingDeleteHandoverId(null);
+                          }}
+                          className="flex-1 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-black transition cursor-pointer text-center"
+                        >
+                          Confirm Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteHandoverId(null)}
+                          className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[11px] font-bold transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteHandoverId(ho.id)}
+                        className="w-full py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[11px] font-extrabold transition cursor-pointer text-center"
+                      >
+                        🗑️ Delete Shift Handover
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

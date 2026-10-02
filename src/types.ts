@@ -601,6 +601,7 @@ export interface FactoryState {
   deletedLogIds?: string[];
   deletedPlanIds?: string[];
   deletedWorkerIds?: string[];
+  deletedHandoverIds?: string[];
   deletedVaultItems?: DeletedVaultItem[];
   jobs: Job[];
   wipLots?: WipLot[]; // New ERP Lot Ledger
