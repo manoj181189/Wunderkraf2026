@@ -44,14 +44,41 @@ export const StockMatrixView: React.FC<StockMatrixViewProps> = ({
     prod.toLowerCase().includes(searchTerm.toLowerCase().trim())
   );
 
+  // Helper to compute roll weight for a single Job
+  const getJobRollWeight = (j: any) => {
+    let rollAvgWeight = 12.5; // fallback weight (ITC paper standard)
+    if (j.reelsList && j.reelsList.length > 0) {
+      const totalW = j.reelsList.reduce((sum: number, r: any) => sum + (r.weightKg || r.outputWeightKg || 0), 0);
+      const totalR = j.reelsList.reduce((sum: number, r: any) => sum + (r.rolls || 0), 0);
+      if (totalW > 0 && totalR > 0) {
+        rollAvgWeight = totalW / totalR;
+      }
+    } else if (j.inputWeightKg && j.availableRolls) {
+      rollAvgWeight = j.inputWeightKg / j.availableRolls;
+    }
+    return (j.availableRolls || 0) * rollAvgWeight;
+  };
+
   // Overall factory stage totals
   const overallTotals = {
     rolls: jobs.reduce((s, j) => s + (Number(j.availableRolls) || 0), 0),
+    rollsWeight: jobs.reduce((s, j) => s + getJobRollWeight(j), 0),
+
     cutCrates: jobs.reduce((s, j) => s + (Number(j.availableCuttingCrates) || 0), 0),
+    cutCratesPieces: jobs.reduce((s, j) => s + (Number(j.availableCuttingCrates) || 0) * (j.pcsPerCrateCutting || 5000), 0),
+
     formCrates: jobs.reduce((s, j) => s + (Number(j.availableFormingCrates) || 0), 0),
+    formCratesPieces: jobs.reduce((s, j) => s + (Number(j.availableFormingCrates) || 0) * (j.pcsPerCrateForming || 4500), 0),
+
     qcCrates: jobs.reduce((s, j) => s + (Number(j.availableQcCrates) || 0), 0),
+    qcCratesPieces: jobs.reduce((s, j) => s + (Number(j.availableQcCrates) || 0) * (j.pcsPerCrateForming || 4500), 0),
+
     packedBoxes: packJobs.reduce(
       (s, pj) => s + Math.max(0, (Number(pj.packedBoxes) || 0) - (Number(pj.dispatchedBoxes) || 0)),
+      0
+    ),
+    packedBoxesPieces: packJobs.reduce(
+      (s, pj) => s + Math.max(0, (Number(pj.packedBoxes) || 0) - (Number(pj.dispatchedBoxes) || 0)) * (pj.pcsPerBox || 1000),
       0
     )
   };
@@ -151,7 +178,10 @@ export const StockMatrixView: React.FC<StockMatrixViewProps> = ({
           <div className="text-xl font-black text-indigo-950 mt-1">
             {overallTotals.rolls} <span className="text-xs font-bold">Rolls</span>
           </div>
-          <span className="text-[10px] text-indigo-700 font-medium">Slitting Roll Stock</span>
+          <div className="text-[10px] text-indigo-700 font-extrabold mt-0.5">
+            ⚖️ {Math.round(overallTotals.rollsWeight).toLocaleString()} KG
+          </div>
+          <span className="text-[9px] text-indigo-500 font-medium">Slitting Roll Stock</span>
         </div>
 
         <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl">
@@ -162,7 +192,10 @@ export const StockMatrixView: React.FC<StockMatrixViewProps> = ({
           <div className="text-xl font-black text-purple-950 mt-1">
             {overallTotals.cutCrates} <span className="text-xs font-bold">Crates</span>
           </div>
-          <span className="text-[10px] text-purple-700 font-medium">Cutting Blank Crates</span>
+          <div className="text-[10px] text-purple-700 font-extrabold mt-0.5">
+            📦 {overallTotals.cutCratesPieces.toLocaleString()} Pcs
+          </div>
+          <span className="text-[9px] text-purple-500 font-medium">Cutting Blank Crates</span>
         </div>
 
         <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
@@ -173,7 +206,10 @@ export const StockMatrixView: React.FC<StockMatrixViewProps> = ({
           <div className="text-xl font-black text-amber-950 mt-1">
             {overallTotals.formCrates} <span className="text-xs font-bold">Crates</span>
           </div>
-          <span className="text-[10px] text-amber-700 font-medium">Forming Press Crates</span>
+          <div className="text-[10px] text-amber-700 font-extrabold mt-0.5">
+            🛠️ {overallTotals.formCratesPieces.toLocaleString()} Pcs
+          </div>
+          <span className="text-[9px] text-amber-500 font-medium">Forming Press Crates</span>
         </div>
 
         <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl">
@@ -184,7 +220,10 @@ export const StockMatrixView: React.FC<StockMatrixViewProps> = ({
           <div className="text-xl font-black text-emerald-950 mt-1">
             {overallTotals.qcCrates} <span className="text-xs font-bold">Crates</span>
           </div>
-          <span className="text-[10px] text-emerald-700 font-medium">Crates Ready for Packing</span>
+          <div className="text-[10px] text-emerald-700 font-extrabold mt-0.5">
+            ✅ {overallTotals.qcCratesPieces.toLocaleString()} Pcs
+          </div>
+          <span className="text-[9px] text-emerald-500 font-medium">Crates Ready for Packing</span>
         </div>
 
         <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl col-span-2 sm:col-span-1">
@@ -195,19 +234,10 @@ export const StockMatrixView: React.FC<StockMatrixViewProps> = ({
           <div className="text-xl font-black text-blue-950 mt-1">
             {overallTotals.packedBoxes} <span className="text-xs font-bold">Boxes</span>
           </div>
-          <span className="text-[10px] text-blue-700 font-medium">Dispatch Ready Goods</span>
-        </div>
-      </div>
-
-      {/* Helpful Interactive Guide Banner */}
-      <div className="mb-4 p-3 bg-amber-50/80 border border-amber-200/90 rounded-xl text-xs text-amber-950 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-          <span className="font-medium leading-relaxed">
-            <b>Instructions:</b> Click on any number/button — based on that product\'s <b>Job ID</b>,{' '}
-            <b>Mother Reel Number</b>, <b>GSM</b> and <b>Paper Mill</b>, how much quantity is in stock
-            will open the full history and specification table.
-          </span>
+          <div className="text-[10px] text-blue-700 font-extrabold mt-0.5">
+            📥 {overallTotals.packedBoxesPieces.toLocaleString()} Pcs
+          </div>
+          <span className="text-[9px] text-blue-500 font-medium">Dispatch Ready Goods</span>
         </div>
       </div>
 

@@ -38,7 +38,24 @@ export function calculateAvailableScrapKg(logs: LogEntry[], scrapSales: any[], d
   (logs || []).forEach((l) => {
     if (!l.action) return;
     if (l.jobId && deletedSet.has(l.jobId)) return;
-    if (l.stage === 'Slitting') return;
+    if (
+      l.stage === 'Slitting' || 
+      l.stage?.toLowerCase().includes('slit') || 
+      l.machine?.toLowerCase().includes('slit') || 
+      l.action?.toLowerCase().includes('slit')
+    ) return;
+
+    // Ignore master overwrites on slitting jobs SPN-071, SPN-070, FRK-066
+    if (l.stage?.toLowerCase().includes('admin') || l.stage?.toLowerCase().includes('master') || l.machine?.toLowerCase().includes('master')) {
+      const actionLower = l.action.toLowerCase();
+      if (
+        actionLower.includes('spn-071') ||
+        actionLower.includes('spn-070') ||
+        actionLower.includes('frk-066')
+      ) {
+        return;
+      }
+    }
 
     let scrapKg = 0;
     let scrapPieces = 0;

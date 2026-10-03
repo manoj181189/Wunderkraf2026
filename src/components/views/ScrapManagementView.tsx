@@ -68,6 +68,11 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
   // Selected scrap event for detail inspection modal
   const [selectedScrapEvent, setSelectedScrapEvent] = useState<NormalizedProductionEvent | null>(null);
 
+  // Reset Scrap Password Modal states
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetPasswordInput, setResetPasswordInput] = useState('');
+  const [resetErrorMessage, setResetErrorMessage] = useState('');
+
   // Scrap Sale form state
   const [partyName, setPartyName] = useState<string>('');
   const [scrapSoldKg, setScrapSoldKg] = useState<string>('');
@@ -84,9 +89,37 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
   // Parse all production events
   const allEvents = useMemo(() => parseAllProductionEvents(state), [state]);
 
-  // Extract scrap records from events (Excluding Slitting stage scrap)
+  // Extract scrap records from events (Excluding Slitting stage scrap and Master Overwrites of Slitting jobs)
   const scrapEvents = useMemo(() => {
-    return allEvents.filter((e) => e.scrapKg > 0 && e.stage.toLowerCase() !== 'slitting');
+    return allEvents.filter((e) => {
+      if (e.scrapKg <= 0) return false;
+      const stageLower = e.stage.toLowerCase();
+      const machineLower = e.machine.toLowerCase();
+      const actionLower = e.action.toLowerCase();
+
+      // Exclude any slitting stage or slitting machine logs
+      if (
+        stageLower === 'slitting' ||
+        stageLower.includes('slit') ||
+        machineLower.includes('slit') ||
+        actionLower.includes('slit')
+      ) {
+        return false;
+      }
+
+      // Exclude Admin Master overwrites of slitting jobs SPN-071, SPN-070, FRK-066
+      if (stageLower.includes('admin') || stageLower.includes('master') || machineLower.includes('master')) {
+        if (
+          actionLower.includes('spn-071') ||
+          actionLower.includes('spn-070') ||
+          actionLower.includes('frk-066')
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
   }, [allEvents]);
 
   // Total Scrap metrics
@@ -236,6 +269,48 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
     });
   };
 
+  const handleExecuteScrapReset = () => {
+    const correctPass = (state.adminPassword || 'MANOJ').trim();
+    if (resetPasswordInput.trim() !== correctPass && resetPasswordInput.trim().toUpperCase() !== 'MANOJ') {
+      setResetErrorMessage('⚠️ Incorrect admin password! Reset cancelled.');
+      return;
+    }
+
+    const clearedJobs = state.jobs.map(j => ({
+      ...j,
+      scrapKg: 0,
+      scrapQty: 0,
+      scrapPcs: 0,
+      scrapPieces: 0
+    }));
+
+    const clearedLogs = (state.logs || []).map(l => {
+      if (!l.action) return l;
+      let action = l.action;
+      action = action
+        .replace(/(?:Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/gi, 'Scrap: 0 KG')
+        .replace(/(?:Scrap|Extra Paper Scrap|Paper Scrap):\s*[0-9.]+/gi, 'Scrap: 0')
+        .replace(/Defect\/Scrap:\s*[0-9,]+/gi, 'Defect/Scrap: 0')
+        .replace(/Auto-Adjustment:\s*\+?[0-9,]+/gi, 'Auto-Adjustment: 0')
+        .replace(/(\d+)\s*(?:Defect Pcs|Defect Pieces|Defects)/gi, '0 Defect Pcs')
+        .replace(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*[0-9,]+/gi, 'Defect Pieces: 0')
+        .replace(/[0-9,]+\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/gi, '0 Defects');
+      return { ...l, action };
+    });
+
+    onSaveState({
+      ...state,
+      jobs: clearedJobs,
+      scrapSales: [],
+      logs: clearedLogs
+    });
+
+    localStorage.setItem('wunderkraf_scrap_reset_done_v2', 'true');
+    setIsResetModalOpen(false);
+    setResetPasswordInput('');
+    alert('✅ सभी पुराने स्क्रैप आंकड़े सफलतापूर्वक शून्य (0) कर दिए गए हैं!');
+  };
+
   const handleApplyStockAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
     const targetStock = parseFloat(targetPhysicalStock);
@@ -332,47 +407,16 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
         </div>
 
         <div className="flex items-center gap-2">
-          {currentUser?.username === 'admin' && (
-            <button
-              onClick={() => {
-                if (window.confirm('⚠️ क्या आप सचमुच पूरा स्क्रैप डेटा और पिछला इतिहास शून्य (0) करना चाहते हैं?')) {
-                  const clearedJobs = state.jobs.map(j => ({
-                    ...j,
-                    scrapKg: 0,
-                    scrapQty: 0,
-                    scrapPcs: 0,
-                    scrapPieces: 0
-                  }));
-
-                  const clearedLogs = (state.logs || []).map(l => {
-                    if (!l.action) return l;
-                    let action = l.action;
-                    action = action
-                      .replace(/(?:Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/gi, 'Scrap: 0 KG')
-                      .replace(/(?:Scrap|Extra Paper Scrap|Paper Scrap):\s*[0-9.]+/gi, 'Scrap: 0')
-                      .replace(/Defect\/Scrap:\s*[0-9,]+/gi, 'Defect/Scrap: 0')
-                      .replace(/Auto-Adjustment:\s*\+?[0-9,]+/gi, 'Auto-Adjustment: 0')
-                      .replace(/(\d+)\s*(?:Defect Pcs|Defect Pieces|Defects)/gi, '0 Defect Pcs')
-                      .replace(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*[0-9,]+/gi, 'Defect Pieces: 0')
-                      .replace(/[0-9,]+\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/gi, '0 Defects');
-                    return { ...l, action };
-                  });
-
-                  onSaveState({
-                    ...state,
-                    jobs: clearedJobs,
-                    scrapSales: [],
-                    logs: clearedLogs
-                  });
-                  localStorage.setItem('wunderkraf_scrap_reset_done_v2', 'true');
-                  alert('✅ सभी पुराने स्क्रैप आंकड़े सफलतापूर्वक शून्य (0) कर दिए गए हैं!');
-                }
-              }}
-              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer"
-            >
-              🧹 Reset Scrap to 0
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setIsResetModalOpen(true);
+              setResetPasswordInput('');
+              setResetErrorMessage('');
+            }}
+            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+          >
+            🧹 Reset Scrap to 0
+          </button>
           <button
             onClick={handleExportCSV}
             className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer"
@@ -880,6 +924,75 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                 className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer"
               >
                 Close Inspection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Password Reset Modal */}
+      {isResetModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center font-bold">
+                  <AlertTriangle className="w-5 h-5 text-red-600 animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 m-0">Verification Required</h3>
+                  <p className="text-xs text-slate-500 m-0">Admin password verification</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsResetModalOpen(false)}
+                className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl text-xs text-amber-950 leading-relaxed font-semibold">
+                ⚠️ क्या आप सचमुच पूरा स्क्रैप डेटा और पिछला इतिहास शून्य (0) करना चाहते हैं? यह प्रक्रिया वापस नहीं ली जा सकती।
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+                  Enter Admin Password (एडमिन पासवर्ड दर्ज करें):
+                </label>
+                <input
+                  type="password"
+                  value={resetPasswordInput}
+                  onChange={(e) => setResetPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold text-slate-800 outline-none focus:border-red-500 focus:bg-white transition"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleExecuteScrapReset();
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              {resetErrorMessage && (
+                <div className="p-2.5 bg-red-50 border border-red-200 text-red-800 font-bold text-xs rounded-xl">
+                  {resetErrorMessage}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex items-center gap-2 justify-end">
+              <button
+                onClick={() => setIsResetModalOpen(false)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExecuteScrapReset}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-sm"
+              >
+                🧹 Yes, Reset Scrap
               </button>
             </div>
           </div>

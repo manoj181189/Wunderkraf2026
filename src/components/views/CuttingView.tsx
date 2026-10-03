@@ -1841,37 +1841,8 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
             <Droplets className="w-4 h-4 text-teal-600" />
             <span>💧 Adhesive Glue (Glue Tracker)</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setShowLiveManpowerRoster((prev) => !prev)}
-            className="flex items-center gap-1.5 text-xs font-bold text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-3 py-1.5 rounded-lg transition cursor-pointer shadow-2xs"
-            title="View & Change Floor Manpower Roster"
-          >
-            <Users className="w-4 h-4 text-blue-600" />
-            <span>👥 Live Manpower (Floor Roster)</span>
-          </button>
         </div>
       </div>
-
-      {/* Optional Expandable Live Floor Manpower Roster */}
-      {showLiveManpowerRoster && (
-        <div className="bg-slate-50 border border-slate-300 rounded-2xl p-4 space-y-3 relative shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-            <h4 className="text-xs font-black text-slate-800 uppercase flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-blue-600" />
-              <span>Live Cutting Floor Manpower Roster (Live Station Crew & Floor Manpower)</span>
-            </h4>
-            <button
-              type="button"
-              onClick={() => setShowLiveManpowerRoster(false)}
-              className="text-slate-500 hover:text-slate-800 text-xs font-bold px-2.5 py-1 bg-white border border-slate-300 rounded-lg cursor-pointer"
-            >
-              Close ✕
-            </button>
-          </div>
-          <LiveFloorManpowerTracker state={state} onSaveState={onSaveState} />
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* VISUAL WORKSTATION FLOOR SELECTOR */}

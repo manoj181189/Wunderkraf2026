@@ -72,89 +72,11 @@ export const MasterExecutiveDashboard: React.FC<MasterExecutiveDashboardProps> =
           <span>Back to Main Menu</span>
         </button>
         <div className="flex items-center gap-2">
-          {onNavigateAnalytics && (
-            <button
-              onClick={onNavigateAnalytics}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-violet-700 to-indigo-800 hover:from-violet-800 hover:to-indigo-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer"
-            >
-              <Activity className="w-3.5 h-3.5 text-violet-200" />
-              <span>Machine & Operator Audit (8-day/5-day report) ➔</span>
-            </button>
-          )}
           <div className="flex items-center gap-1.5">
             <Activity className="w-5 h-5 text-blue-600 animate-pulse" />
             <h3 className="text-base font-bold text-[#1a365d] uppercase tracking-wide m-0">
               Executive Control Center
             </h3>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Floor KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-4 rounded-xl flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
-            <Scroll className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">Total Paper Slit</span>
-            <div className="text-xl font-extrabold text-blue-950">{totalSlitPaperKg.toLocaleString()} KG</div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 p-4 rounded-xl flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center">
-            <SearchCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wide">QC Crates Pipeline</span>
-            <div className="text-xl font-extrabold text-purple-950">
-              {(totalActiveQcCrates + totalPendingQcCrates).toLocaleString()} Crates
-            </div>
-            <div className="text-[10px] text-purple-700 font-semibold">
-              {totalActiveQcCrates} In Inspection • {totalPendingQcCrates} Pending QC
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-xl flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
-            <Package className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">Packed Output</span>
-            <div className="text-xl font-extrabold text-emerald-950">{totalPackedBoxes.toLocaleString()} Boxes</div>
-          </div>
-        </div>
-
-        <div 
-          onClick={() => {
-            if (onNavigateToTraceability) {
-              onNavigateToTraceability('Scrap');
-            } else if (onNavigateAnalytics) {
-              onNavigateAnalytics();
-            }
-          }}
-          className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 p-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:border-rose-400 hover:shadow-md transition group"
-          title="Click to trace all scrap events by Batch, Machine, and Operator"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center group-hover:scale-105 transition">
-              <Trash2 className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Available Scrap</span>
-                <span className="text-[10px] text-rose-600 font-extrabold bg-rose-100 px-1.5 py-0.2 rounded border border-rose-200 group-hover:bg-rose-600 group-hover:text-white transition">
-                  🔍 Trace
-                </span>
-              </div>
-              <div className="text-xl font-extrabold text-rose-950">{availableScrap} KG</div>
-            </div>
-          </div>
-          <div className="text-right hidden sm:block">
-            <span className="text-[10px] text-rose-600 font-semibold block group-hover:underline">View Traceability ➔</span>
-            <span className="text-[9px] text-rose-400">Slit Trim • Punch • QC Rejects</span>
           </div>
         </div>
       </div>

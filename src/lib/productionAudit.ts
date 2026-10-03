@@ -179,8 +179,8 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
         shift,
         crates,
         pieces,
-        scrapKg,
-        scrapPieces,
+        scrapKg: stage.toLowerCase() === 'slitting' ? 0 : scrapKg,
+        scrapPieces: stage.toLowerCase() === 'slitting' ? 0 : scrapPieces,
         action,
         jobId: log.jobId
       });
