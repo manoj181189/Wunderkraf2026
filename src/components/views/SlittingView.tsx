@@ -671,7 +671,20 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       printedRollIcon: addReelIsPrintedRoll ? addReelPrintedRollIcon : undefined
     };
 
-    const updatedReelsList = [...existingReelsList, newReelItem];
+    // If a reel with the same reelNo already exists as an empty placeholder (rolls=0 and without active batchId), update it rather than duplicating
+    const placeholderIndex = existingReelsList.findIndex(
+      (r) => r.reelNo.toLowerCase() === effectiveReelNo.toLowerCase() && (r.rolls || 0) === 0 && !r.batchId
+    );
+    let updatedReelsList: JobReelItem[];
+    if (placeholderIndex >= 0) {
+      updatedReelsList = [...existingReelsList];
+      updatedReelsList[placeholderIndex] = {
+        ...updatedReelsList[placeholderIndex],
+        ...newReelItem
+      };
+    } else {
+      updatedReelsList = [...existingReelsList, newReelItem];
+    }
 
     const updatedJobs = baseJobsListForAdd.map((j) => {
       if (j.id !== targetJob.id) return j;
@@ -683,6 +696,8 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       const hasPrintedRoll = j.printedRollRequired || addReelIsPrintedRoll;
       return {
         ...j,
+        stage: 'Slitting',
+        status: 'SLITTING_IN_PROGRESS',
         reelNo: combinedReelNoStr,
         reelNumbers: updatedReelNumbers,
         reelsList: updatedReelsList,
@@ -1039,14 +1054,20 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
         return rItem;
       });
 
+      const hasOtherActiveBatches = (j.runningBatches || []).some(
+        (b) => b.batchId !== batch.batchId && (b.status === 'Running' || b.status === 'Held')
+      );
+      const targetStage = hasOtherActiveBatches ? 'Slitting' : 'Slitting Completed';
+      const targetStatus = hasOtherActiveBatches ? 'SLITTING_IN_PROGRESS' : 'READY_FOR_CUTTING';
+
       return {
         ...j,
         reelNo: effectiveReelNumbers.join(', '),
         reelNumbers: effectiveReelNumbers,
         reelsList: updatedReelsList,
         availableRolls: (j.availableRolls || 0) + rollsCount,
-        stage: 'Slitting Completed',
-        status: 'READY_FOR_CUTTING',
+        stage: targetStage,
+        status: targetStatus,
         outputWeightKg: newOutKg,
         scrapKg: newScrapKg,
         scrapPercent: totalScrapPct,
@@ -2819,11 +2840,14 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 <option value="">-- SELECT JOB ID --</option>
                 {jobs.map((j) => {
                   const isRunningNow = currentRunningBatch?.job.id === j.id;
+                  const isFinished = j.stage?.toLowerCase().includes('complet') || j.status === 'READY_FOR_CUTTING';
                   return (
                     <option key={j.id} value={j.id}>
                       {isRunningNow ? '⭐ [ACTIVE RUNNING] ' : ''}
+                      {isFinished ? '🔄 [RE-OPEN TO ADD REEL] ' : ''}
                       {j.id} - {j.product} [{j.paperBrand || 'ITC'}]{' '}
                       {getJobAllReels(j).length > 0 ? `(Reels: ${getJobAllReels(j).join(', ')})` : ''}
+                      {isFinished ? ' (Input Weight: ' + (j.inputWeightKg || 0) + 'kg)' : ''}
                     </option>
                   );
                 })}

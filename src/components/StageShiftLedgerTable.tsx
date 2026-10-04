@@ -22,6 +22,7 @@ interface StageShiftLedgerTableProps {
   themeColor?: 'blue' | 'indigo' | 'purple' | 'emerald';
   autoAdjustmentPcs?: number;
   totalMaterialIssuedKg?: number;
+  totalOutputWeightKg?: number;
 }
 
 export const StageShiftLedgerTable: React.FC<StageShiftLedgerTableProps> = ({
@@ -29,7 +30,8 @@ export const StageShiftLedgerTable: React.FC<StageShiftLedgerTableProps> = ({
   stageTitle,
   themeColor = 'indigo',
   autoAdjustmentPcs = 0,
-  totalMaterialIssuedKg
+  totalMaterialIssuedKg,
+  totalOutputWeightKg
 }) => {
   const {
     items,
@@ -274,12 +276,12 @@ export const StageShiftLedgerTable: React.FC<StageShiftLedgerTableProps> = ({
 
           {stageTitle.toLowerCase().includes('slitting') ? (
             <div className="bg-slate-800/80 rounded-lg p-2 border border-slate-700">
-              <span className="text-[10px] text-slate-400 block font-semibold uppercase">Total Material Issued</span>
+              <span className="text-[10px] text-slate-400 block font-semibold uppercase">Total Slitted Weight</span>
               <span className="text-sm font-black text-sky-400">
-                {totalMaterialIssuedKg ? `${totalMaterialIssuedKg.toLocaleString()} KG` : '0 KG'}
+                {totalOutputWeightKg ? `${totalOutputWeightKg.toLocaleString()} KG` : '0 KG'}
               </span>
               <span className="text-[10px] text-slate-400 block">
-                Jumbo Weight Loaded
+                Slit Roll Net Weight
               </span>
             </div>
           ) : (

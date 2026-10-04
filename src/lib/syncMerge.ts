@@ -95,11 +95,44 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       };
       const existingPrio = stagePriority[existing.stage] || 0;
       const incPrio = stagePriority[incJob.stage] || 0;
-      const resolvedStage = incPrio >= existingPrio ? incJob.stage : existing.stage;
+      
+      const allBatches = Array.from(batchMap.values());
+      const hasActiveSlittingRun = allBatches.some(
+        (b) => b.stage === 'Slitting' && (b.status === 'Running' || b.status === 'Held')
+      );
+      
+      // If there is an active running/held slitting run or incoming stage was explicitly re-opened to Slitting, honor Slitting
+      let resolvedStage = incPrio >= existingPrio ? incJob.stage : existing.stage;
+      if (hasActiveSlittingRun || incJob.stage === 'Slitting' || incJob.status === 'SLITTING_IN_PROGRESS') {
+        resolvedStage = 'Slitting';
+      }
+
+      // Merge reelsList by batchId or reelNo so no loaded jumbo reels are ever lost
+      const reelMap = new Map<string, any>();
+      (existing.reelsList || []).forEach((r) => {
+        const key = r.batchId || r.reelNo || Math.random().toString();
+        reelMap.set(key, { ...r });
+      });
+      (incJob.reelsList || []).forEach((r) => {
+        const key = r.batchId || r.reelNo || Math.random().toString();
+        const prev = reelMap.get(key);
+        reelMap.set(key, { ...prev, ...r });
+      });
+      const resolvedReelsList = Array.from(reelMap.values());
+
+      const resolvedReelNumbers = Array.from(new Set([...(existing.reelNumbers || []), ...(incJob.reelNumbers || [])]));
+      const resolvedReelNo = resolvedReelNumbers.length > 0 ? resolvedReelNumbers.join(', ') : (incJob.reelNo || existing.reelNo);
 
       jobMap.set(incJob.id, {
         ...existing,
         ...incJob,
+        reelNo: resolvedReelNo,
+        reelNumbers: resolvedReelNumbers,
+        reelsList: resolvedReelsList,
+        inputWeightKg: Math.max(existing.inputWeightKg || 0, incJob.inputWeightKg || 0),
+        outputWeightKg: Math.max(existing.outputWeightKg || 0, incJob.outputWeightKg || 0),
+        scrapKg: Math.max(existing.scrapKg || 0, incJob.scrapKg || 0),
+        status: hasActiveSlittingRun ? 'SLITTING_IN_PROGRESS' : (incJob.status || existing.status),
         plannedGsms: incJob.plannedGsms || existing.plannedGsms,
         plannedLayers: incJob.plannedLayers || existing.plannedLayers,
         targetLayers: incJob.targetLayers || existing.targetLayers,
@@ -109,7 +142,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         printedRollDesign: incJob.printedRollDesign || existing.printedRollDesign,
         printedRollIcon: incJob.printedRollIcon || existing.printedRollIcon,
         stage: resolvedStage,
-        availableRolls: incJob.availableRolls !== undefined ? incJob.availableRolls : (existing.availableRolls || 0),
+        availableRolls: Math.max(existing.availableRolls || 0, incJob.availableRolls || 0),
         availableCuttingCrates: incJob.availableCuttingCrates !== undefined ? incJob.availableCuttingCrates : (existing.availableCuttingCrates || 0),
         availableFormingCrates: incJob.availableFormingCrates !== undefined ? incJob.availableFormingCrates : (existing.availableFormingCrates || 0),
         availableForQcCrates: incJob.availableForQcCrates !== undefined ? incJob.availableForQcCrates : (existing.availableForQcCrates || 0),

@@ -267,6 +267,7 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                     stageTitle="Slitting Machine"
                     themeColor="blue"
                     totalMaterialIssuedKg={job.inputWeightKg || 0}
+                    totalOutputWeightKg={job.outputWeightKg || 0}
                   />
                 </div>
               </div>
