@@ -197,6 +197,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
   const [addReelGsm, setAddReelGsm] = useState(() => (state.targetGsmMaster && state.targetGsmMaster.length > 0 ? state.targetGsmMaster[0] : '120 GSM'));
   const [addReelRemarks, setAddReelRemarks] = useState('');
   const [addReelWeightKg, setAddReelWeightKg] = useState('');
+  const [showCompletedJobsInAddReel, setShowCompletedJobsInAddReel] = useState(false);
 
   // Synchronize isPrintedRoll dynamically when selectedPlanId or selected GSM changes
   useEffect(() => {
@@ -1831,7 +1832,19 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
               >
                 <option value="" disabled>-- Select a Scheduled PPC Plan --</option>
                 {productionPlans
-                  .filter((p) => p.status === 'Scheduled' || p.status === 'In-Progress')
+                  .filter((p) => {
+                    if (p.status === 'Completed' || p.status === 'Cancelled') return false;
+                    if (p.jobId) {
+                      const linkedJob = jobs.find((j) => j.id === p.jobId);
+                      if (linkedJob) {
+                        const reels = getJobAllReels(linkedJob);
+                        const plannedLimit = p.targetLayers || linkedJob.targetLayers || 8;
+                        const isJobDone = (linkedJob.stage === 'Slitting Completed' || linkedJob.status === 'READY_FOR_CUTTING' || linkedJob.stage === 'Cutting') && reels.length >= plannedLimit;
+                        if (isJobDone) return false;
+                      }
+                    }
+                    return p.status === 'Scheduled' || p.status === 'In-Progress';
+                  })
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       [{p.id}] {p.product} • {p.targetLayers}L • {p.targetLengthMeters}M • {p.paperBrand || 'ITC'} ({p.status})
@@ -2834,26 +2847,110 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                   </span>
                 )}
               </div>
-              <select
-                value={addReelJobId}
-                onChange={(e) => setAddReelJobId(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-              >
-                <option value="">-- SELECT JOB ID --</option>
-                {jobs.map((j) => {
+              {(() => {
+                const activeOrPartial: Array<{
+                  job: Job;
+                  currReelsCount: number;
+                  plannedLimit: number;
+                  isRunningNow: boolean;
+                  isPartial: boolean;
+                }> = [];
+                const completedJobsList: Array<{
+                  job: Job;
+                  currReelsCount: number;
+                  plannedLimit: number;
+                }> = [];
+
+                jobs.forEach((j) => {
+                  const currReels = getJobAllReels(j);
+                  const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
+                  const plannedLimit = targetPlan?.targetLayers || j.targetLayers || 8;
                   const isRunningNow = currentRunningBatch?.job.id === j.id;
-                  const isFinished = j.stage?.toLowerCase().includes('complet') || j.status === 'READY_FOR_CUTTING';
-                  return (
-                    <option key={j.id} value={j.id}>
-                      {isRunningNow ? '⭐ [ACTIVE RUNNING] ' : ''}
-                      {isFinished ? '🔄 [RE-OPEN TO ADD REEL] ' : ''}
-                      {j.id} - {j.product} [{j.paperBrand || 'ITC'}]{' '}
-                      {getJobAllReels(j).length > 0 ? `(Reels: ${getJobAllReels(j).join(', ')})` : ''}
-                      {isFinished ? ' (Input Weight: ' + (j.inputWeightKg || 0) + 'kg)' : ''}
-                    </option>
-                  );
-                })}
-              </select>
+                  const isLimitReached = currReels.length >= plannedLimit;
+                  const isSlittingFinished = j.stage === 'Slitting Completed' || j.status === 'READY_FOR_CUTTING' || j.stage === 'Cutting' || j.status === 'CUTTING_IN_PROGRESS';
+                  const is100PercentDone = isLimitReached && isSlittingFinished;
+
+                  if (isRunningNow) {
+                    activeOrPartial.unshift({
+                      job: j,
+                      currReelsCount: currReels.length,
+                      plannedLimit,
+                      isRunningNow: true,
+                      isPartial: !isLimitReached
+                    });
+                  } else if (!is100PercentDone) {
+                    activeOrPartial.push({
+                      job: j,
+                      currReelsCount: currReels.length,
+                      plannedLimit,
+                      isRunningNow: false,
+                      isPartial: currReels.length > 0 && currReels.length < plannedLimit
+                    });
+                  } else {
+                    completedJobsList.push({
+                      job: j,
+                      currReelsCount: currReels.length,
+                      plannedLimit
+                    });
+                  }
+                });
+
+                return (
+                  <>
+                    <select
+                      value={addReelJobId}
+                      onChange={(e) => setAddReelJobId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                    >
+                      <option value="">-- SELECT JOB ID --</option>
+                      {activeOrPartial.length === 0 && !showCompletedJobsInAddReel && (
+                        <option value="" disabled>
+                          ✅ All slitting jobs have completed their 100% reels quota!
+                        </option>
+                      )}
+                      {activeOrPartial.map(({ job: j, currReelsCount, plannedLimit, isRunningNow, isPartial }) => {
+                        const reelsList = getJobAllReels(j);
+                        return (
+                          <option key={j.id} value={j.id}>
+                            {isRunningNow ? '⭐ [ACTIVE RUNNING] ' : isPartial ? `⏳ [PARTIAL - ${currReelsCount}/${plannedLimit} REELS DONE, ${plannedLimit - currReelsCount} PENDING] ` : ''}
+                            {j.id} - {j.product} [{j.paperBrand || 'ITC'}]{' '}
+                            {reelsList.length > 0 ? `(Reels: ${reelsList.join(', ')})` : ''}
+                          </option>
+                        );
+                      })}
+                      {showCompletedJobsInAddReel && completedJobsList.length > 0 && (
+                        <optgroup label="🔒 100% Completed Jobs (Supervisor Override)">
+                          {completedJobsList.map(({ job: j, currReelsCount, plannedLimit }) => {
+                            const reelsList = getJobAllReels(j);
+                            return (
+                              <option key={j.id} value={j.id}>
+                                🔒 [100% DONE - {currReelsCount}/{plannedLimit} REELS] {j.id} - {j.product} [{j.paperBrand || 'ITC'}] {reelsList.length > 0 ? `(${reelsList.join(', ')})` : ''}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      )}
+                    </select>
+
+                    <div className="flex items-center justify-between mt-1.5 pt-1 text-[11px] text-slate-500">
+                      <span>
+                        {activeOrPartial.length} Active/Partial lot{activeOrPartial.length !== 1 ? 's' : ''} awaiting reels
+                      </span>
+                      {completedJobsList.length > 0 && (
+                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-600 hover:text-slate-900 select-none">
+                          <input
+                            type="checkbox"
+                            checked={showCompletedJobsInAddReel}
+                            onChange={(e) => setShowCompletedJobsInAddReel(e.target.checked)}
+                            className="rounded text-blue-600 focus:ring-0 cursor-pointer"
+                          />
+                          <span>Show 100% Completed Jobs ({completedJobsList.length})</span>
+                        </label>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
               {currentRunningBatch && addReelJobId && addReelJobId !== currentRunningBatch.job.id && (
                 <div className="mt-1.5 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-900 font-semibold">
                   ⚠️ <b>Single Active Job Info:</b> Job <b>{currentRunningBatch.job.id}</b> is currently running on machine {selectedMachine}. Until it is Held or Completed, new reel/entry can only be added-on to this active job <b>{currentRunningBatch.job.id}</b>.
