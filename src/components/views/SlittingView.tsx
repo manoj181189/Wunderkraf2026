@@ -2399,7 +2399,9 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
           const entryTime = latestLog?.startTime || (latestLog?.timestamp ? latestLog.timestamp.split(',')[1]?.trim() : '');
           const paperBrand = j.paperBrand || 'ITC';
           const remark = j.customRemark || 'Standard';
-          const stock = j.availableRolls || 0;
+          const totalSlitRolls = (j.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0) ||
+            (j.runningBatches || []).filter(b => b.stage === 'Slitting' && b.status === 'Completed').reduce((s, b) => s + (b.producedQty || 0), 0);
+          const stock = (j.availableRolls !== undefined && j.availableRolls > 0) ? j.availableRolls : totalSlitRolls;
 
           return {
             job: j,

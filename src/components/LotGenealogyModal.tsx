@@ -255,7 +255,12 @@ export const LotGenealogyModal: React.FC<LotGenealogyModalProps> = ({
                   <div>
                     <span className="text-slate-500 font-medium">Output Slit Rolls:</span>
                     <div className="font-bold text-emerald-800 mt-0.5">
-                      {job.availableRolls || 0} Rolls Stock (In: {job.inputWeightKg || 200}kg / Out: {job.outputWeightKg || 0}kg)
+                      {(() => {
+                        const totalSlitRolls = (job.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0) ||
+                          (job.runningBatches || []).filter(b => b.stage === 'Slitting' && b.status === 'Completed').reduce((s, b) => s + (b.producedQty || 0), 0);
+                        const computedRolls = (job.availableRolls && job.availableRolls > 0) ? job.availableRolls : totalSlitRolls;
+                        return `${computedRolls} Rolls Stock`;
+                      })()} (In: {job.inputWeightKg || 200}kg / Out: {job.outputWeightKg || 0}kg)
                     </div>
                   </div>
                 </div>
