@@ -105,7 +105,20 @@ export const FormingView: React.FC<FormingViewProps> = ({
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
   // Pending queue of cut crates
-  let pendingCutJobs = jobs.filter((j) => (j.availableCuttingCrates || 0) > 0);
+  let pendingCutJobs = jobs.filter((j) => {
+    const cutCrates = Number(j.availableCuttingCrates) || 0;
+    const cutBatches = (j.runningBatches || []).filter(
+      (b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
+    );
+    const totalCutProduced = cutBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
+    const formBatches = (j.runningBatches || []).filter(
+      (b) => b.stage === 'Forming' || b.machine?.startsWith('Forming')
+    );
+    const totalFormIssued = formBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
+    const unformedCrates = Math.max(0, totalCutProduced - totalFormIssued);
+
+    return cutCrates > 0 || unformedCrates > 0 || ((Number(j.totalCutPieces) || 0) > 0 && j.stage === 'Cutting') || j.stage === 'Forming';
+  });
   if (filterProduct) {
     pendingCutJobs = pendingCutJobs.filter((j) => j.product === filterProduct);
   }
@@ -187,30 +200,34 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const cuttingBatches = (j.runningBatches || []).filter(
       (b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
     );
-    const totalCutCrates = cuttingBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
-    const rawStdCutPcs = j.pcsPerCrateCutting || state.crateCapacityMaster?.[j.product]?.cuttingPcs || 10000;
-    const cuttingRejectedPcs = j.cuttingRejectedPcs || j.cuttingScrapPcs || 0;
-
-    // Total net flat blanks after cutting minor rejections:
-    let totalNetPieces = 0;
-    if (j.totalCutPieces !== undefined && j.totalCutPieces > 0) {
-      totalNetPieces = j.totalCutPieces;
-    } else if (totalCutCrates > 0) {
-      totalNetPieces = Math.max(0, (totalCutCrates * rawStdCutPcs) - cuttingRejectedPcs);
-    } else {
-      totalNetPieces = (j.availableCuttingCrates || 0) * rawStdCutPcs;
-    }
+    const totalCutCrates = cuttingBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
+    const rawStdCutPcs = Number(j.pcsPerCrateCutting) || state.crateCapacityMaster?.[j.product]?.cuttingPcs || 10000;
+    const cuttingRejectedPcs = Number(j.cuttingRejectedPcs) || Number(j.cuttingScrapPcs) || 0;
+    const availCrates = Number(j.availableCuttingCrates) || 0;
 
     // Net pieces per cutting crate: Calculate based on ACTUAL cut output if possible (strict whole integers)
     let netPcsPerCrate = rawStdCutPcs;
-    const totalActualPieces = cuttingBatches.reduce((sum, b) => sum + (b.producedPieces || 0), 0);
+    const totalActualPieces = cuttingBatches.reduce((sum, b) => sum + (Number(b.producedPieces) || 0), 0);
     if (totalActualPieces > 0 && totalCutCrates > 0) {
       netPcsPerCrate = Math.round(totalActualPieces / totalCutCrates);
-    } else if (j.totalCutPieces && j.totalCutPieces > 0 && j.availableCuttingCrates && j.availableCuttingCrates > 0) {
-      netPcsPerCrate = Math.round(j.totalCutPieces / j.availableCuttingCrates);
+    } else if (j.totalCutPieces && Number(j.totalCutPieces) > 0 && (totalCutCrates > 0 || availCrates > 0)) {
+      const denom = totalCutCrates || availCrates || 1;
+      netPcsPerCrate = Math.round(Number(j.totalCutPieces) / denom);
     }
 
-    const hasRejectionDeduction = cuttingRejectedPcs > 0 && totalNetPieces < ((totalCutCrates || j.availableCuttingCrates || 0) * rawStdCutPcs);
+    // Total net flat blanks available:
+    let totalNetPieces = 0;
+    if (availCrates > 0) {
+      totalNetPieces = availCrates * netPcsPerCrate;
+    } else if (j.totalCutPieces !== undefined && Number(j.totalCutPieces) > 0) {
+      totalNetPieces = Number(j.totalCutPieces);
+    } else if (totalCutCrates > 0) {
+      totalNetPieces = Math.max(0, (totalCutCrates * rawStdCutPcs) - cuttingRejectedPcs);
+    } else {
+      totalNetPieces = availCrates * rawStdCutPcs;
+    }
+
+    const hasRejectionDeduction = cuttingRejectedPcs > 0 && totalNetPieces < ((totalCutCrates || availCrates || 0) * rawStdCutPcs);
 
     return {
       totalCutCrates,
@@ -2202,9 +2219,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
               {pendingCutJobs.map((j) => {
                 const jm = getJobCuttingMetrics(j);
                 const custSuffix = j.customerName ? ` [Customer: ${j.customerName}]` : '';
+                const displayCrates = Number(j.availableCuttingCrates) || 0;
                 return (
                   <option key={j.id} value={j.id}>
-                    {j.id}{custSuffix} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {j.availableCuttingCrates} Crates = {jm.totalNetPieces.toLocaleString()} Net Blanks)
+                    {j.id}{custSuffix} - {j.product} [{j.paperBrand || 'ITC'}] (Avail: {displayCrates} Crates = {jm.totalNetPieces.toLocaleString()} Net Blanks)
                   </option>
                 );
               })}
@@ -2215,13 +2233,14 @@ export const FormingView: React.FC<FormingViewProps> = ({
             const jm = getJobCuttingMetrics(selectedPendingJob);
             const inputCratesNum = parseInt(issueCratesQty, 10) || 0;
             const issuingPcs = inputCratesNum * jm.netPcsPerCrate;
+            const displayAvailCrates = Number(selectedPendingJob.availableCuttingCrates) || 0;
             return (
               <div className="space-y-2">
                 <div className="p-3.5 bg-indigo-50/90 border border-indigo-200 rounded-xl space-y-2 text-xs text-indigo-950 shadow-2xs">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <span className="font-extrabold text-sm text-indigo-900">
-                        📦 Available Stock: {selectedPendingJob.availableCuttingCrates} Cut Crates {selectedPendingJob.customerName ? `[${selectedPendingJob.customerName}]` : ''}
+                        📦 Available Stock: {displayAvailCrates} Cut Crates {selectedPendingJob.customerName ? `[${selectedPendingJob.customerName}]` : ''}
                       </span>
                       <span className="bg-indigo-200/80 text-indigo-900 font-black px-2 py-0.5 rounded text-[11px]">
                         {jm.totalNetPieces.toLocaleString()} Net Flat Blanks
