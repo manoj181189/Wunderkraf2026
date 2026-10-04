@@ -165,6 +165,7 @@ export interface RunningBatch {
   printedRollIcon?: string;
   worker: string;
   operator?: string;
+  supervisor?: string;
   user: string;
   holdReason?: string;
   parentBatchId?: string;
@@ -309,6 +310,8 @@ export interface Job {
   childJobIds?: string[];
   isMultiCustomerSplit?: boolean;
   targetQuantity?: number;
+  isAuthoritativeMasterEdit?: boolean;
+  updatedAt?: string;
 }
 
 export interface DispatchLog {
@@ -332,6 +335,7 @@ export interface HistoryRun {
   startTime?: string;
   endTime?: string;
   worker: string;
+  helpers?: string[];
   usedLots?: Record<string, string>;
   issuedRawMaterial?: string;
   issuedCrates?: Record<string, number>;
@@ -346,6 +350,9 @@ export interface PackJob {
   dispatchDate: string;
   kitItems: string[];
   kitType: string;
+  packer?: string;
+  helper?: string;
+  planId?: string;
   status: string;
   packedBoxes: number;
   dispatchedBoxes: number;

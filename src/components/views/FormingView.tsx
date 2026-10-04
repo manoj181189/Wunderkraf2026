@@ -2333,6 +2333,22 @@ export const FormingView: React.FC<FormingViewProps> = ({
                       });
 
 
+                      const totalLotsRemaining = selectableLots.reduce((sum, l) => sum + l.remainingQty, 0);
+                      const extraUnassignedCrates = Math.max(0, (selectedPendingJob.availableCuttingCrates || 0) - totalLotsRemaining);
+                      if (extraUnassignedCrates > 0) {
+                        selectableLots.push({
+                          id: `${selectedPendingJob.id}-DIRECT-LOT`,
+                          batchId: `${selectedPendingJob.id}-ADMIN-CUT`,
+                          worker: 'Admin / Direct Floor Stock',
+                          shift: 'DAY',
+                          machine: 'Cutting',
+                          totalQty: extraUnassignedCrates,
+                          consumedQty: 0,
+                          remainingQty: extraUnassignedCrates,
+                          date: new Date().toISOString().split('T')[0]
+                        });
+                      }
+
                       const activeLots = selectableLots.filter(l => l.remainingQty > 0);
 
                       if (activeLots.length === 0) {

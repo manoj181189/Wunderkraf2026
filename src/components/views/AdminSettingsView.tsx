@@ -78,7 +78,7 @@ import {
   TARGET_GSM_DEFAULT
 } from '../../lib/constants';
 import { triggerWhatsAppShiftNotification } from '../../lib/whatsappReports';
-import { exportToJSON, getCurrentExpectedShift, exportToCSV, getJobDeletionWarningInfo, performCascadeDeleteAndBackup } from '../../lib/utils';
+import { exportToJSON, getCurrentExpectedShift, exportToCSV, getJobDeletionWarningInfo, performCascadeDeleteAndBackup, getJobAllReels } from '../../lib/utils';
 import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState, getCentralSyncEndpoint, setCustomSyncEndpoint, forceSyncWithCentral, getPendingSyncCount, getCloudSyncStatus } from '../../lib/storage';
 import { syncStateToCloud, isFirebaseConfigured } from '../../lib/firebaseSync';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
@@ -869,7 +869,30 @@ _If you received this message, your contact number and routing configuration are
     setSelectedJobIdToEdit(jobId);
     const list = customJobs || state.jobs;
     const j = list.find((x) => x.id === jobId);
-    setJobEditForm(j ? JSON.parse(JSON.stringify(j)) : null);
+    if (!j) {
+      setJobEditForm(null);
+      return;
+    }
+    const cloned: Job = JSON.parse(JSON.stringify(j));
+    if (!cloned.reelsList || cloned.reelsList.length === 0) {
+      const allReels = getJobAllReels(cloned);
+      if (allReels.length > 0) {
+        cloned.reelsList = allReels.map((r, idx) => ({
+          reelNo: r,
+          gsm: cloned.gsm || '120 GSM',
+          rolls: Math.floor((cloned.availableRolls || 0) / (allReels.length || 1)),
+          weightKg: Math.round((cloned.inputWeightKg || 200) / (allReels.length || 1))
+        }));
+      } else {
+        cloned.reelsList = [{
+          reelNo: cloned.reelNo || 'RL-01',
+          gsm: cloned.gsm || '120 GSM',
+          rolls: cloned.availableRolls || 0,
+          weightKg: cloned.inputWeightKg || 200
+        }];
+      }
+    }
+    setJobEditForm(cloned);
   };
 
   const handleSelectPlanToEdit = (planId: string, customPlans?: ProductionPlan[]) => {
@@ -1138,27 +1161,69 @@ _If you received this message, your contact number and routing configuration are
     const actualScrapKg = jobEditForm.scrapKg !== undefined ? Math.max(0, Number(jobEditForm.scrapKg) || 0) : calculatedScrapKg;
     const scrapPct = inKg > 0 ? Number(((actualScrapKg / inKg) * 100).toFixed(1)) : 0;
 
+    const cleanReelsList = (jobEditForm.reelsList || []).map((r, idx) => ({
+      ...r,
+      reelNo: String(r.reelNo || '').trim().toUpperCase() || `REEL-${idx + 1}`,
+      gsm: String(r.gsm || jobEditForm.gsm || '120 GSM').trim(),
+      weightKg: Number(r.weightKg) || 0,
+      rolls: Number(r.rolls) || 0
+    }));
+
+    const cleanReelNumbers = cleanReelsList.map((r) => r.reelNo);
+    const summaryReelNo = cleanReelNumbers.length > 0 ? cleanReelNumbers.join(', ') : String(jobEditForm.reelNo || '').trim().toUpperCase();
+
     const updatedJobs = state.jobs.map((j) => {
       if (j.id === selectedJobIdToEdit) {
+        const updatedCuttingCrates = Number(jobEditForm.availableCuttingCrates) || 0;
+        let runningBatches = [...(jobEditForm.runningBatches || j.runningBatches || [])];
+
+        // If cutting crates were increased beyond existing batches (e.g. 19 -> 20), sync a traceable lot for Forming
+        const cuttingBatches = runningBatches.filter((b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
+        const totalCuttingProduced = cuttingBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
+        if (updatedCuttingCrates > totalCuttingProduced) {
+          const diff = updatedCuttingCrates - totalCuttingProduced;
+          const adminBatch: RunningBatch = {
+            batchId: `${cleanId}-ADMIN-CUT-${Date.now().toString().slice(-4)}`,
+            stage: 'Cutting',
+            machine: 'Cutting-Admin',
+            shift: 'DAY',
+            startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: 'Completed',
+            producedQty: diff,
+            producedPieces: diff * (Number(jobEditForm.pcsPerCrateCutting) || 10000),
+            worker: 'ADMIN-SYNC',
+            supervisor: 'ADMIN'
+          };
+          runningBatches = [...runningBatches, adminBatch];
+        }
+
         return {
           ...j,
           ...jobEditForm,
           id: cleanId,
-          reelNo: String(jobEditForm.reelNo || '').trim().toUpperCase(),
-          gsm: String(jobEditForm.gsm || '').trim(),
+          stage: jobEditForm.stage || j.stage || 'Slitting',
+          status: jobEditForm.status || j.status || 'READY_FOR_CUTTING',
+          reelNo: summaryReelNo,
+          reelNumbers: cleanReelNumbers,
+          reelsList: cleanReelsList,
+          targetLayers: cleanReelsList.length || Number(jobEditForm.targetLayers) || 8,
+          gsm: cleanReelsList[0]?.gsm || String(jobEditForm.gsm || '').trim(),
           inputWeightKg: inKg,
           outputWeightKg: outKg,
           scrapKg: actualScrapKg,
           scrapPercent: scrapPct,
           availableRolls: Number(jobEditForm.availableRolls) || 0,
-          availableCuttingCrates: Number(jobEditForm.availableCuttingCrates) || 0,
+          availableCuttingCrates: updatedCuttingCrates,
           availableFormingCrates: Number(jobEditForm.availableFormingCrates) || 0,
           availableQcCrates: Number(jobEditForm.availableQcCrates) || 0,
           pcsPerCrateCutting: Number(jobEditForm.pcsPerCrateCutting) || undefined,
           pcsPerCrateForming: Number(jobEditForm.pcsPerCrateForming) || undefined,
           totalCutPieces: Number(jobEditForm.totalCutPieces) || undefined,
           totalFormedPieces: Number(jobEditForm.totalFormedPieces) || undefined,
-          totalQcPieces: Number(jobEditForm.totalQcPieces) || undefined
+          totalQcPieces: Number(jobEditForm.totalQcPieces) || undefined,
+          runningBatches,
+          isAuthoritativeMasterEdit: true,
+          updatedAt: new Date().toISOString()
         };
       }
       return j;
@@ -1170,7 +1235,7 @@ _If you received this message, your contact number and routing configuration are
       stage: 'Admin Master',
       machine: 'MASTER-OVERWRITE',
       shift: 'DAY',
-      action: `🛠️ Master Overwrite on Job [${cleanId}]: Admin modified details (Reel: ${jobEditForm.reelNo || '-'}, GSM: ${jobEditForm.gsm || '-'}, In: ${inKg}kg, Out: ${outKg}kg, Scrap: ${actualScrapKg}kg)`,
+      action: `🛠️ Master Overwrite on Job [${cleanId}]: Admin modified details (Reels: ${summaryReelNo || '-'}, Stage: ${jobEditForm.stage || '-'}, Cut: ${jobEditForm.availableCuttingCrates || 0} Crates, Form: ${jobEditForm.availableFormingCrates || 0} Crates, In: ${inKg}kg, Out: ${outKg}kg, Scrap: ${actualScrapKg}kg)`,
       worker: 'ADMIN',
       user: 'admin',
       rawDate: new Date().toISOString().split('T')[0],
@@ -4904,7 +4969,7 @@ ${formLines.join('\n')}
 
               {jobEditForm ? (
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4 shadow-2xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-blue-900 uppercase mb-1">
                         Job ID (Job Number):
@@ -4918,7 +4983,7 @@ ${formLines.join('\n')}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Product Item (Item Type):
+                        Product Item:
                       </label>
                       <select
                         value={jobEditForm.product}
@@ -4934,7 +4999,7 @@ ${formLines.join('\n')}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Paper Brand / Mill:
+                        Paper Brand:
                       </label>
                       <select
                         value={jobEditForm.paperBrand || PAPER_BRANDS[0]}
@@ -4948,42 +5013,212 @@ ${formLines.join('\n')}
                         ))}
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-xs font-bold text-indigo-800 uppercase mb-1">
+                        Job Stage:
+                      </label>
+                      <select
+                        value={jobEditForm.stage || 'Slitting'}
+                        onChange={(e) => setJobEditForm({ ...jobEditForm, stage: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                      >
+                        <option value="Slitting">1. Slitting</option>
+                        <option value="Slitting Completed">1b. Slitting Completed</option>
+                        <option value="Cutting">2. Cutting</option>
+                        <option value="Cutting Completed">2b. Cutting Completed</option>
+                        <option value="Forming">3. Forming</option>
+                        <option value="Forming Completed">3b. Forming Completed</option>
+                        <option value="QC">4. Quality Control (QC)</option>
+                        <option value="Packing">5. Packing / Dispatch</option>
+                        <option value="Completed">6. Completed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-purple-800 uppercase mb-1">
+                        Job Status:
+                      </label>
+                      <select
+                        value={jobEditForm.status || 'READY_FOR_CUTTING'}
+                        onChange={(e) => setJobEditForm({ ...jobEditForm, status: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-purple-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                      >
+                        <option value="SLITTING_IN_PROGRESS">Slitting In Progress</option>
+                        <option value="READY_FOR_CUTTING">Ready for Cutting</option>
+                        <option value="CUTTING_IN_PROGRESS">Cutting In Progress</option>
+                        <option value="READY_FOR_FORMING">Ready for Forming</option>
+                        <option value="FORMING_IN_PROGRESS">Forming In Progress</option>
+                        <option value="READY_FOR_QC">Ready for QC</option>
+                        <option value="COMPLETED">Completed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-teal-800 uppercase mb-1">
+                        Planned Layers / Reels:
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="16"
+                        value={jobEditForm.targetLayers || (jobEditForm.reelsList || []).length || 8}
+                        onChange={(e) => setJobEditForm({ ...jobEditForm, targetLayers: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-white border border-teal-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                      />
+                    </div>
                   </div>
 
-                  {/* Reel Traceability & Weight Scrap Inputs */}
-                  <div className="border border-blue-200 rounded-xl p-3 bg-blue-50/40 space-y-2">
-                    <label className="text-xs font-extrabold text-blue-900 uppercase block flex items-center justify-between">
-                      <span>🎯 Reel Traceability & Jumbo Weights (Correct Reel Number & Weight):</span>
-                      <span className="text-[11px] font-bold text-purple-700">Admin Master Edit</span>
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-blue-800 uppercase mb-1">
-                          Reel No. (Reel Number):
-                        </label>
-                        <input
-                          type="text"
-                          value={jobEditForm.reelNo || ''}
-                          onChange={(e) => setJobEditForm({ ...jobEditForm, reelNo: e.target.value.toUpperCase() })}
-                          placeholder="e.g. RL-ITC-0012"
-                          className="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-slate-800 outline-none uppercase"
-                        />
+                  {/* Reel Traceability & Full Reels/GSM Management Suite */}
+                  <div className="border border-blue-200 rounded-xl p-3 bg-blue-50/40 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-blue-900 uppercase">
+                          🎯 Job Card Reels & GSM Master Suite:
+                        </span>
+                        <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full border border-purple-200">
+                          {(jobEditForm.reelsList || []).length} Jumbo Reels Configured
+                        </span>
                       </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-amber-800 uppercase mb-1">
-                          GSM Thickness:
-                        </label>
-                        <input
-                          type="text"
-                          value={jobEditForm.gsm || ''}
-                          onChange={(e) => setJobEditForm({ ...jobEditForm, gsm: e.target.value })}
-                          placeholder="e.g. 120 GSM"
-                          className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                        />
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentList = [...(jobEditForm.reelsList || [])];
+                          const nextIdx = currentList.length + 1;
+                          const newReel = {
+                            reelNo: `RL-${jobEditForm.paperBrand || 'ITC'}-${String(nextIdx).padStart(2, '0')}`,
+                            gsm: jobEditForm.gsm || (state.targetGsmMaster && state.targetGsmMaster[0]) || '120 GSM',
+                            rolls: 0,
+                            weightKg: 200
+                          };
+                          setJobEditForm({
+                            ...jobEditForm,
+                            reelsList: [...currentList, newReel],
+                            targetLayers: currentList.length + 1
+                          });
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> ➕ Add Reel to Job
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {(jobEditForm.reelsList || []).map((reel, rIdx) => (
+                        <div
+                          key={rIdx}
+                          className="p-2.5 bg-white border border-blue-200 rounded-xl grid grid-cols-1 sm:grid-cols-6 gap-2 text-xs items-center shadow-2xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                              {rIdx + 1}
+                            </span>
+                            <div className="flex-1">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase block">Reel Number:</span>
+                              <input
+                                type="text"
+                                value={reel.reelNo}
+                                onChange={(e) => {
+                                  const updated = [...(jobEditForm.reelsList || [])];
+                                  updated[rIdx] = { ...updated[rIdx], reelNo: e.target.value.toUpperCase() };
+                                  setJobEditForm({ ...jobEditForm, reelsList: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-blue-300 rounded font-mono font-bold text-xs uppercase"
+                                placeholder="e.g. RL-01"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold text-amber-800 uppercase block">GSM Specification:</span>
+                            <input
+                              type="text"
+                              value={reel.gsm}
+                              onChange={(e) => {
+                                const updated = [...(jobEditForm.reelsList || [])];
+                                updated[rIdx] = { ...updated[rIdx], gsm: e.target.value };
+                                setJobEditForm({ ...jobEditForm, reelsList: updated });
+                              }}
+                              className="w-full px-2 py-1 border border-amber-300 rounded font-bold text-xs"
+                              placeholder="e.g. 120 GSM"
+                            />
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold text-blue-700 uppercase block">Jumbo In Weight (KG):</span>
+                            <input
+                              type="number"
+                              value={reel.weightKg || ''}
+                              onChange={(e) => {
+                                const updated = [...(jobEditForm.reelsList || [])];
+                                updated[rIdx] = { ...updated[rIdx], weightKg: Number(e.target.value) };
+                                const totalWeight = updated.reduce((sum, r) => sum + (r.weightKg || 0), 0);
+                                setJobEditForm({ ...jobEditForm, reelsList: updated, inputWeightKg: totalWeight });
+                              }}
+                              className="w-full px-2 py-1 border border-blue-300 rounded font-bold text-xs"
+                              placeholder="KG"
+                            />
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold text-teal-700 uppercase block">Rolls Count:</span>
+                            <input
+                              type="number"
+                              value={reel.rolls || ''}
+                              onChange={(e) => {
+                                const updated = [...(jobEditForm.reelsList || [])];
+                                updated[rIdx] = { ...updated[rIdx], rolls: Number(e.target.value) };
+                                setJobEditForm({ ...jobEditForm, reelsList: updated });
+                              }}
+                              className="w-full px-2 py-1 border border-teal-300 rounded font-bold text-xs"
+                              placeholder="Rolls"
+                            />
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase block">Layer Type:</span>
+                            <select
+                              value={reel.isPrintedRoll ? 'Printed' : 'Plain'}
+                              onChange={(e) => {
+                                const updated = [...(jobEditForm.reelsList || [])];
+                                updated[rIdx] = { ...updated[rIdx], isPrintedRoll: e.target.value === 'Printed' };
+                                setJobEditForm({ ...jobEditForm, reelsList: updated });
+                              }}
+                              className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-bold"
+                            >
+                              <option value="Plain">Plain Paper</option>
+                              <option value="Printed">Printed Layer</option>
+                            </select>
+                          </div>
+
+                          <div className="flex items-center justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = (jobEditForm.reelsList || []).filter((_, idx) => idx !== rIdx);
+                                setJobEditForm({
+                                  ...jobEditForm,
+                                  reelsList: updated,
+                                  targetLayers: updated.length
+                                });
+                              }}
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              title="Delete this reel from Job Card"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {(!jobEditForm.reelsList || jobEditForm.reelsList.length === 0) && (
+                        <div className="text-xs text-slate-400 text-center py-3 bg-white rounded-lg border border-dashed border-blue-200">
+                          No jumbo reels configured. Click "+ Add Reel to Job" above to add reels.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-blue-200/60">
                       <div>
                         <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">
-                          Jumbo In Weight (KG):
+                          Total Jumbo In Weight (KG):
                         </label>
                         <input
                           type="number"
