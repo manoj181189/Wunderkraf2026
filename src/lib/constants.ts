@@ -471,7 +471,7 @@ export const DEFAULT_MOTHER_REELS: MotherReelItem[] = [
 
 export const DEFAULT_USERS: Record<string, { pass: string; perms: string[]; name?: string; role?: string; phone?: string }> = {
   'admin': {
-    pass: '1811',
+    pass: 'WKF1811',
     perms: ['*'],
     name: 'Master Administrator',
     role: 'Administrator'
@@ -752,6 +752,7 @@ export const INITIAL_STATE: FactoryState = {
   logs: [],
   scrapSales: [],
   users: DEFAULT_USERS,
+  adminPassword: 'WKF1811',
   deptWorkers: DEPT_WORKERS,
   seriesConfig: {
     orderSeq: 1,
