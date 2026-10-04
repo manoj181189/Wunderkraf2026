@@ -412,7 +412,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
       return lot;
     });
 
-    if (remDeduct > 0 && remWipDeduct > 0) {
+    if (selectedCuttingBatchId && remDeduct > 0 && remWipDeduct > 0 && (Number(job.availableCuttingCrates) || 0) < cratesCount) {
       alert(`⚠️ Insufficient crates in selected Cutting Operator Lot! Available remaining: ${cratesCount - Math.min(remDeduct, remWipDeduct)}, Requested: ${cratesCount}`);
       return;
     }
