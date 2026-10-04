@@ -84,6 +84,7 @@ import { syncStateToCloud, isFirebaseConfigured } from '../../lib/firebaseSync';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
 import { OpeningStockModal } from '../OpeningStockModal';
 import { EmployeeMasterView } from './EmployeeMasterView';
+import { parseAllProductionEvents } from '../../lib/productionAudit';
 
 interface AdminSettingsViewProps {
   state: FactoryState;
@@ -137,6 +138,12 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
 
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [editingItem, setEditingItem] = useState<CoordinationMatrixItem | null>(null);
+
+  // Admin Scrap Settings & Overrides Tab States
+  const [adminScrapSearch, setAdminScrapSearch] = useState('');
+  const [selectedAdminScrapEvent, setSelectedAdminScrapEvent] = useState<any>(null);
+  const [adminScrapEditWeight, setAdminScrapEditWeight] = useState('');
+  const [isAdminEditingScrap, setIsAdminEditingScrap] = useState(false);
 
   const validateMatrixItem = (role: string, name: string, phone: string): boolean => {
     if (!role.trim()) {
@@ -1025,10 +1032,18 @@ _If you received this message, your contact number and routing configuration are
     'Mnt_SpareParts',
     'Mnt_Preventative',
     'Mnt_RCA',
+    'WhatsApp',
+    'WA_ShiftReports',
+    'WA_BreakdownAlerts',
+    'WA_QcAlerts',
+    'WA_DispatchNotes',
+    'WA_ManpowerReports',
+    'WA_ConfigEdit',
     'Purchase',
     'Stock',
     'Orders',
     'Analytics',
+    'Scrap',
     'Search',
     'Audit'
   ];
@@ -1203,6 +1218,160 @@ _If you received this message, your contact number and routing configuration are
         setDeletePassword('');
       }
     });
+  };
+
+  // ==========================================
+  // MASTER DATA OVERWRITE: SCRAP EVENTS
+  // ==========================================
+  const handleDeleteAdminScrapEvent = (ev: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '🧹 Permanent Scrap Deletion',
+      message: `क्या आप सचमुच इस ${ev.scrapKg} KG स्क्रैप रिकॉर्ड को स्थायी रूप से डिलीट करना चाहते हैं?\n\nयह प्रक्रिया वापस नहीं ली जा सकती और रिकॉर्ड केंद्रीय डेटाबेस से स्थायी रूप से हटा दिया जाएगा।`,
+      confirmLabel: 'Yes, Delete Scrap',
+      isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
+      onConfirm: () => {
+        let updatedState = { ...state };
+
+        if (ev.id.startsWith('evt-log-')) {
+          const logIdx = parseInt(ev.id.replace('evt-log-', ''), 10);
+          if (updatedState.logs && updatedState.logs[logIdx]) {
+            const oldLog = updatedState.logs[logIdx];
+            const oldKey = `${oldLog.jobId || ''}_${oldLog.timestamp || ''}_${oldLog.action || ''}_${oldLog.stage || ''}_${oldLog.machine || ''}`;
+            
+            // Register old log key as deleted
+            updatedState.deletedLogIds = Array.from(new Set([...(updatedState.deletedLogIds || []), oldKey]));
+            
+            // Permanently filter out the log from logs list
+            updatedState.logs = (updatedState.logs || []).filter((_, idx) => idx !== logIdx);
+          }
+        } else if (ev.id.startsWith('evt-slice-')) {
+          const sliceId = ev.id.replace('evt-slice-', '');
+          updatedState.jobs = (updatedState.jobs || []).map((job) => {
+            const updatedBatches = (job.runningBatches || []).map((batch) => {
+              const updatedSlices = (batch.slices || []).map((slice, sIdx) => {
+                if (slice.sliceId === sliceId || String(sIdx) === sliceId) {
+                  return {
+                    ...slice,
+                    scrapQty: 0,
+                    scrapKg: 0,
+                    notes: slice.notes ? `${slice.notes} | [Scrap cleared by Admin]` : '[Scrap cleared by Admin]'
+                  };
+                }
+                return slice;
+              });
+              return { ...batch, slices: updatedSlices };
+            });
+            return { ...job, runningBatches: updatedBatches };
+          });
+        }
+
+        const newLog = {
+          jobId: ev.jobId || 'SCRAP-DEL',
+          product: ev.product || 'Paper Scrap',
+          stage: 'Admin Master',
+          machine: 'SCRAP-OVERWRITE',
+          shift: ev.shift || 'DAY',
+          action: `🧹 Admin permanently deleted/deleted scrap event of ${ev.scrapKg} KG for ${ev.jobId || 'N/A'} (${ev.stage})`,
+          worker: 'ADMIN',
+          user: 'admin',
+          rawDate: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          date: new Date().toISOString().split('T')[0]
+        };
+        updatedState.logs = [...(updatedState.logs || []), newLog];
+
+        onSaveState(updatedState);
+        setSelectedAdminScrapEvent(null);
+        setConfirmModal(null);
+        setDeletePassword('');
+        alert('✅ Scrap record deleted successfully from database!');
+      }
+    });
+  };
+
+  const handleEditAdminScrapEvent = (ev: any, newWeightKg: number) => {
+    if (isNaN(newWeightKg) || newWeightKg < 0) {
+      alert('Please enter a valid positive number for scrap weight!');
+      return;
+    }
+
+    let updatedState = { ...state };
+
+    if (ev.id.startsWith('evt-log-')) {
+      const logIdx = parseInt(ev.id.replace('evt-log-', ''), 10);
+      if (updatedState.logs && updatedState.logs[logIdx]) {
+        const oldLog = updatedState.logs[logIdx];
+        const oldKey = `${oldLog.jobId || ''}_${oldLog.timestamp || ''}_${oldLog.action || ''}_${oldLog.stage || ''}_${oldLog.machine || ''}`;
+        
+        let newAction = oldLog.action || '';
+        const hasKgMatch = newAction.match(/(Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/i);
+        if (hasKgMatch) {
+          newAction = newAction.replace(/(Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/i, `Scrap: ${newWeightKg} KG`);
+        } else {
+          const hasKgSuffixMatch = newAction.match(/(\d+(?:\.\d+)?)\s*KG\s*(Scrap|Paper Scrap|Extra Paper Scrap)/i);
+          if (hasKgSuffixMatch) {
+            newAction = newAction.replace(/(\d+(?:\.\d+)?)\s*KG\s*(Scrap|Paper Scrap|Extra Paper Scrap)/i, `${newWeightKg} KG Scrap`);
+          } else {
+            newAction = `${newAction} | Scrap: ${newWeightKg} KG`;
+          }
+        }
+
+        const newLogEntry = {
+          ...oldLog,
+          action: newAction,
+          details: oldLog.details ? `${oldLog.details} | [Scrap edited by Admin to ${newWeightKg} KG]` : `[Scrap edited by Admin to ${newWeightKg} KG]`
+        };
+
+        // Register old log key as deleted so merge doesn't bring it back
+        updatedState.deletedLogIds = Array.from(new Set([...(updatedState.deletedLogIds || []), oldKey]));
+
+        // Filter out old log index and push the new edited log
+        updatedState.logs = (updatedState.logs || []).filter((_, idx) => idx !== logIdx);
+        updatedState.logs.push(newLogEntry);
+      }
+    } else if (ev.id.startsWith('evt-slice-')) {
+      const sliceId = ev.id.replace('evt-slice-', '');
+      updatedState.jobs = (updatedState.jobs || []).map((job) => {
+        const updatedBatches = (job.runningBatches || []).map((batch) => {
+          const updatedSlices = (batch.slices || []).map((slice, sIdx) => {
+            if (slice.sliceId === sliceId || String(sIdx) === sliceId) {
+              const pcsPerKg = 450;
+              const newScrapQty = batch.stage === 'Cutting' ? newWeightKg : Math.round(newWeightKg * pcsPerKg);
+              return {
+                ...slice,
+                scrapQty: newScrapQty,
+                notes: slice.notes ? `${slice.notes} | [Scrap edited by Admin to ${newWeightKg} KG]` : `[Scrap edited by Admin to ${newWeightKg} KG]`
+              };
+            }
+            return slice;
+          });
+          return { ...batch, slices: updatedSlices };
+        });
+        return { ...job, runningBatches: updatedBatches };
+      });
+    }
+
+    const newLog = {
+      jobId: ev.jobId || 'SCRAP-EDIT',
+      product: ev.product || 'Paper Scrap',
+      stage: 'Admin Master',
+      machine: 'SCRAP-OVERWRITE',
+      shift: ev.shift || 'DAY',
+      action: `✏️ Admin edited scrap event for ${ev.jobId || 'N/A'} (${ev.stage}) from ${ev.scrapKg} KG to ${newWeightKg} KG`,
+      worker: 'ADMIN',
+      user: 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toISOString().split('T')[0]
+    };
+    updatedState.logs = [...(updatedState.logs || []), newLog];
+
+    onSaveState(updatedState);
+    setSelectedAdminScrapEvent(null);
+    alert(`✅ Scrap weight successfully updated to ${newWeightKg} KG in database!`);
   };
 
   // ==========================================
@@ -3207,6 +3376,7 @@ ${formLines.join('\n')}
     { key: 'Stock', label: '📊 Raw & WIP Stock Matrix', desc: 'Real-time inventory levels' },
     { key: 'Orders', label: '📋 Orders Book & Customer Specs', desc: 'View customer orders list' },
     { key: 'Analytics', label: '📈 Scrap & Efficiency Analytics', desc: 'Output yield & machine metrics' },
+    { key: 'Scrap', label: '♻️ Scrap Desk & Wastage Entries', desc: 'Direct access to record Scrap and Wastage logs' },
     { key: 'Search', label: '🔎 Universal Search Desk', desc: 'Search Job ID, Invoices, Customers & Operators' },
     { key: 'Audit', label: '📜 Traceability & Batch Reports', desc: 'Box-to-raw trace, customer complaints & audit logs' }
   ];
@@ -4173,6 +4343,108 @@ ${formLines.join('\n')}
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Admin Scrap & Waste Logs Overrides Panel */}
+          <div className="max-w-4xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+            <div className="px-4 py-3 bg-rose-50 border-b border-slate-200 font-black text-rose-950 uppercase text-xs flex justify-between items-center">
+              <span>♻️ Scrap & Wastage Database Overrides</span>
+              <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-bold">Admin Panel</span>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Search Scrap Event by Job ID, Machine, Operator or Details..."
+                  value={adminScrapSearch}
+                  onChange={(e) => setAdminScrapSearch(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-rose-500 transition"
+                />
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-96">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-900 text-white sticky top-0">
+                    <tr>
+                      <th className="p-2.5 font-bold">Date & Time</th>
+                      <th className="p-2.5 font-bold">Stage</th>
+                      <th className="p-2.5 font-bold">Machine</th>
+                      <th className="p-2.5 font-bold">Job ID / Product</th>
+                      <th className="p-2.5 font-bold">Operator</th>
+                      <th className="p-2.5 font-bold text-right">Scrap Weight</th>
+                      <th className="p-2.5 font-bold text-center">Override Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {(() => {
+                      const allEvents = parseAllProductionEvents(state);
+                      const filtered = allEvents.filter((ev) => {
+                        if (ev.scrapKg <= 0) return false;
+                        if (ev.stage.toLowerCase() === 'slitting') return false;
+                        
+                        const query = adminScrapSearch.toLowerCase();
+                        if (!query) return true;
+                        
+                        return (
+                          (ev.jobId || '').toLowerCase().includes(query) ||
+                          (ev.machine || '').toLowerCase().includes(query) ||
+                          (ev.operator || '').toLowerCase().includes(query) ||
+                          (ev.action || '').toLowerCase().includes(query) ||
+                          (ev.product || '').toLowerCase().includes(query) ||
+                          (ev.stage || '').toLowerCase().includes(query)
+                        );
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={7} className="p-6 text-center text-slate-400 italic font-semibold">
+                              No scrap records found matching the search.
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return filtered.map((ev, idx) => (
+                        <tr key={idx} className="hover:bg-amber-50/50">
+                          <td className="p-2.5 text-slate-600 font-mono">
+                            <div>{ev.date}</div>
+                            <div className="text-[10px] text-slate-400">{ev.timestamp}</div>
+                          </td>
+                          <td className="p-2.5">
+                            <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[9px] font-black uppercase">
+                              {ev.stage}
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-bold text-slate-800">{ev.machine}</td>
+                          <td className="p-2.5">
+                            <div className="font-bold text-indigo-700 font-mono">{ev.jobId || 'N/A'}</div>
+                            <div className="text-[10px] text-slate-500">{ev.product}</div>
+                          </td>
+                          <td className="p-2.5 font-semibold text-slate-600">{ev.operator}</td>
+                          <td className="p-2.5 text-right font-black text-rose-600 text-sm">
+                            {ev.scrapKg.toLocaleString()} KG
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <button
+                              onClick={() => {
+                                setSelectedAdminScrapEvent(ev);
+                                setAdminScrapEditWeight(String(ev.scrapKg));
+                                setIsAdminEditingScrap(false);
+                              }}
+                              className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[10px] rounded border border-rose-200 transition cursor-pointer"
+                            >
+                              ⚙️ Manage / Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ));
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -9199,6 +9471,128 @@ ${formLines.join('\n')}
         </div>
       </div>
 
+      {/* Admin Scrap Audit Overwrites Modal */}
+      {selectedAdminScrapEvent && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
+                  <Scale className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 m-0">Scrap Master Data Audit</h3>
+                  <p className="text-xs text-slate-500 m-0">Overwrite scrap logs or correct weight discrepancies</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedAdminScrapEvent(null)}
+                className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Stage / Department</span>
+                  <span className="font-extrabold text-slate-900 uppercase">{selectedAdminScrapEvent.stage}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Machine / Operator</span>
+                  <span className="font-extrabold text-slate-900">{selectedAdminScrapEvent.machine} ({selectedAdminScrapEvent.operator})</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Job ID</span>
+                  <span className="font-mono font-bold text-indigo-700">{selectedAdminScrapEvent.jobId || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Product</span>
+                  <span className="font-bold text-slate-900">{selectedAdminScrapEvent.product}</span>
+                </div>
+              </div>
+
+              <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-rose-800 uppercase block">Scrap Generated</span>
+                  <span className="text-xl font-black text-rose-700">{selectedAdminScrapEvent.scrapKg} KG</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-rose-600 uppercase block">Timestamp</span>
+                  <span className="text-xs font-mono font-bold text-rose-900">{selectedAdminScrapEvent.date} {selectedAdminScrapEvent.timestamp}</span>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold text-slate-700 uppercase block mb-1">Production Log Action</span>
+                <div className="p-3 bg-slate-900 text-slate-100 font-mono text-[11px] rounded-xl overflow-x-auto max-h-24">
+                  {selectedAdminScrapEvent.action}
+                </div>
+              </div>
+
+              <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black text-slate-700 uppercase block">✏️ Overwrite Options</span>
+                  <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold uppercase">Authorized Admin Only</span>
+                </div>
+
+                {isAdminEditingScrap ? (
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Corrected Scrap Weight (KG)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={adminScrapEditWeight}
+                        onChange={(e) => setAdminScrapEditWeight(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                      />
+                      <button
+                        onClick={() => handleEditAdminScrapEvent(selectedAdminScrapEvent, parseFloat(adminScrapEditWeight) || 0)}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] rounded-lg transition shrink-0 cursor-pointer"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setIsAdminEditingScrap(false)}
+                        className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[11px] rounded-lg transition shrink-0 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsAdminEditingScrap(true)}
+                      className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-[11px] rounded-lg transition cursor-pointer"
+                    >
+                      ✏️ Edit Weight
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAdminScrapEvent(selectedAdminScrapEvent)}
+                      className="flex-1 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold text-[11px] rounded-lg transition cursor-pointer"
+                    >
+                      🗑️ Delete Record
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setSelectedAdminScrapEvent(null)}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* In-App Toast Notification */}
       {adminToast && (
         <div
@@ -9223,7 +9617,7 @@ ${formLines.join('\n')}
 
       {/* In-App Confirmation Modal (Safe for iframes) */}
       {confirmModal && confirmModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center gap-3">
               <div

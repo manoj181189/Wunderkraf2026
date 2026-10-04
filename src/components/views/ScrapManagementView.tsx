@@ -83,8 +83,34 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
   const [targetPhysicalStock, setTargetPhysicalStock] = useState<string>('');
   const [adjustmentRemarks, setAdjustmentRemarks] = useState<string>('');
 
+  // Admin Scrap Edit & Delete States
+  const [editScrapWeightVal, setEditScrapWeightVal] = useState<string>('');
+  const [isEditingScrap, setIsEditingScrap] = useState<boolean>(false);
+
+  const isAdmin = useMemo(() => {
+    if (!currentUser) return false;
+    const cleanUser = currentUser.username.toLowerCase();
+    const userRole = (state.users && state.users[cleanUser]?.role) || '';
+    return (
+      currentUser.perms.includes('*') ||
+      currentUser.perms.includes('Admin') ||
+      cleanUser === 'admin' ||
+      cleanUser.includes('manoj') ||
+      userRole.toLowerCase() === 'administrator' ||
+      userRole.toLowerCase() === 'admin'
+    );
+  }, [currentUser, state.users]);
+
   const logs = state.logs || [];
   const scrapSales: ScrapSale[] = state.scrapSales || [];
+
+  // Reset edit states when modal opens/closes
+  React.useEffect(() => {
+    if (selectedScrapEvent) {
+      setEditScrapWeightVal(String(selectedScrapEvent.scrapKg));
+      setIsEditingScrap(false);
+    }
+  }, [selectedScrapEvent]);
 
   // Parse all production events
   const allEvents = useMemo(() => parseAllProductionEvents(state), [state]);
@@ -147,12 +173,12 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
 
   // One-time automatic clean up of past scrap records to start fresh from 0
   React.useEffect(() => {
-    const hasJobScrap = state.jobs.some(j => (j.scrapKg || 0) > 0 || (j.scrapQty || 0) > 0 || (j.scrapPcs || 0) > 0);
+    const hasJobScrap = state.jobs.some((j: any) => (j.scrapKg || 0) > 0 || (j.scrapQty || 0) > 0 || (j.scrapPcs || 0) > 0);
     const hasSales = (state.scrapSales || []).length > 0;
     const alreadyReset = localStorage.getItem('wunderkraf_scrap_reset_done_v2');
 
     if (!alreadyReset && (hasJobScrap || hasSales)) {
-      const clearedJobs = state.jobs.map(j => ({
+      const clearedJobs = state.jobs.map((j: any) => ({
         ...j,
         scrapKg: 0,
         scrapQty: 0,
@@ -346,6 +372,149 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
     setTargetPhysicalStock('');
     setAdjustmentRemarks('');
     alert(`✅ Scrap Inventory adjusted to physically measured ${targetStock} KG successfully!`);
+  };
+
+  const handleDeleteScrapEvent = (ev: NormalizedProductionEvent) => {
+    if (!confirm(`Are you sure you want to permanently delete/clear this scrap record of ${ev.scrapKg} KG?`)) return;
+
+    let updatedState = { ...state };
+
+    if (ev.id.startsWith('evt-log-')) {
+      const logIdx = parseInt(ev.id.replace('evt-log-', ''), 10);
+      if (updatedState.logs && updatedState.logs[logIdx]) {
+        const log = updatedState.logs[logIdx];
+        let newAction = log.action || '';
+        
+        newAction = newAction
+          .replace(/(?:Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/gi, 'Scrap: 0 KG')
+          .replace(/(?:Scrap|Extra Paper Scrap|Paper Scrap):\s*[0-9.]+/gi, 'Scrap: 0')
+          .replace(/Defect\/Scrap:\s*[0-9,]+/gi, 'Defect/Scrap: 0')
+          .replace(/Auto-Adjustment:\s*\+?[0-9,]+/gi, 'Auto-Adjustment: 0')
+          .replace(/(\d+)\s*(?:Defect Pcs|Defect Pieces|Defects)/gi, '0 Defect Pcs')
+          .replace(/(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Loose Pieces):\s*[0-9,]+/gi, 'Defect Pieces: 0')
+          .replace(/[0-9,]+\s*(?:Defect Pieces|Defects|Scrap Pcs|Defect|Rejected Pcs|Rejected|Defective)/gi, '0 Defects');
+        
+        updatedState.logs = [...updatedState.logs];
+        updatedState.logs[logIdx] = {
+          ...log,
+          action: newAction,
+          details: log.details ? `${log.details} | [Scrap cleared by Admin]` : '[Scrap cleared by Admin]'
+        };
+      }
+    } else if (ev.id.startsWith('evt-slice-')) {
+      const sliceId = ev.id.replace('evt-slice-', '');
+      updatedState.jobs = (updatedState.jobs || []).map((job) => {
+        const updatedBatches = (job.runningBatches || []).map((batch) => {
+          const updatedSlices = (batch.slices || []).map((slice, sIdx) => {
+            if (slice.sliceId === sliceId || String(sIdx) === sliceId) {
+              return {
+                ...slice,
+                scrapQty: 0,
+                scrapKg: 0,
+                notes: slice.notes ? `${slice.notes} | [Scrap cleared by Admin]` : '[Scrap cleared by Admin]'
+              };
+            }
+            return slice;
+          });
+          return { ...batch, slices: updatedSlices };
+        });
+        return { ...job, runningBatches: updatedBatches };
+      });
+    }
+
+    const newLog = {
+      jobId: ev.jobId || 'SCRAP-DEL',
+      product: ev.product || 'Paper Scrap',
+      stage: 'Admin Master',
+      machine: 'SCRAP-OVERWRITE',
+      shift: ev.shift || 'DAY',
+      action: `🧹 Admin deleted/cleared scrap event of ${ev.scrapKg} KG for ${ev.jobId || 'N/A'} (${ev.stage})`,
+      worker: 'ADMIN',
+      user: 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toISOString().split('T')[0]
+    };
+    updatedState.logs = [...(updatedState.logs || []), newLog];
+
+    onSaveState(updatedState);
+    setSelectedScrapEvent(null);
+    alert('✅ Scrap record deleted/cleared successfully!');
+  };
+
+  const handleEditScrapEvent = (ev: NormalizedProductionEvent, newWeightKg: number) => {
+    if (isNaN(newWeightKg) || newWeightKg < 0) {
+      alert('Please enter a valid positive number for scrap weight!');
+      return;
+    }
+
+    let updatedState = { ...state };
+
+    if (ev.id.startsWith('evt-log-')) {
+      const logIdx = parseInt(ev.id.replace('evt-log-', ''), 10);
+      if (updatedState.logs && updatedState.logs[logIdx]) {
+        const log = updatedState.logs[logIdx];
+        let newAction = log.action || '';
+        
+        const hasKgMatch = newAction.match(/(Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/i);
+        if (hasKgMatch) {
+          newAction = newAction.replace(/(Scrap|Extra Paper Scrap|cuttingScrapKg|Paper Scrap):\s*[0-9.]+\s*KG/i, `Scrap: ${newWeightKg} KG`);
+        } else {
+          const hasKgSuffixMatch = newAction.match(/(\d+(?:\.\d+)?)\s*KG\s*(Scrap|Paper Scrap|Extra Paper Scrap)/i);
+          if (hasKgSuffixMatch) {
+            newAction = newAction.replace(/(\d+(?:\.\d+)?)\s*KG\s*(Scrap|Paper Scrap|Extra Paper Scrap)/i, `${newWeightKg} KG Scrap`);
+          } else {
+            newAction = `${newAction} | Scrap: ${newWeightKg} KG`;
+          }
+        }
+
+        updatedState.logs = [...updatedState.logs];
+        updatedState.logs[logIdx] = {
+          ...log,
+          action: newAction,
+          details: log.details ? `${log.details} | [Scrap edited by Admin to ${newWeightKg} KG]` : `[Scrap edited by Admin to ${newWeightKg} KG]`
+        };
+      }
+    } else if (ev.id.startsWith('evt-slice-')) {
+      const sliceId = ev.id.replace('evt-slice-', '');
+      updatedState.jobs = (updatedState.jobs || []).map((job) => {
+        const updatedBatches = (job.runningBatches || []).map((batch) => {
+          const updatedSlices = (batch.slices || []).map((slice, sIdx) => {
+            if (slice.sliceId === sliceId || String(sIdx) === sliceId) {
+              const pcsPerKg = 450;
+              const newScrapQty = batch.stage === 'Cutting' ? newWeightKg : Math.round(newWeightKg * pcsPerKg);
+              return {
+                ...slice,
+                scrapQty: newScrapQty,
+                notes: slice.notes ? `${slice.notes} | [Scrap edited by Admin to ${newWeightKg} KG]` : `[Scrap edited by Admin to ${newWeightKg} KG]`
+              };
+            }
+            return slice;
+          });
+          return { ...batch, slices: updatedSlices };
+        });
+        return { ...job, runningBatches: updatedBatches };
+      });
+    }
+
+    const newLog = {
+      jobId: ev.jobId || 'SCRAP-EDIT',
+      product: ev.product || 'Paper Scrap',
+      stage: 'Admin Master',
+      machine: 'SCRAP-OVERWRITE',
+      shift: ev.shift || 'DAY',
+      action: `✏️ Admin edited scrap event for ${ev.jobId || 'N/A'} (${ev.stage}) from ${ev.scrapKg} KG to ${newWeightKg} KG`,
+      worker: 'ADMIN',
+      user: 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toISOString().split('T')[0]
+    };
+    updatedState.logs = [...(updatedState.logs || []), newLog];
+
+    onSaveState(updatedState);
+    setSelectedScrapEvent(null);
+    alert(`✅ Scrap weight successfully updated to ${newWeightKg} KG!`);
   };
 
   const handleExportCSV = () => {
@@ -591,7 +760,7 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                 <p className="text-xs text-slate-500 m-0">Correct scrap stock discrepancies to match actual physical weighments</p>
               </div>
 
-              {currentUser?.username === 'admin' ? (
+              {isAdmin ? (
                 <form onSubmit={handleApplyStockAdjustment} className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className="block text-[11px] font-extrabold text-slate-700 mb-1 uppercase">
@@ -682,7 +851,7 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                         <td className="p-2.5 text-right text-slate-600">₹{sale.ratePerKg || 0}</td>
                         <td className="p-2.5 text-right font-extrabold text-emerald-700">₹{(sale.totalAmount || ((sale.weightKg || sale.soldKg || 0) * (sale.ratePerKg || 0))).toLocaleString()}</td>
                         <td className="p-2.5 text-center">
-                          {currentUser?.username === 'admin' ? (
+                          {isAdmin ? (
                             <button
                               onClick={() => handleDeleteScrapSale(index)}
                               className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition cursor-pointer"
@@ -916,6 +1085,58 @@ export const ScrapManagementView: React.FC<ScrapManagementViewProps> = ({ state,
                   {selectedScrapEvent.action}
                 </div>
               </div>
+
+              {/* Admin Override Actions */}
+              {(currentUser?.username === 'admin' || currentUser?.perms.includes('Admin') || currentUser?.perms.includes('*')) && (
+                <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-slate-700 uppercase tracking-wide block">✏️ Admin Override Controls</span>
+                    <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase">Authorized Only</span>
+                  </div>
+                  
+                  {isEditingScrap ? (
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">New Weight (KG)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={editScrapWeightVal}
+                          onChange={(e) => setEditScrapWeightVal(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-indigo-600"
+                        />
+                        <button
+                          onClick={() => handleEditScrapEvent(selectedScrapEvent, parseFloat(editScrapWeightVal) || 0)}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-xl cursor-pointer transition shrink-0"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setIsEditingScrap(false)}
+                          className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[11px] rounded-xl cursor-pointer transition shrink-0"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setIsEditingScrap(true)}
+                        className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-[11px] rounded-xl cursor-pointer transition"
+                      >
+                        Edit Scrap Weight
+                      </button>
+                      <button
+                        onClick={() => handleDeleteScrapEvent(selectedScrapEvent)}
+                        className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-[11px] rounded-xl cursor-pointer transition"
+                      >
+                        Delete / Clear Scrap
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="pt-2 flex justify-end">

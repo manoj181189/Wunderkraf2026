@@ -375,7 +375,7 @@ export function getJobStageShiftLedger(
     new Set(rawItems.map((item) => item.operator).filter(Boolean))
   );
 
-  const totalGlueKg = Number(
+  const totalGlueKg = stageLower.includes('slit') ? 0 : Number(
     (
       job.glueUsageKg ||
       batches.reduce((sum, b) => sum + (b.glueUsageKg || 0), 0) ||

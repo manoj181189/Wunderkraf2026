@@ -2,15 +2,16 @@ import { FactoryState } from '../types';
 
 export function generateShiftChangeoverReportText(
   state: FactoryState,
-  targetShift: 'DAY' | 'NIGHT'
+  targetShift: 'DAY' | 'NIGHT',
+  targetDate?: string
 ): string {
-  const today = new Date().toISOString().split('T')[0];
+  const today = targetDate || new Date().toISOString().split('T')[0];
   const shiftTitle = targetShift === 'DAY' ? '☀️ DAY SHIFT' : '🌙 NIGHT SHIFT';
 
   // 1. Gather all logs recorded for today & targetShift
   const shiftLogs = (state.logs || []).filter((l) => {
-    const logDate = l.timestamp ? l.timestamp.split('T')[0] : '';
-    const matchesDate = logDate === today;
+    const logDate = l.rawDate || l.date || (l.timestamp ? l.timestamp.split('T')[0] : '');
+    const matchesDate = logDate === today || (l.timestamp && l.timestamp.split('T')[0] === today);
     const matchesShift = l.shift ? l.shift.toUpperCase() === targetShift : true;
     return matchesDate && matchesShift;
   });
@@ -20,11 +21,11 @@ export function generateShiftChangeoverReportText(
   const slittingLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('slit') || l.jobId?.startsWith('SL-'));
   const slittingOperators = Array.from(new Set(slittingLogs.map((l) => l.operator).filter(Boolean)));
   const slittingRolls = slittingLogs.reduce((acc, l) => {
-    const match = l.details?.match(/(\d+)\s*Rolls/i);
+    const match = l.action?.match(/(\d+)\s*Rolls/i) || l.details?.match(/(\d+)\s*Rolls/i);
     return acc + (match ? parseInt(match[1], 10) : 0);
   }, 0);
   const slittingScrap = slittingLogs.reduce((acc, l) => {
-    const match = l.details?.match(/Scrap:\s*([\d.]+)\s*KG/i);
+    const match = l.action?.match(/Scrap:\s*([\d.]+)\s*KG/i) || l.details?.match(/Scrap:\s*([\d.]+)\s*KG/i);
     return acc + (match ? parseFloat(match[1]) : 0);
   }, 0);
 
@@ -43,6 +44,15 @@ export function generateShiftChangeoverReportText(
     )
   );
 
+  const cutM1Crates = cutM1Logs.reduce((acc, l) => {
+    const match = l.action?.match(/(\d+)\s*Crates/i) || l.action?.match(/(\d+)\s*Cut Crates/i) || l.details?.match(/(\d+)\s*Crates/i) || l.details?.match(/(\d+)\s*Cut Crates/i);
+    return acc + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+  const cutM2Crates = cutM2Logs.reduce((acc, l) => {
+    const match = l.action?.match(/(\d+)\s*Crates/i) || l.action?.match(/(\d+)\s*Cut Crates/i) || l.details?.match(/(\d+)\s*Crates/i) || l.details?.match(/(\d+)\s*Cut Crates/i);
+    return acc + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+
   // Forming Machines (M1 to M8)
   const formingLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('form') || l.jobId?.startsWith('FORM-'));
   const formingMachineReports: string[] = [];
@@ -57,7 +67,7 @@ export function generateShiftChangeoverReportText(
 
     const opName = mOps.length > 0 ? mOps.join(', ') : (mRunningBatches[0]?.operator || 'Assigned');
     const crates = mLogs.reduce((acc, l) => {
-      const match = l.details?.match(/(\d+)\s*Crates/i);
+      const match = l.action?.match(/(\d+)\s*Formed Crates/i) || l.action?.match(/(\d+)\s*Crates/i) || l.details?.match(/(\d+)\s*Formed Crates/i) || l.details?.match(/(\d+)\s*Crates/i);
       return acc + (match ? parseInt(match[1], 10) : 0);
     }, 0);
 
@@ -70,11 +80,11 @@ export function generateShiftChangeoverReportText(
   const qcLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('qc') || l.details?.toLowerCase().includes('qc'));
   const qcInspectors = Array.from(new Set(qcLogs.map((l) => l.operator).filter(Boolean)));
   const qcOkCrates = qcLogs.reduce((acc, l) => {
-    const match = l.details?.match(/(\d+)\s*OK Crates/i) || l.details?.match(/Accepted:\s*(\d+)/i);
+    const match = l.action?.match(/(\d+)\s*OK Crates/i) || l.action?.match(/Accepted:\s*(\d+)/i) || l.details?.match(/(\d+)\s*OK Crates/i) || l.details?.match(/Accepted:\s*(\d+)/i);
     return acc + (match ? parseInt(match[1], 10) : 0);
   }, 0);
   const qcScrapCrates = qcLogs.reduce((acc, l) => {
-    const match = l.details?.match(/(\d+)\s*Scrap Crates/i) || l.details?.match(/Rejected:\s*(\d+)/i);
+    const match = l.action?.match(/(\d+)\s*Scrap Crates/i) || l.action?.match(/Rejected:\s*(\d+)/i) || l.details?.match(/(\d+)\s*Scrap Crates/i) || l.details?.match(/Rejected:\s*(\d+)/i);
     return acc + (match ? parseInt(match[1], 10) : 0);
   }, 0);
 
@@ -82,7 +92,7 @@ export function generateShiftChangeoverReportText(
   const packLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('pack') || l.jobId?.startsWith('PKG-'));
   const packOperators = Array.from(new Set(packLogs.map((l) => l.operator).filter(Boolean)));
   const packedBoxes = packLogs.reduce((acc, l) => {
-    const match = l.details?.match(/(\d+)\s*Boxes/i);
+    const match = l.action?.match(/(\d+)\s*Boxes/i) || l.details?.match(/(\d+)\s*Boxes/i);
     return acc + (match ? parseInt(match[1], 10) : 0);
   }, 0);
 
@@ -116,8 +126,8 @@ export function generateShiftChangeoverReportText(
 • Scrap: ${slittingScrap.toFixed(1)} KG
 
 ✂️ *2. CUTTING DESK:*
-• Machine C-01: ${cutM1Ops.join(', ') || 'Team A'}
-• Machine C-02: ${cutM2Ops.join(', ') || 'Team B'}
+• Machine C-01: ${cutM1Ops.join(', ') || 'Team A'}${cutM1Crates > 0 ? ` | Output: ${cutM1Crates} Crates` : ''}
+• Machine C-02: ${cutM2Ops.join(', ') || 'Team B'}${cutM2Crates > 0 ? ` | Output: ${cutM2Crates} Crates` : ''}
 ${cutOtherOps.length > 0 ? `• Operators: ${cutOtherOps.join(', ')}` : ''}
 
 ⚙️ *3. FORMING DESK (M1 - M8):*
@@ -530,14 +540,14 @@ export function generateScrapYieldReportText(state: FactoryState, targetDate?: s
   const slittingScrap = logs
     .filter((l) => l.action?.toLowerCase().includes('slit') && (l.rawDate === selectedDate || l.timestamp?.startsWith(selectedDate)))
     .reduce((acc, l) => {
-      const match = l.details?.match(/Scrap:\s*([\d.]+)\s*KG/i);
+      const match = l.action?.match(/Scrap:\s*([\d.]+)\s*KG/i) || l.details?.match(/Scrap:\s*([\d.]+)\s*KG/i);
       return acc + (match ? parseFloat(match[1]) : 0);
     }, 0);
 
   const cuttingScrap = logs
     .filter((l) => l.action?.toLowerCase().includes('cut') && (l.rawDate === selectedDate || l.timestamp?.startsWith(selectedDate)))
     .reduce((acc, l) => {
-      const match = l.details?.match(/Scrap:\s*([\d.]+)\s*KG/i);
+      const match = l.action?.match(/Scrap:\s*([\d.]+)\s*KG/i) || l.details?.match(/Scrap:\s*([\d.]+)\s*KG/i);
       return acc + (match ? parseFloat(match[1]) : 0);
     }, 0);
 
