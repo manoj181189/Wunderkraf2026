@@ -55,6 +55,19 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     if (!existing) {
       jobMap.set(incJob.id, { ...incJob });
     } else {
+      const isMasterEdit = Boolean(
+        incJob.isAuthoritativeMasterEdit ||
+        (incJob.updatedAt && (!existing.updatedAt || incJob.updatedAt >= existing.updatedAt))
+      );
+
+      if (isMasterEdit) {
+        jobMap.set(incJob.id, {
+          ...existing,
+          ...incJob
+        });
+        return;
+      }
+
       // Merge runningBatches by batchId
       const batchMap = new Map<string, RunningBatch>();
       (existing.runningBatches || []).forEach((b) => {
@@ -123,21 +136,16 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       const resolvedReelNumbers = Array.from(new Set([...(existing.reelNumbers || []), ...(incJob.reelNumbers || [])]));
       const resolvedReelNo = resolvedReelNumbers.length > 0 ? resolvedReelNumbers.join(', ') : (incJob.reelNo || existing.reelNo);
 
-      const isMasterEdit = Boolean(
-        incJob.isAuthoritativeMasterEdit ||
-        (incJob.updatedAt && (!existing.updatedAt || incJob.updatedAt >= existing.updatedAt))
-      );
-
       jobMap.set(incJob.id, {
         ...existing,
         ...incJob,
-        reelNo: isMasterEdit && incJob.reelNo ? incJob.reelNo : resolvedReelNo,
-        reelNumbers: isMasterEdit && incJob.reelNumbers ? incJob.reelNumbers : resolvedReelNumbers,
-        reelsList: isMasterEdit && incJob.reelsList ? incJob.reelsList : resolvedReelsList,
-        inputWeightKg: isMasterEdit && incJob.inputWeightKg !== undefined ? incJob.inputWeightKg : Math.max(existing.inputWeightKg || 0, incJob.inputWeightKg || 0),
-        outputWeightKg: isMasterEdit && incJob.outputWeightKg !== undefined ? incJob.outputWeightKg : Math.max(existing.outputWeightKg || 0, incJob.outputWeightKg || 0),
-        scrapKg: isMasterEdit && incJob.scrapKg !== undefined ? incJob.scrapKg : Math.max(existing.scrapKg || 0, incJob.scrapKg || 0),
-        status: isMasterEdit && incJob.status ? incJob.status : (hasActiveSlittingRun ? 'SLITTING_IN_PROGRESS' : (incJob.status || existing.status)),
+        reelNo: resolvedReelNo,
+        reelNumbers: resolvedReelNumbers,
+        reelsList: resolvedReelsList,
+        inputWeightKg: Math.max(existing.inputWeightKg || 0, incJob.inputWeightKg || 0),
+        outputWeightKg: Math.max(existing.outputWeightKg || 0, incJob.outputWeightKg || 0),
+        scrapKg: Math.max(existing.scrapKg || 0, incJob.scrapKg || 0),
+        status: hasActiveSlittingRun ? 'SLITTING_IN_PROGRESS' : (incJob.status || existing.status),
         plannedGsms: incJob.plannedGsms || existing.plannedGsms,
         plannedLayers: incJob.plannedLayers || existing.plannedLayers,
         targetLayers: incJob.targetLayers || existing.targetLayers,
@@ -146,21 +154,21 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         printedRollRequired: incJob.printedRollRequired ?? existing.printedRollRequired,
         printedRollDesign: incJob.printedRollDesign || existing.printedRollDesign,
         printedRollIcon: incJob.printedRollIcon || existing.printedRollIcon,
-        stage: isMasterEdit && incJob.stage ? incJob.stage : resolvedStage,
-        availableRolls: isMasterEdit && incJob.availableRolls !== undefined ? incJob.availableRolls : Math.max(existing.availableRolls || 0, incJob.availableRolls || 0),
+        stage: resolvedStage,
+        availableRolls: Math.max(existing.availableRolls || 0, incJob.availableRolls || 0),
         availableCuttingCrates: incJob.availableCuttingCrates !== undefined ? incJob.availableCuttingCrates : (existing.availableCuttingCrates || 0),
         availableFormingCrates: incJob.availableFormingCrates !== undefined ? incJob.availableFormingCrates : (existing.availableFormingCrates || 0),
         availableForQcCrates: incJob.availableForQcCrates !== undefined ? incJob.availableForQcCrates : (existing.availableForQcCrates || 0),
         availableQcCrates: incJob.availableQcCrates !== undefined ? incJob.availableQcCrates : (existing.availableQcCrates || 0),
         isReadyForQcInspection: incJob.isReadyForQcInspection !== undefined ? incJob.isReadyForQcInspection : existing.isReadyForQcInspection,
         tracedLots: { ...(existing.tracedLots || {}), ...(incJob.tracedLots || {}) },
-        totalCutPieces: isMasterEdit && incJob.totalCutPieces !== undefined ? incJob.totalCutPieces : Math.max(existing.totalCutPieces || 0, incJob.totalCutPieces || 0),
-        totalFormedPieces: isMasterEdit && incJob.totalFormedPieces !== undefined ? incJob.totalFormedPieces : Math.max(existing.totalFormedPieces || 0, incJob.totalFormedPieces || 0),
-        totalQcPieces: isMasterEdit && incJob.totalQcPieces !== undefined ? incJob.totalQcPieces : Math.max(existing.totalQcPieces || 0, incJob.totalQcPieces || 0),
-        cuttingLoosePcs: isMasterEdit && incJob.cuttingLoosePcs !== undefined ? incJob.cuttingLoosePcs : Math.max(existing.cuttingLoosePcs || 0, incJob.cuttingLoosePcs || 0),
-        formingLoosePcs: isMasterEdit && incJob.formingLoosePcs !== undefined ? incJob.formingLoosePcs : Math.max(existing.formingLoosePcs || 0, incJob.formingLoosePcs || 0),
-        qcLoosePcs: isMasterEdit && incJob.qcLoosePcs !== undefined ? incJob.qcLoosePcs : Math.max(existing.qcLoosePcs || 0, incJob.qcLoosePcs || 0),
-        runningBatches: isMasterEdit && incJob.runningBatches ? incJob.runningBatches : Array.from(batchMap.values())
+        totalCutPieces: Math.max(existing.totalCutPieces || 0, incJob.totalCutPieces || 0),
+        totalFormedPieces: Math.max(existing.totalFormedPieces || 0, incJob.totalFormedPieces || 0),
+        totalQcPieces: Math.max(existing.totalQcPieces || 0, incJob.totalQcPieces || 0),
+        cuttingLoosePcs: Math.max(existing.cuttingLoosePcs || 0, incJob.cuttingLoosePcs || 0),
+        formingLoosePcs: Math.max(existing.formingLoosePcs || 0, incJob.formingLoosePcs || 0),
+        qcLoosePcs: Math.max(existing.qcLoosePcs || 0, incJob.qcLoosePcs || 0),
+        runningBatches: Array.from(batchMap.values())
       });
     }
   });
@@ -178,6 +186,15 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     if (!existing) {
       planMap.set(p.id, { ...p });
     } else {
+      const isMasterEdit = Boolean(
+        p.isAuthoritativeMasterEdit ||
+        (p.updatedAt && (!existing.updatedAt || p.updatedAt >= existing.updatedAt))
+      );
+      if (isMasterEdit) {
+        planMap.set(p.id, { ...existing, ...p });
+        return;
+      }
+
       const isCompleted = p.status === 'Completed' || existing.status === 'Completed';
       planMap.set(p.id, {
         ...existing,
@@ -211,6 +228,15 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     if (!existing) {
       packMap.set(pj.id, { ...pj });
     } else {
+      const isMasterEdit = Boolean(
+        pj.isAuthoritativeMasterEdit ||
+        (pj.updatedAt && (!existing.updatedAt || pj.updatedAt >= existing.updatedAt))
+      );
+      if (isMasterEdit) {
+        packMap.set(pj.id, { ...existing, ...pj });
+        return;
+      }
+
       // Merge history runs
       const historyRuns = [...(existing.historyRuns || []), ...(pj.historyRuns || [])];
       const uniqueRuns = Array.from(new Map(historyRuns.map(r => [r.runId || `${r.date}_${r.time}_${r.worker}`, r])).values());

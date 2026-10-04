@@ -375,6 +375,8 @@ export interface PackJob {
   helperCount?: number;
   isOpeningBalance?: boolean;
   lotId?: string;
+  isAuthoritativeMasterEdit?: boolean;
+  updatedAt?: string;
 }
 
 export interface LogEntry {
@@ -706,6 +708,8 @@ export interface ProductionPlan {
   actualGlueConsumedKg?: number;
   isMultiCustomerSplit?: boolean;
   customerAllocations?: { customerName: string; allocatedQty: number; childJobId?: string }[];
+  isAuthoritativeMasterEdit?: boolean;
+  updatedAt?: string;
 }
 
 export interface MotherReelItem {

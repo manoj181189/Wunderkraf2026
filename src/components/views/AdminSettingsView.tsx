@@ -1446,7 +1446,11 @@ _If you received this message, your contact number and routing configuration are
     if (!planEditForm) return;
     const updatedPlans = (state.productionPlans || []).map((p) => {
       if (p.id === selectedPlanIdToEdit) {
-        return { ...planEditForm };
+        return {
+          ...planEditForm,
+          isAuthoritativeMasterEdit: true,
+          updatedAt: new Date().toISOString()
+        };
       }
       return p;
     });
@@ -1534,7 +1538,9 @@ _If you received this message, your contact number and routing configuration are
           pcsPerBox: Number(orderEditForm.pcsPerBox) || 1,
           orderQty: Number(orderEditForm.orderQty) || 1,
           packedBoxes: Number(orderEditForm.packedBoxes) || 0,
-          dispatchedBoxes: Number(orderEditForm.dispatchedBoxes) || 0
+          dispatchedBoxes: Number(orderEditForm.dispatchedBoxes) || 0,
+          isAuthoritativeMasterEdit: true,
+          updatedAt: new Date().toISOString()
         };
       }
       return o;
@@ -2206,7 +2212,9 @@ _If you received this message, your contact number and routing configuration are
           availableQcCrates: newQcCrates,
           totalCutPieces: Number(reconcileJobTarget.totalCutPieces) || undefined,
           totalFormedPieces: Number(reconcileJobTarget.totalFormedPieces) || undefined,
-          totalQcPieces: Number(reconcileJobTarget.totalQcPieces) || undefined
+          totalQcPieces: Number(reconcileJobTarget.totalQcPieces) || undefined,
+          isAuthoritativeMasterEdit: true,
+          updatedAt: new Date().toISOString()
         };
       }
       return j;
@@ -2272,7 +2280,9 @@ _If you received this message, your contact number and routing configuration are
         };
         return {
           ...j,
-          runningBatches: batches
+          runningBatches: batches,
+          isAuthoritativeMasterEdit: true,
+          updatedAt: new Date().toISOString()
         };
       }
       return j;
