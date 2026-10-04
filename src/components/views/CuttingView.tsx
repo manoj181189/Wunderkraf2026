@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Scissors, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, Box, Wrench, Search, Shield, ShieldCheck, CheckCircle2, AlertTriangle, RotateCcw, Calendar, Clock, Droplets, Users, UserCheck, Recycle, ChevronDown, ChevronUp, Lock, Pencil, Plus, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, Scroll } from 'lucide-react';
+import { ArrowLeft, Scissors, Play, Pause, Square, Zap, Undo2, XCircle, Check, Layers, AlertCircle, Box, Wrench, Search, Shield, ShieldCheck, CheckCircle2, AlertTriangle, RotateCcw, Calendar, Clock, Droplets, Users, UserCheck, Recycle, ChevronDown, ChevronUp, Lock, Pencil, Plus, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { FactoryState, WipLot, Job, ProductType, RunningBatch, OperatorRunSlice, LogEntry, GlueUsageEntry, AuditLog, ShiftHandoverRecord } from '../../types';
 import { logAuditTrail } from '../../lib/audit';
 import { PRODUCTS, DEPT_WORKERS, MACHINES } from '../../lib/constants';
@@ -287,29 +287,15 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
 
   // Pending queue of slit rolls
   let pendingSlitJobs = jobs.filter((j) => {
-    // 1. If this job is ALREADY actively running or held on ANY cutting machine, exclude it immediately!
-    const isActivelyRunningInCutting = (j.runningBatches || []).some(
-      (b) => (b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && (b.status === 'Running' || b.status === 'Held')
-    );
-    if (isActivelyRunningInCutting) {
-      return false; // Already running in Cutting! Cannot be queued or selected again.
-    }
-
-    // 2. If it's a child job, its available rolls are from its parent!
+    // If it's a child job, its available rolls are from its parent!
     const parentJob = j.parentJobId ? jobs.find(p => p.id === j.parentJobId) : null;
-    const effectiveJob = parentJob || j;
-
-    // Available unissued rolls remaining
-    const rollsCount = effectiveJob.availableRolls || 0;
+    const rollsCount = parentJob ? (parentJob.availableRolls || 0) : (j.availableRolls || 0);
     const hasRolls = rollsCount > 0;
-    if (!hasRolls) {
-      return false; // No slit rolls left! Exclude from queue.
-    }
     
     // If it's a child job, it is ready for cutting if the parent is ready or in progress
     if (j.parentJobId) {
-      const parentIsReady = parentJob && (parentJob.status === 'READY_FOR_CUTTING' || parentJob.status === 'CUTTING_IN_PROGRESS' || parentJob.stage === 'Slitting Completed');
-      return parentIsReady;
+      const parentIsReady = parentJob && (parentJob.status === 'READY_FOR_CUTTING' || parentJob.status === 'CUTTING_IN_PROGRESS');
+      return hasRolls && parentIsReady;
     }
     
     // If it is a parent job, we only show it in cutting if it has no child jobs.
@@ -319,17 +305,8 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       return false; // Hide the parent job, show its child jobs instead!
     }
 
-    const allSlitBatchesDone = (j.runningBatches || []).length > 0 &&
-      (j.runningBatches || []).filter((b) => b.stage === 'Slitting').every((b) => b.status === 'Completed');
-
-    const isReadyOrInProgress =
-      j.status === 'READY_FOR_CUTTING' ||
-      j.status === 'CUTTING_IN_PROGRESS' ||
-      j.stage === 'Slitting Completed' ||
-      j.stage === 'Cutting' ||
-      allSlitBatchesDone;
-
-    return isReadyOrInProgress;
+    const isReadyOrInProgress = j.status === 'READY_FOR_CUTTING' || j.status === 'CUTTING_IN_PROGRESS';
+    return hasRolls && isReadyOrInProgress;
   });
   if (filterProduct) {
     pendingSlitJobs = pendingSlitJobs.filter((j) => j.product === filterProduct);
@@ -638,11 +615,11 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       return;
     }
 
-    // Check if machine is occupied by an active running or held job
-    const activeOccupying = activeBatches.find((b) => b.batch.status === 'Running' || b.batch.status === 'Held');
-    if (activeOccupying) {
+    // Check if machine is running another job
+    const activeRunning = activeBatches.find((b) => b.batch.status === 'Running');
+    if (activeRunning && activeRunning.job.id !== job.id) {
       alert(
-        `⚠️ MACHINE BUSY & LOCKED!\nMachine [${selectedMachine}] is currently running Job [${activeOccupying.job.id}] (Batch: ${activeOccupying.batch.batchId}).\nजब तक आप ऊपर से एक्टिव जॉब को Finish नहीं करते, तब तक [${selectedMachine}] पर कोई नया रन नहीं लगाया जा सकता!`
+        `⚠️ MACHINE BUSY WITH DIFFERENT JOB!\nMachine [${selectedMachine}] is currently running Job [${activeRunning.job.id}].\nYou cannot start a new Job [${job.id}] until the active job is Finished or Placed on Hold.`
       );
       return;
     }
@@ -654,7 +631,27 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     let updatedJobs: Job[] = [];
     let logMessage = '';
 
-    {
+    if (activeRunning && activeRunning.job.id === job.id) {
+      // Same-job Top-up
+      updatedJobs = jobs.map((j) => {
+        let updatedJ = { ...j };
+        if (j.id === rollSourceJob.id) {
+          updatedJ.availableRolls = (j.availableRolls || 0) - rollsCount;
+        }
+        if (j.id === job.id) {
+          updatedJ.runningBatches = (j.runningBatches || []).map((b) => {
+            if (b.batchId !== activeRunning.batch.batchId) return b;
+            return {
+              ...b,
+              issuedQty: (b.issuedQty || 0) + rollsCount
+            };
+          });
+        }
+        return updatedJ;
+      });
+      logMessage = `Cutting Top-up on ${selectedMachine} (+${rollsCount} Rolls Added to Running Batch)`;
+      alert(`✅ Top-up Successful! Added ${rollsCount} more rolls to running Job ${job.id} on ${selectedMachine}.`);
+    } else {
       // Fresh batch
       const master = getNumberingMaster(state.seriesConfig);
       const batchId = generateCuttingBatchId(job.id, job.runningBatches || [], master);
@@ -1785,15 +1782,15 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       };
     });
 
-    const newLog = {
+    const newLog: LogEntry = {
       jobId: job.id,
       product: job.product,
       stage: 'Cutting Cancelled',
       machine: selectedMachine,
-      shift: batch.shift,
+      shift: batch.shift || 'DAY',
       action: `❌ Cutting Run Cancelled: Batch ${batch.batchId} deleted, ${rollsToReturn} slit rolls returned to stock.`,
-      worker: batch.worker,
-      user: 'cut_user',
+      worker: batch.worker || operatorName,
+      user: currentUser?.username || 'cut_user',
       rawDate: new Date().toISOString().split('T')[0],
       timestamp: new Date().toLocaleString()
     };
@@ -1806,7 +1803,12 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
 
     setIsCancelConfirmOpen(false);
     setSelectedActiveBatchId('');
-    alert('✅ Cutting run cancelled and slit rolls restored.');
+    setOutputCrates('');
+    setLoosePiecesInput('');
+    setRejectedPcsInput('');
+    setScrapKg('');
+    setGlueIssueInput('');
+    alert(`✅ Cutting run #${batch.batchId} cancelled. ${rollsToReturn} slit rolls returned to stock.`);
   };
 
   return (
@@ -2637,13 +2639,11 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setUnissueQtyInput(String(activeBatchObj.batch.issuedQty || '1'));
-                    setIsUnissueModalOpen(true);
-                  }}
-                  className="py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                  onClick={() => setIsCancelConfirmOpen(true)}
+                  className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                  title="Cancel and delete active cutting batch"
                 >
-                  {/* Issue Return removed per user request */}
+                  <XCircle className="w-3.5 h-3.5" /> Cancel Run
                 </button>
                 <button
                   type="button"
@@ -2694,176 +2694,21 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       </div>
 
       {/* ======================================================== */}
-      {/* PENDING SLIT ROLLS READY FOR CUTTING QUEUE CARDS */}
-      {/* ======================================================== */}
-      <div className="border-t border-slate-200 pt-4 space-y-2.5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-              <Scroll className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide m-0 flex items-center gap-1.5">
-                <span>📋 Slit Rolls Waiting for Cutting</span>
-                <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.2 rounded-full">
-                  {pendingSlitJobs.length} Jobs Ready
-                </span>
-              </h4>
-              <p className="text-[10px] text-slate-500 m-0">स्लिटिंग पूरी हो चुकी जॉब्स - कटिंग के लिए उपलब्ध रोल्स</p>
-            </div>
-          </div>
-          {pendingSlitJobs.length > 0 && (
-            <span className="text-[11px] font-extrabold text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">
-              Total Rolls Pending: {pendingSlitJobs.reduce((acc, j) => {
-                const rolls = (j.availableRolls && j.availableRolls > 0)
-                  ? j.availableRolls
-                  : Math.max(
-                      (j.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0),
-                      (j.runningBatches || []).filter(b => b.stage === 'Slitting' && b.status === 'Completed').reduce((s, b) => s + (b.producedQty || 0), 0)
-                    );
-                return acc + rolls;
-              }, 0)} Rolls
-            </span>
-          )}
-        </div>
-
-        {pendingSlitJobs.length === 0 ? (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 font-medium">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>All slit rolls have been cut or no open slitting lots pending. Slitting desk will populate new jobs here as rolls finish!</span>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {pendingSlitJobs.map((j) => {
-              const allReels = getJobAllReels(j);
-              const computedRolls = (j.availableRolls && j.availableRolls > 0)
-                ? j.availableRolls
-                : Math.max(
-                    (j.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0),
-                    (j.runningBatches || []).filter(b => b.stage === 'Slitting' && b.status === 'Completed').reduce((s, b) => s + (b.producedQty || 0), 0)
-                  );
-              const isSelected = selectedPendingJobId === j.id;
-              return (
-                <div
-                  key={j.id}
-                  className={`p-3 rounded-xl border transition flex flex-col justify-between gap-2 shadow-2xs ${
-                    isSelected
-                      ? 'bg-blue-50/90 border-blue-500 ring-2 ring-blue-400'
-                      : 'bg-white hover:bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-black text-sm text-blue-900 bg-blue-100/70 px-2 py-0.5 rounded border border-blue-200">
-                        {j.id}
-                      </span>
-                      <span className="font-black text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        ⭐ {computedRolls} Rolls Ready
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-slate-700 pt-0.5">
-                      <span className="font-bold">{j.product}</span>
-                      <span className="text-[11px] text-slate-500 font-medium">[{j.paperBrand || 'ITC'}]</span>
-                    </div>
-                    <div className="text-[10px] text-slate-600 flex items-center justify-between pt-0.5 border-t border-slate-100">
-                      <span className="truncate max-w-[140px]" title={allReels.join(', ')}>
-                        Reel: <b>{allReels.join(', ') || j.reelNo || 'N/A'}</b>
-                      </span>
-                      <span>GSM: <b>{j.targetGsm || j.gsm || '125 GSM'}</b></span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPendingJobId(j.id);
-                      setIssueRollsQty('');
-                    }}
-                    className={`w-full py-1.5 px-3 text-xs font-black rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
-                      isSelected
-                        ? 'bg-blue-700 text-white'
-                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200'
-                    }`}
-                  >
-                    {isSelected ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Selected for [{selectedMachine}]</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-3.5 h-3.5 text-blue-600" />
-                        <span>⚡ Load into [{selectedMachine}]</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ======================================================== */}
       {/* START / ISSUE SLIT ROLLS TO WORKSTATION FORM */}
       {/* ======================================================== */}
       <div className="border-t border-slate-200 pt-4">
-        {(() => {
-          const machineActiveRunning = activeBatches.find((b) => b.batch.status === 'Running');
-          const machineActiveHeld = activeBatches.find((b) => b.batch.status === 'Held');
-          const isMachineBusy = Boolean(machineActiveRunning || machineActiveHeld);
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-1.5 m-0">
+            <Play className="w-4 h-4 text-blue-600" />
+            Start or Top-up Cutting Run on [{selectedMachine}]:
+          </h4>
+          <span className="text-[11px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+            <span>🛡️ Supervisor on Duty:</span>
+            <span className="font-mono text-indigo-950 font-black">{currentSupervisor}</span>
+          </span>
+        </div>
 
-          if (isMachineBusy) {
-            return (
-              <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-xs space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-400 text-amber-900 flex items-center justify-center shrink-0">
-                    <Lock className="w-5 h-5 text-amber-800" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-amber-950 uppercase tracking-wide m-0">
-                      🛑 MACHINE {selectedMachine} IS OCCUPIED & LOCKED (मशीन व्यस्त है)
-                    </h4>
-                    <p className="text-xs text-amber-900 font-bold mt-0.5 m-0">
-                      {machineActiveRunning ? (
-                        <>
-                          🟢 Active Job <b>{machineActiveRunning.job.id}</b> ({machineActiveRunning.job.product}) is currently running on <b>{selectedMachine}</b> (Batch: {machineActiveRunning.batch.batchId}).
-                        </>
-                      ) : (
-                        <>
-                          ⏸️ Job <b>{machineActiveHeld?.job.id}</b> ({machineActiveHeld?.job.product}) is currently ON HOLD on <b>{selectedMachine}</b> (Batch: {machineActiveHeld?.batch.batchId}).
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white/90 border border-amber-200 rounded-xl text-xs text-amber-950 space-y-1.5">
-                  <div className="font-extrabold flex items-center gap-1.5 text-amber-900">
-                    <span>🔒 Single Active Job Rule Enforced (फ़ैक्ट्री का सख्त नियम):</span>
-                  </div>
-                  <p className="text-[11px] text-slate-700 m-0 leading-relaxed">
-                    एक कटिंग मशीन पर एक समय में केवल एक ही जॉब चल सकता है। जब तक आप ऊपर <b>Active Batch Card</b> से इस जॉब को <b>"Finish Run"</b> नहीं करते, तब तक <b>{selectedMachine}</b> पर कोई नया जॉब लोड या रन नहीं किया जा सकता।
-                  </p>
-                </div>
-              </div>
-            );
-          }
-
-          return (
-            <>
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-1.5 m-0">
-                  <Play className="w-4 h-4 text-blue-600" />
-                  Start Cutting Run on [{selectedMachine}]:
-                </h4>
-                <span className="text-[11px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
-                  <span>🛡️ Supervisor on Duty:</span>
-                  <span className="font-mono text-indigo-950 font-black">{currentSupervisor}</span>
-                </span>
-              </div>
-
-              <form onSubmit={handleStartRun} className="space-y-4">
+        <form onSubmit={handleStartRun} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-purple-700 uppercase mb-1">
@@ -3011,15 +2856,9 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 const reelsLabel = allReels.length > 1
                   ? `Jumbo Reels (${allReels.length}): ${allReels.join(', ')}`
                   : `Reel: ${allReels[0] || j.reelNo || 'RL-RAW-001'}`;
-                const computedRolls = (j.availableRolls && j.availableRolls > 0)
-                  ? j.availableRolls
-                  : Math.max(
-                      (j.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0),
-                      (j.runningBatches || []).filter((b) => b.stage === 'Slitting' && b.status === 'Completed').reduce((s, b) => s + (b.producedQty || 0), 0)
-                    );
                 return (
                   <option key={j.id} value={j.id}>
-                    {j.id} - {j.product} [{reelsLabel}] [{j.gsm || j.targetGsm || '-'}] [{j.paperBrand || 'ITC'}] (Avail: {computedRolls} Rolls)
+                    {j.id} - {j.product} [{reelsLabel}] [{j.gsm || j.targetGsm || '-'}] [{j.paperBrand || 'ITC'}] (Avail: {j.availableRolls} Rolls)
                   </option>
                 );
               })}
@@ -3029,12 +2868,6 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
           {selectedPendingJob && (() => {
             const allReels = getJobAllReels(selectedPendingJob);
             const reelBreakdown = getJobReelItemsBreakdown(selectedPendingJob);
-            const availRollsDisplay = (selectedPendingJob.availableRolls && selectedPendingJob.availableRolls > 0)
-              ? selectedPendingJob.availableRolls
-              : Math.max(
-                  (selectedPendingJob.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0),
-                  (selectedPendingJob.runningBatches || []).filter((b) => b.stage === 'Slitting' && b.status === 'Completed').reduce((s, b) => s + (b.producedQty || 0), 0)
-                );
             return (
               <div className="p-3.5 bg-blue-50/90 border-2 border-blue-200 rounded-xl text-xs space-y-2.5 shadow-2xs">
                 <div className="flex items-center justify-between flex-wrap gap-2 border-b border-blue-200/80 pb-2">
@@ -3051,7 +2884,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="text-slate-600 font-medium">Available Slit Rolls:</span>
                     <span className="font-black text-sm text-blue-800 bg-white px-2 py-0.5 rounded border border-blue-300">
-                      {availRollsDisplay} Rolls
+                      {selectedPendingJob.availableRolls} Rolls
                     </span>
                   </div>
                 </div>
@@ -3184,7 +3017,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 Enter Slit Rolls to Issue (Roll Count) *:
               </label>
               <div className="flex items-center gap-1">
-                {[1, 2, 4, 6].map((num) => (
+                {(selectedPendingJob ? [selectedPendingJob.targetLayers || 8] : [8, 9]).map((num) => (
                   <button
                     key={num}
                     type="button"
@@ -3258,10 +3091,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
             <span>Start Cutting Run on {selectedMachine}</span>
           </button>
         </form>
-      </>
-    );
-  })()}
-</div>
+      </div>
 
       {/* ======================================================== */}
       {/* CUTTING REELS & TRACEABILITY REGISTER (BOTTOM TEMPLATE MATCHING SLITTING) */}
@@ -3312,18 +3142,6 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
           let statusText = j.stage || '';
           if (stock > 0) {
             statusText = `Pending Forming (${stock} Crates)`;
-          } else {
-            const availRolls = (j.availableRolls && j.availableRolls > 0)
-              ? j.availableRolls
-              : Math.max(
-                  (j.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0),
-                  (j.runningBatches || []).filter((b) => b.stage === 'Slitting' && b.status === 'Completed').reduce((s, b) => s + (b.producedQty || 0), 0)
-                );
-            if (availRolls > 0) {
-              statusText = `⏳ Pending Cutting (${availRolls} Rolls Ready)`;
-            } else if (j.status === 'CUTTING_IN_PROGRESS') {
-              statusText = `✂️ Cutting In-Progress`;
-            }
           }
 
           return {
@@ -3703,7 +3521,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                         <td className="p-2.5 text-right font-mono text-xs">
                           <div className="flex flex-col items-end">
                             <span className="text-slate-700 font-bold">
-                              In: {item.totalInRolls > 0 ? `${item.totalInRolls} Rolls` : `${(j.availableRolls && j.availableRolls > 0) ? j.availableRolls : ((j.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0) || 0)} Rolls`}
+                              In: {item.totalInRolls > 0 ? `${item.totalInRolls} Rolls` : `${j.availableRolls || 0} Rolls`}
                             </span>
                             <span className="text-blue-700 font-medium">
                               Out: {item.stock} Crates
@@ -3719,10 +3537,6 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                           {item.stock > 0 ? (
                             <span className="text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                               Pending Forming ({item.stock} Crates)
-                            </span>
-                          ) : item.statusText.includes('Pending Cutting') ? (
-                            <span className="text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                              {item.statusText}
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">

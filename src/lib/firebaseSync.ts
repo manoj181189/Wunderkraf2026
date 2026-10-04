@@ -62,11 +62,56 @@ export function getFirebaseProjectId(): string {
   return firebaseConfig?.projectId || '';
 }
 
+export function isStudioOrDevEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname || '';
+  return (
+    hostname.includes('ais-dev') ||
+    hostname.includes('ais-pre') ||
+    hostname.includes('googleusercontent.com') ||
+    hostname.includes('run.app') ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1'
+  );
+}
+
+export type CloudSyncMode = 'manual' | 'auto';
+
+export function getCloudSyncMode(): CloudSyncMode {
+  if (typeof window === 'undefined') return 'manual';
+  try {
+    const saved = localStorage.getItem('wunderkraf_cloud_sync_mode');
+    if (saved === 'auto' || saved === 'manual') {
+      return saved;
+    }
+  } catch (e) {}
+  
+  // Default to 'manual' (Safe Sandbox mode) in AI Studio / Dev environments
+  if (isStudioOrDevEnvironment()) {
+    return 'manual';
+  }
+  // In production (e.g. GitHub Pages or custom domain), default to 'auto'
+  return 'auto';
+}
+
+export function setCloudSyncMode(mode: CloudSyncMode): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('wunderkraf_cloud_sync_mode', mode);
+  } catch (e) {}
+}
+
 /**
  * Pushes the full consolidated state to the central Firestore cloud document.
- * This guarantees real-time synchronization across GitHub Pages, mobile tablets, and desktop workstations.
+ * In Manual/Safe mode (default for AI Studio), background auto-sync is skipped unless force=true.
  */
-export async function syncStateToCloud(state: FactoryState): Promise<boolean> {
+export async function syncStateToCloud(state: FactoryState, force: boolean = false): Promise<boolean> {
+  const syncMode = getCloudSyncMode();
+  if (!force && syncMode === 'manual') {
+    console.info('[FirebaseSync] Auto-push skipped (Safe/Manual Mode is active in Studio). Use "Push to Live Cloud" in Admin Settings to push changes.');
+    return false;
+  }
+
   const database = getFirebaseDb();
   if (!database) {
     return false;
@@ -85,6 +130,7 @@ export async function syncStateToCloud(state: FactoryState): Promise<boolean> {
       deviceId: LOCAL_DEVICE_ID
     });
 
+    console.info('[FirebaseSync] State successfully pushed to Firestore Cloud!');
     return true;
   } catch (err: any) {
     if (err?.message?.includes('offline') || err?.code === 'unavailable') {
@@ -126,12 +172,17 @@ export async function fetchStateFromCloud(): Promise<FactoryState | null> {
 
 /**
  * Subscribes to live real-time state changes from Firestore.
- * When any mobile or computer records a change on GitHub Pages,
- * all other connected devices instantly receive and merge the update.
+ * In Manual/Safe mode (AI Studio), automatic live overwrite is bypassed.
  */
 export function subscribeToCloudSync(
   onRemoteStateReceived: (mergedState: FactoryState, fromDeviceId: string) => void
 ): Unsubscribe | null {
+  const syncMode = getCloudSyncMode();
+  if (syncMode === 'manual') {
+    console.info('[FirebaseSync] Live auto-listener skipped because Safe/Manual Mode is active in Studio.');
+    return null;
+  }
+
   const database = getFirebaseDb();
   if (!database) return null;
 

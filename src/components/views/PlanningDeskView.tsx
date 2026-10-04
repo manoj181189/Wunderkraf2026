@@ -99,14 +99,11 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
   ]);
 
   const handleToggleGsm = (gsmValue: string) => {
-    setFormSelectedGsms((prev) => {
-      if (prev.includes(gsmValue)) {
-        if (prev.length === 1) return prev; // Retain at least 1 GSM
-        return prev.filter((g) => g !== gsmValue);
-      } else {
-        return [...prev, gsmValue];
-      }
-    });
+    const nextGsms = formSelectedGsms.includes(gsmValue)
+      ? formSelectedGsms.filter((g) => g !== gsmValue)
+      : [...formSelectedGsms, gsmValue];
+    setFormSelectedGsms(nextGsms);
+    syncLayersToTargetAndPrinting(formTargetLayers, formPrintedRollRequired, nextGsms);
   };
 
   const handleAddCustomGsm = () => {
@@ -221,8 +218,33 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setFormPlannedLayers(layers);
   };
 
+  const syncLayersToTargetAndPrinting = (targetL: number, isPrinted: boolean) => {
+    const totalL = Math.max(1, targetL || 8);
+    const gsms = formSelectedGsms.length > 0 ? formSelectedGsms : ['120 GSM', '60 GSM'];
+    
+    const pGsmStr = gsms[0] || '120 GSM';
+    const thinGsmStr = gsms.find(g => parseNumericGsm(g) < 100) || gsms[1] || '60 GSM';
+
+    let layers: PlannedLayer[] = [];
+
+    if (isPrinted) {
+      const plainReels = Math.max(1, totalL - 1);
+      layers = [
+        { gsm: pGsmStr, type: 'Plain', requiredReels: plainReels },
+        { gsm: thinGsmStr, type: 'Printed', requiredReels: 1 }
+      ];
+      setFormPrintedLayersCount(1);
+    } else {
+      layers = [
+        { gsm: pGsmStr, type: 'Plain', requiredReels: totalL }
+      ];
+      setFormPrintedLayersCount(0);
+    }
+    setFormPlannedLayers(layers);
+  };
+
   const handleAutoSyncPlannedLayers = () => {
-    applyPresetLayers('standard');
+    syncLayersToTargetAndPrinting(formTargetLayers, formPrintedRollRequired);
   };
 
   // Mother Reel Modal State
@@ -238,27 +260,48 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
   const inProgressCount = productionPlans.filter((p) => p.status === 'In-Progress').length;
   const completedCount = productionPlans.filter((p) => p.status === 'Completed').length;
 
-  const filteredPlans = productionPlans.filter((p) => {
-    if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        p.id.toLowerCase().includes(q) ||
-        p.jobId.toLowerCase().includes(q) ||
-        p.product.toLowerCase().includes(q) ||
-        (p.adhesiveBrand && p.adhesiveBrand.toLowerCase().includes(q)) ||
-        (p.paperBrand && p.paperBrand.toLowerCase().includes(q))
-      );
+  const filteredPlans = [...productionPlans]
+    .filter((p) => {
+      if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          p.id.toLowerCase().includes(q) ||
+          p.jobId.toLowerCase().includes(q) ||
+          p.product.toLowerCase().includes(q) ||
+          (p.adhesiveBrand && p.adhesiveBrand.toLowerCase().includes(q)) ||
+          (p.paperBrand && p.paperBrand.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => b.id.localeCompare(a.id));
+
+  const handleProductChange = (prod: ProductType) => {
+    setFormProduct(prod);
+    const lastPlan = [...productionPlans]
+      .reverse()
+      .find((p) => p.product === prod);
+    if (lastPlan && lastPlan.targetLengthMeters) {
+      setFormTargetLengthMeters(lastPlan.targetLengthMeters);
+    } else {
+      setFormTargetLengthMeters(4000);
     }
-    return true;
-  });
+  };
 
   const handleOpenNewPlanModal = () => {
     setEditingPlanId(null);
-    setFormProduct(productList[0] || 'Spoon');
-    setFormTargetLayers(9);
-    setFormTargetLengthMeters(4000);
-    setFormAdhesiveBrand(glueBrandList[0] || 'Pidilite FS-35)');
+    const defaultProduct = productList[0] || 'Spoon';
+    setFormProduct(defaultProduct);
+    setFormTargetLayers(8);
+
+    const lastPlan = [...productionPlans]
+      .reverse()
+      .find((p) => p.product === defaultProduct);
+    const defaultLen = lastPlan && lastPlan.targetLengthMeters ? lastPlan.targetLengthMeters : 4000;
+    setFormTargetLengthMeters(defaultLen);
+
+    setFormAdhesiveBrand(glueBrandList[0] || 'Pidilite FS-35');
     setFormTargetScrapLimitPct(2.5);
     setFormTargetScrapLimitKg(15);
     setFormAssignedMachine(machinesList[0] || 'Slitting-1');
@@ -266,17 +309,16 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setFormPlannedDate(new Date().toISOString().split('T')[0]);
     setFormTargetQuantity(300000); // default to 300k as requested
     setFormPaperBrand(paperBrandList[0] || 'ITC');
-    setFormTargetGsm('120 GSM, 60 GSM');
-    setFormSelectedGsms(['120 GSM', '60 GSM']);
+    setFormTargetGsm('');
+    setFormSelectedGsms([]);
     setCustomGsmInput('');
     setFormNotes('');
-    setFormPrintedRollRequired(true);
+    setFormPrintedRollRequired(false);
     setFormPrintedRollDesign('Wunderkraf');
     setFormPrintedRollIcon('Sparkles');
-    setFormPrintedLayersCount(1);
+    setFormPrintedLayersCount(0);
     setFormPlannedLayers([
-      { gsm: 120, type: 'Plain', requiredReels: 8 },
-      { gsm: 60, type: 'Printed', requiredReels: 1 }
+      { gsm: '120 GSM', type: 'Plain', requiredReels: 8 }
     ]);
     setIsMultiCustomerSplit(false);
     setCustomerAllocations([
@@ -339,7 +381,12 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
   const handleSavePlan = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const effectiveGsms = formSelectedGsms.length > 0 ? formSelectedGsms : [formTargetGsm || defaultPlannedGsm];
+    if (formSelectedGsms.length === 0) {
+      alert('⚠️ MANDATORY: कृपया सबमिट करने से पहले कम से कम एक Paper GSM (जैसे 120 GSM या 60 GSM) अवश्य चुनें! पहले से कोई जीएसएम सिलेक्टेड नहीं रखा गया है ताकि गलती न हो।');
+      return;
+    }
+
+    const effectiveGsms = formSelectedGsms;
     const combinedGsmStr = effectiveGsms.join(', ');
 
     const effectivePlannedLayers: PlannedLayer[] = formPlannedLayers.length > 0
@@ -1137,7 +1184,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                   <label className="block font-bold text-slate-700 uppercase mb-1">Product Item:</label>
                   <select
                     value={formProduct}
-                    onChange={(e) => setFormProduct(e.target.value as ProductType)}
+                    onChange={(e) => handleProductChange(e.target.value as ProductType)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-800 bg-white"
                   >
                     {productList.map((p) => (
@@ -1170,7 +1217,11 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                   <label className="block font-bold text-blue-900 uppercase mb-1">Target Layers:</label>
                   <select
                     value={formTargetLayers}
-                    onChange={(e) => setFormTargetLayers(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setFormTargetLayers(val);
+                      syncLayersToTargetAndPrinting(val, formPrintedRollRequired);
+                    }}
                     className="w-full px-3 py-2 border border-blue-300 rounded-lg font-extrabold text-blue-900 bg-blue-50/50"
                   >
                     {targetLayersList.map((layer) => (
@@ -1198,7 +1249,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                 <div className="flex items-center justify-between">
                   <label className="block font-extrabold text-slate-800 text-xs uppercase flex items-center gap-1.5">
                     <Layers className="w-4 h-4 text-indigo-600" />
-                    <span>Target Paper GSM (Select Multiple, e.g. 60 GSM, 120 GSM):</span>
+                    <span>Paper GSM Selection:</span>
                   </label>
                   <span className="text-[10px] font-black text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full border border-indigo-200">
                     {formSelectedGsms.length} Selected (Auto-Integrated with Slitting)
@@ -1212,9 +1263,11 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                     onChange={(e) => {
                       const selected = e.target.value;
                       if (selected) {
-                        if (!formSelectedGsms.includes(selected)) {
-                          setFormSelectedGsms((prev) => [...prev, selected]);
-                        }
+                        const nextGsms = formSelectedGsms.includes(selected)
+                          ? formSelectedGsms
+                          : [...formSelectedGsms, selected];
+                        setFormSelectedGsms(nextGsms);
+                        syncLayersToTargetAndPrinting(formTargetLayers, formPrintedRollRequired, nextGsms);
                         setFormTargetGsm(selected);
                       }
                     }}
@@ -1239,7 +1292,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                     >
                       <Check className="w-3 h-3 text-indigo-200" />
                       {gsm}
-                      {formSelectedGsms.length > 1 && (
+                      {formSelectedGsms.length > 0 && (
                         <button
                           type="button"
                           onClick={() => handleToggleGsm(gsm)}
@@ -1278,30 +1331,6 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                     })}
                   </div>
                 </div>
-
-                {/* Custom GSM Input */}
-                <div className="flex items-center gap-1.5 pt-1">
-                  <input
-                    type="text"
-                    placeholder="Custom GSM (e.g. 70 GSM or 110 GSM)"
-                    value={customGsmInput}
-                    onChange={(e) => setCustomGsmInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddCustomGsm();
-                      }
-                    }}
-                    className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-lg font-semibold text-slate-800 bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomGsm}
-                    className="px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-300 rounded-lg cursor-pointer flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Custom
-                  </button>
-                </div>
               </div>
 
               {/* PRINTED ROLL CONFIGURATION */}
@@ -1317,6 +1346,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                       if (checked && !formPrintedRollDesign) {
                         setFormPrintedRollDesign('Wunderkraf');
                       }
+                      syncLayersToTargetAndPrinting(formTargetLayers, checked);
                     }}
                     className="w-4 h-4 text-indigo-600 border-indigo-300 rounded focus:ring-indigo-500"
                   />

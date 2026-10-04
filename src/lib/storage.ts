@@ -8,7 +8,11 @@ import {
   LOCAL_DEVICE_ID,
   isFirebaseConfigured,
   getFirebaseProjectId,
-  testFirestoreConnection
+  testFirestoreConnection,
+  getCloudSyncMode,
+  setCloudSyncMode,
+  isStudioOrDevEnvironment,
+  CloudSyncMode
 } from './firebaseSync';
 
 const DB_NAME = 'WunderkrafFactoryDB';
@@ -314,7 +318,7 @@ export async function fetchCentralState(): Promise<FactoryState | null> {
  */
 export async function persistFactoryState(
   nextState: FactoryState,
-  currentState: FactoryState
+  _currentState?: FactoryState
 ): Promise<{
   success: boolean;
   savedToIndexedDB: boolean;
@@ -324,26 +328,26 @@ export async function persistFactoryState(
   let savedToIndexedDB = false;
   let savedToLocalStorage = false;
 
-  // Merge with latest local authoritative state before persistence
-  const merged = mergeFactoryStates(currentState, nextState);
+  // Use nextState directly as the authoritative state to persist (do not merge old deleted items back)
+  const stateToSave = nextState;
 
   // 1. Primary IndexedDB write
   try {
-    savedToIndexedDB = await saveToIndexedDB(merged);
+    savedToIndexedDB = await saveToIndexedDB(stateToSave);
   } catch (e) {
     console.error('[Storage] Error during IndexedDB persistence:', e);
   }
 
   // 2. Mirror to localStorage with auto-pruning if quota reached
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
     savedToLocalStorage = true;
   } catch (localStorageErr: any) {
     console.warn('[Storage] localStorage quota reached. Attempting defensive pruning...', localStorageErr);
     try {
       const trimmedState: FactoryState = {
-        ...merged,
-        logs: (merged.logs || []).slice(-100)
+        ...stateToSave,
+        logs: (stateToSave.logs || []).slice(-100)
       };
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(trimmedState));
       savedToLocalStorage = true;
@@ -352,38 +356,44 @@ export async function persistFactoryState(
     }
   }
 
-  // 3. Enqueue to offline write-queue for central sync
-  await enqueueOfflineSync(merged);
+  // 3. Enqueue to offline write-queue for central sync (Auto mode only)
+  if (getCloudSyncMode() === 'auto') {
+    await enqueueOfflineSync(stateToSave);
+  }
 
   // 4. Notify all local tabs on same browser
-  syncBus?.postMessage({ type: 'STATE_CHANGED', state: merged });
+  syncBus?.postMessage({ type: 'STATE_CHANGED', state: stateToSave });
 
   // 5. Real-time Multi-Device Cloud Sync (Firestore: Works on GitHub Pages worldwide)
-  if (isFirebaseConfigured()) {
-    syncStateToCloud(merged).catch((err) => {
+  // In Manual Mode (AI Studio / Dev), auto-push is skipped to prevent accidental live overwrites
+  if (isFirebaseConfigured() && getCloudSyncMode() === 'auto') {
+    syncStateToCloud(stateToSave, false).catch((err) => {
       console.warn('[FirebaseSync] Background cloud sync deferred:', err);
     });
   }
 
-  // 6. Trigger non-blocking central sync flush (for local/custom endpoint)
-  flushOfflineSyncQueue().catch(() => {});
+  // 6. Trigger non-blocking central sync flush (Auto mode only)
+  if (getCloudSyncMode() === 'auto') {
+    flushOfflineSyncQueue().catch(() => {});
+  }
 
   return {
     success: savedToIndexedDB || savedToLocalStorage,
     savedToIndexedDB,
     savedToLocalStorage,
-    mergedState: merged
+    mergedState: stateToSave
   };
 }
 
 /**
  * Initialize factory state on startup:
  * 1. Loads local cached state from IndexedDB (or localStorage fallback).
- * 2. Concurrently fetches authoritative latest state from Central Shared Endpoint.
- * 3. Merges Central State + Local State using 100_2026_V1 merge rules before returning.
- * 4. Ensures all devices display identical counts without data asymmetry.
+ * 2. If in Auto Mode (Production), pulls authoritative latest state from Firestore Cloud.
+ * 3. In Safe/Manual Mode (AI Studio), uses local state as primary to prevent overriding studio work.
  */
 export async function initializeFactoryState(): Promise<FactoryState> {
+  const syncMode = getCloudSyncMode();
+
   // Step 1: Load baseline state from local IndexedDB
   let localState: FactoryState | null = null;
   try {
@@ -406,8 +416,15 @@ export async function initializeFactoryState(): Promise<FactoryState> {
     }
   }
 
-  // Step 2: Attempt to pull latest shared state from Firestore Cloud (Primary for GitHub Pages / Multi-Device Fleet)
-  if (isFirebaseConfigured()) {
+  // If in Manual/Safe Mode and we have valid local state, respect local studio state without auto-pulling
+  if (syncMode === 'manual' && localState && localState.jobs && Array.isArray(localState.jobs)) {
+    console.info('[Storage] Safe/Manual Mode: Initialized using pristine local state.');
+    localState.glueBrands = ['Pidilite FS35'];
+    return localState;
+  }
+
+  // Step 2: Attempt to pull latest shared state from Firestore Cloud (Primary for GitHub Pages / Multi-Device Fleet in Auto Mode)
+  if (isFirebaseConfigured() && syncMode === 'auto') {
     try {
       const cloudState = await fetchStateFromCloud();
       if (cloudState && Array.isArray(cloudState.jobs)) {
@@ -418,7 +435,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
         try {
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
         } catch (e) {}
-        syncStateToCloud(merged).catch(() => {});
+        syncStateToCloud(merged, true).catch(() => {});
         flushOfflineSyncQueue().catch(() => {});
         return merged;
       }
@@ -427,27 +444,29 @@ export async function initializeFactoryState(): Promise<FactoryState> {
     }
   }
 
-  // Step 2b: Fallback attempt to pull from Central Sync Bridge HTTP endpoint
-  try {
-    const centralState = await fetchCentralState();
-    if (centralState) {
-      console.info('[Sync Bridge] Central state fetched successfully. Merging with local data...');
-      const merged = mergeFactoryStates(centralState, localState || INITIAL_STATE);
-      merged.glueBrands = ['Pidilite FS35'];
+  // Step 2b: Fallback attempt to pull from Central Sync Bridge HTTP endpoint (Auto Mode Only)
+  if (syncMode === 'auto') {
+    try {
+      const centralState = await fetchCentralState();
+      if (centralState) {
+        console.info('[Sync Bridge] Central state fetched successfully. Merging with local data...');
+        const merged = mergeFactoryStates(centralState, localState || INITIAL_STATE);
+        merged.glueBrands = ['Pidilite FS35'];
 
-      // Save converged authoritative state to local storage
-      await saveToIndexedDB(merged);
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
-      } catch (e) {}
+        // Save converged authoritative state to local storage
+        await saveToIndexedDB(merged);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+        } catch (e) {}
 
-      // Flush any pending offline queue items
-      flushOfflineSyncQueue().catch(() => {});
+        // Flush any pending offline queue items
+        flushOfflineSyncQueue().catch(() => {});
 
-      return merged;
+        return merged;
+      }
+    } catch (syncErr) {
+      console.warn('[Sync Bridge] Central sync failed on boot. Using local cached state:', syncErr);
     }
-  } catch (syncErr) {
-    console.warn('[Sync Bridge] Central sync failed on boot. Using local cached state:', syncErr);
   }
 
   // Step 3: Fallback to local state or INITIAL_STATE if offline
@@ -465,6 +484,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
 
 /**
  * Explicit manual synchronization with Cloud and Central Sync Bridge.
+ * When called explicitly by user, forces cloud push even in Manual Mode.
  */
 export async function forceSyncWithCentral(currentState: FactoryState): Promise<{
   success: boolean;
@@ -476,11 +496,11 @@ export async function forceSyncWithCentral(currentState: FactoryState): Promise<
   // 1. Flush offline queue first
   await flushOfflineSyncQueue().catch(() => {});
 
-  // 2. Push current local state (authoritative when user explicitly clicks Sync) to Firestore Cloud
+  // 2. Push current local state (authoritative when user explicitly clicks Sync) to Firestore Cloud (force = true)
   if (isFirebaseConfigured()) {
     try {
-      await syncStateToCloud(currentState);
-      cloudSuccess = true;
+      const pushed = await syncStateToCloud(currentState, true);
+      cloudSuccess = pushed;
     } catch (e) {
       console.warn('[FirebaseSync] Force sync push error:', e);
     }
@@ -508,15 +528,45 @@ export async function forceSyncWithCentral(currentState: FactoryState): Promise<
     return {
       success: true,
       syncedState: currentState,
-      message: 'Cloud Sync Successful: Local entries & deletions successfully pushed to Cloud & GitHub Pages!'
+      message: 'Cloud Sync Successful: Studio state pushed to Firestore Cloud! Live devices/GitHub Pages are now updated.'
     };
   }
 
   return {
     success: true,
     syncedState: currentState,
-    message: 'Sync updated and persisted. Deletions and updates saved successfully.'
+    message: 'Local state saved and persisted successfully.'
   };
+}
+
+/**
+ * Explicit User Action: Pull latest state from Firestore Cloud into local state.
+ */
+export async function pullStateFromCloudExplicit(currentState: FactoryState): Promise<{
+  success: boolean;
+  pulledState?: FactoryState;
+  message: string;
+}> {
+  if (!isFirebaseConfigured()) {
+    return { success: false, message: 'Firebase is not configured.' };
+  }
+  try {
+    const remoteState = await fetchStateFromCloud();
+    if (remoteState && Array.isArray(remoteState.jobs)) {
+      await saveToIndexedDB(remoteState);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remoteState));
+      } catch (e) {}
+      return {
+        success: true,
+        pulledState: remoteState,
+        message: 'Successfully pulled authoritative live state from Firestore Cloud!'
+      };
+    }
+    return { success: false, message: 'No remote state found in Firestore Cloud.' };
+  } catch (err: any) {
+    return { success: false, message: `Failed to pull from Cloud: ${err.message}` };
+  }
 }
 
 /**
@@ -758,29 +808,43 @@ export async function getStorageHealth(): Promise<{
   };
 }
 
-export function getCloudSyncStatus(): { isConfigured: boolean; projectId: string; deviceId: string } {
+export function getCloudSyncStatus(): {
+  isConfigured: boolean;
+  projectId: string;
+  deviceId: string;
+  syncMode: CloudSyncMode;
+  isStudio: boolean;
+} {
   return {
     isConfigured: isFirebaseConfigured(),
     projectId: getFirebaseProjectId(),
-    deviceId: LOCAL_DEVICE_ID
+    deviceId: LOCAL_DEVICE_ID,
+    syncMode: getCloudSyncMode(),
+    isStudio: isStudioOrDevEnvironment()
   };
 }
 
-export { testFirestoreConnection };
+export { testFirestoreConnection, getCloudSyncMode, setCloudSyncMode, isStudioOrDevEnvironment };
 
 // Attach automatic background sync triggers in browser environment
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
-    console.info('[Sync Bridge] Network connection restored. Flushing offline queue...');
-    flushOfflineSyncQueue();
+    if (getCloudSyncMode() === 'auto') {
+      console.info('[Sync Bridge] Network connection restored. Flushing offline queue...');
+      flushOfflineSyncQueue();
+    }
   });
 
   window.addEventListener('focus', () => {
-    flushOfflineSyncQueue();
+    if (getCloudSyncMode() === 'auto') {
+      flushOfflineSyncQueue();
+    }
   });
 
-  // Periodic queue flush & sync check every 15 seconds
+  // Periodic queue flush & sync check every 15 seconds (Auto Mode only)
   setInterval(() => {
-    flushOfflineSyncQueue();
+    if (getCloudSyncMode() === 'auto') {
+      flushOfflineSyncQueue();
+    }
   }, 15000);
 }

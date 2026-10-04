@@ -60,12 +60,9 @@ function sanitizeUsersState(users?: Record<string, any>) {
   const clean = { ...(users || DEFAULT_USERS) };
   LEGACY_DEFAULT_USER_KEYS.forEach((k) => delete clean[k]);
   if (!clean.admin) {
-    clean.admin = { pass: 'WKF1811', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
+    clean.admin = { pass: '1811', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
   } else {
     clean.admin.perms = ['*'];
-    if (!clean.admin.pass || clean.admin.pass === '1811' || clean.admin.pass === '1234') {
-      clean.admin.pass = 'WKF1811';
-    }
   }
   return clean;
 }
@@ -125,7 +122,7 @@ export const App: React.FC = () => {
         if (isMounted && loadedState) {
           loadedState.users = sanitizeUsersState(loadedState.users);
           
-          const wipeFlag = 'wunderkraf_force_wipe_v6';
+          const wipeFlag = 'wunderkraf_force_wipe_v10';
           if (!localStorage.getItem(wipeFlag)) {
             const cleanRoster = (loadedState.floorWorkers || DEFAULT_FLOOR_WORKERS).map(w => ({
               ...w,
@@ -431,30 +428,17 @@ export const App: React.FC = () => {
     const allUsers = state.users || DEFAULT_USERS;
     const cleanUser = username.trim().toLowerCase();
     const userObj = allUsers[cleanUser];
-    const trimmedPass = pass.trim();
 
-    const isMasterUser = cleanUser === 'admin';
-    const isMasterPassMatch = isMasterUser && (
-      trimmedPass === 'WKF1811' ||
-      trimmedPass.toUpperCase() === 'WKF1811' ||
-      trimmedPass === '1811' ||
-      trimmedPass === 'admin' ||
-      trimmedPass === '1234' ||
-      trimmedPass.toUpperCase() === 'MANOJ' ||
-      trimmedPass === (state.adminPassword || 'WKF1811') ||
-      (userObj && (userObj.pass === pass || userObj.pass === trimmedPass))
-    );
-
-    if (isMasterPassMatch || (userObj && (userObj.pass === pass || userObj.pass === trimmedPass))) {
+    if (userObj && userObj.pass === pass) {
       const isMaster =
         cleanUser === 'admin' ||
-        userObj?.perms?.includes('*') ||
-        userObj?.perms?.includes('Admin') ||
-        userObj?.role?.toLowerCase() === 'administrator' ||
-        userObj?.role?.toLowerCase() === 'admin';
+        userObj.perms?.includes('*') ||
+        userObj.perms?.includes('Admin') ||
+        userObj.role?.toLowerCase() === 'administrator' ||
+        userObj.role?.toLowerCase() === 'admin';
       const active = {
         username: cleanUser,
-        perms: isMaster ? ['*'] : (userObj?.perms || ['*'])
+        perms: isMaster ? ['*'] : (userObj.perms || [])
       };
       setCurrentUser(active);
       try {

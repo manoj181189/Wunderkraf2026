@@ -78,8 +78,23 @@ import {
   TARGET_GSM_DEFAULT
 } from '../../lib/constants';
 import { triggerWhatsAppShiftNotification } from '../../lib/whatsappReports';
-import { exportToJSON, getCurrentExpectedShift, exportToCSV, getJobDeletionWarningInfo, performCascadeDeleteAndBackup, getJobAllReels } from '../../lib/utils';
-import { exportDatabaseBackup, importDatabaseBackup, getStorageHealth, pruneFactoryState, getCentralSyncEndpoint, setCustomSyncEndpoint, forceSyncWithCentral, getPendingSyncCount, getCloudSyncStatus } from '../../lib/storage';
+import { exportToJSON, getCurrentExpectedShift, exportToCSV, getJobDeletionWarningInfo, performCascadeDeleteAndBackup } from '../../lib/utils';
+import {
+  exportDatabaseBackup,
+  importDatabaseBackup,
+  getStorageHealth,
+  pruneFactoryState,
+  getCentralSyncEndpoint,
+  setCustomSyncEndpoint,
+  forceSyncWithCentral,
+  getPendingSyncCount,
+  getCloudSyncStatus,
+  getCloudSyncMode,
+  setCloudSyncMode,
+  pullStateFromCloudExplicit,
+  isStudioOrDevEnvironment,
+  CloudSyncMode
+} from '../../lib/storage';
 import { syncStateToCloud, isFirebaseConfigured } from '../../lib/firebaseSync';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
 import { OpeningStockModal } from '../OpeningStockModal';
@@ -314,10 +329,31 @@ _If you received this message, your contact number and routing configuration are
   const [pendingQueueCount, setPendingQueueCount] = useState<number>(0);
   const [isSyncingBridge, setIsSyncingBridge] = useState<boolean>(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+  const [cloudSyncMode, setCloudSyncModeState] = useState<CloudSyncMode>(() => getCloudSyncMode());
+  const [isPullingCloud, setIsPullingCloud] = useState<boolean>(false);
+  const [cascadeBackups, setCascadeBackups] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem('paperware_deleted_backups');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const reloadCascadeBackups = () => {
+    try {
+      const raw = localStorage.getItem('paperware_deleted_backups');
+      setCascadeBackups(raw ? JSON.parse(raw) : []);
+    } catch {
+      setCascadeBackups([]);
+    }
+  };
 
   const refreshSyncTelemetry = () => {
     setSyncEndpointState(getCentralSyncEndpoint());
+    setCloudSyncModeState(getCloudSyncMode());
     getPendingSyncCount().then(setPendingQueueCount).catch(() => {});
+    reloadCascadeBackups();
   };
 
   useEffect(() => {
@@ -327,7 +363,35 @@ _If you received this message, your contact number and routing configuration are
     }
   }, [activeTab]);
 
+  const handleToggleSyncMode = (mode: CloudSyncMode) => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can configure Cloud Sync Mode.');
+      return;
+    }
+    setCloudSyncMode(mode);
+    setCloudSyncModeState(mode);
+    if (mode === 'manual') {
+      alert('🛡️ Safe Manual Mode Active:\nChanges made in this Studio environment are saved locally and will NOT push to Firestore Cloud or Live devices automatically.\n\nUse the "Push to Live Cloud" button whenever you want to update live production.');
+    } else {
+      alert('⚡ Auto-Sync Active:\nEvery edit and save will automatically push to Firestore Cloud in real-time across all devices.');
+    }
+  };
+
   const handleManualCentralSync = async () => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can push state to Live Cloud.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `🚀 PUSH CURRENT STATE TO LIVE CLOUD (FIRESTORE)?\n\n` +
+      `Are you sure you want to push this current Studio state to Live Cloud?\n` +
+      `• Total Jobs: ${state.jobs?.length || 0}\n` +
+      `• Total Customer Orders: ${state.packJobs?.length || 0}\n` +
+      `• Total Logs: ${state.logs?.length || 0}\n\n` +
+      `This will update Firestore Cloud and immediately sync to all connected devices & GitHub Pages.`
+    );
+    if (!confirmed) return;
+
     setIsSyncingBridge(true);
     setSyncStatusMsg(null);
     try {
@@ -337,11 +401,42 @@ _If you received this message, your contact number and routing configuration are
       }
       setSyncStatusMsg(result.message);
       refreshSyncTelemetry();
+      alert(`✅ Cloud Push Complete!\n\n${result.message}`);
     } catch (err: any) {
       setSyncStatusMsg(`Sync failed: ${err.message}`);
+      alert(`❌ Sync failed: ${err.message}`);
     } finally {
       setIsSyncingBridge(false);
-      setTimeout(() => setSyncStatusMsg(null), 5000);
+      setTimeout(() => setSyncStatusMsg(null), 8000);
+    }
+  };
+
+  const handlePullFromCloud = async () => {
+    if (!isAdmin) {
+      alert('⛔ Access Restricted: Only Administrators can pull state from Live Cloud.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `📥 PULL LATEST STATE FROM LIVE CLOUD (FIRESTORE)?\n\n` +
+      `This will fetch the latest remote state from Firestore Cloud and replace your current Studio view with the live cloud database.\n\n` +
+      `Do you want to proceed?`
+    );
+    if (!confirmed) return;
+
+    setIsPullingCloud(true);
+    try {
+      const result = await pullStateFromCloudExplicit(state);
+      if (result.success && result.pulledState) {
+        onSaveState(result.pulledState);
+        setSyncStatusMsg(result.message);
+        alert(`✅ Cloud Pull Complete!\n\n${result.message}\n• Total Jobs: ${result.pulledState.jobs?.length || 0}\n• Total Orders: ${result.pulledState.packJobs?.length || 0}`);
+      } else {
+        alert(`⚠️ ${result.message}`);
+      }
+    } catch (err: any) {
+      alert(`❌ Pull failed: ${err.message}`);
+    } finally {
+      setIsPullingCloud(false);
     }
   };
 
@@ -869,30 +964,7 @@ _If you received this message, your contact number and routing configuration are
     setSelectedJobIdToEdit(jobId);
     const list = customJobs || state.jobs;
     const j = list.find((x) => x.id === jobId);
-    if (!j) {
-      setJobEditForm(null);
-      return;
-    }
-    const cloned: Job = JSON.parse(JSON.stringify(j));
-    if (!cloned.reelsList || cloned.reelsList.length === 0) {
-      const allReels = getJobAllReels(cloned);
-      if (allReels.length > 0) {
-        cloned.reelsList = allReels.map((r, idx) => ({
-          reelNo: r,
-          gsm: cloned.gsm || '120 GSM',
-          rolls: Math.floor((cloned.availableRolls || 0) / (allReels.length || 1)),
-          weightKg: Math.round((cloned.inputWeightKg || 200) / (allReels.length || 1))
-        }));
-      } else {
-        cloned.reelsList = [{
-          reelNo: cloned.reelNo || 'RL-01',
-          gsm: cloned.gsm || '120 GSM',
-          rolls: cloned.availableRolls || 0,
-          weightKg: cloned.inputWeightKg || 200
-        }];
-      }
-    }
-    setJobEditForm(cloned);
+    setJobEditForm(j ? JSON.parse(JSON.stringify(j)) : null);
   };
 
   const handleSelectPlanToEdit = (planId: string, customPlans?: ProductionPlan[]) => {
@@ -1055,18 +1127,10 @@ _If you received this message, your contact number and routing configuration are
     'Mnt_SpareParts',
     'Mnt_Preventative',
     'Mnt_RCA',
-    'WhatsApp',
-    'WA_ShiftReports',
-    'WA_BreakdownAlerts',
-    'WA_QcAlerts',
-    'WA_DispatchNotes',
-    'WA_ManpowerReports',
-    'WA_ConfigEdit',
     'Purchase',
     'Stock',
     'Orders',
     'Analytics',
-    'Scrap',
     'Search',
     'Audit'
   ];
@@ -1161,69 +1225,27 @@ _If you received this message, your contact number and routing configuration are
     const actualScrapKg = jobEditForm.scrapKg !== undefined ? Math.max(0, Number(jobEditForm.scrapKg) || 0) : calculatedScrapKg;
     const scrapPct = inKg > 0 ? Number(((actualScrapKg / inKg) * 100).toFixed(1)) : 0;
 
-    const cleanReelsList = (jobEditForm.reelsList || []).map((r, idx) => ({
-      ...r,
-      reelNo: String(r.reelNo || '').trim().toUpperCase() || `REEL-${idx + 1}`,
-      gsm: String(r.gsm || jobEditForm.gsm || '120 GSM').trim(),
-      weightKg: Number(r.weightKg) || 0,
-      rolls: Number(r.rolls) || 0
-    }));
-
-    const cleanReelNumbers = cleanReelsList.map((r) => r.reelNo);
-    const summaryReelNo = cleanReelNumbers.length > 0 ? cleanReelNumbers.join(', ') : String(jobEditForm.reelNo || '').trim().toUpperCase();
-
     const updatedJobs = state.jobs.map((j) => {
       if (j.id === selectedJobIdToEdit) {
-        const updatedCuttingCrates = Number(jobEditForm.availableCuttingCrates) || 0;
-        let runningBatches = [...(jobEditForm.runningBatches || j.runningBatches || [])];
-
-        // If cutting crates were increased beyond existing batches (e.g. 19 -> 20), sync a traceable lot for Forming
-        const cuttingBatches = runningBatches.filter((b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
-        const totalCuttingProduced = cuttingBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0);
-        if (updatedCuttingCrates > totalCuttingProduced) {
-          const diff = updatedCuttingCrates - totalCuttingProduced;
-          const adminBatch: RunningBatch = {
-            batchId: `${cleanId}-ADMIN-CUT-${Date.now().toString().slice(-4)}`,
-            stage: 'Cutting',
-            machine: 'Cutting-Admin',
-            shift: 'DAY',
-            startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            status: 'Completed',
-            producedQty: diff,
-            producedPieces: diff * (Number(jobEditForm.pcsPerCrateCutting) || 10000),
-            worker: 'ADMIN-SYNC',
-            supervisor: 'ADMIN'
-          };
-          runningBatches = [...runningBatches, adminBatch];
-        }
-
         return {
           ...j,
           ...jobEditForm,
           id: cleanId,
-          stage: jobEditForm.stage || j.stage || 'Slitting',
-          status: jobEditForm.status || j.status || 'READY_FOR_CUTTING',
-          reelNo: summaryReelNo,
-          reelNumbers: cleanReelNumbers,
-          reelsList: cleanReelsList,
-          targetLayers: cleanReelsList.length || Number(jobEditForm.targetLayers) || 8,
-          gsm: cleanReelsList[0]?.gsm || String(jobEditForm.gsm || '').trim(),
+          reelNo: String(jobEditForm.reelNo || '').trim().toUpperCase(),
+          gsm: String(jobEditForm.gsm || '').trim(),
           inputWeightKg: inKg,
           outputWeightKg: outKg,
           scrapKg: actualScrapKg,
           scrapPercent: scrapPct,
           availableRolls: Number(jobEditForm.availableRolls) || 0,
-          availableCuttingCrates: updatedCuttingCrates,
+          availableCuttingCrates: Number(jobEditForm.availableCuttingCrates) || 0,
           availableFormingCrates: Number(jobEditForm.availableFormingCrates) || 0,
           availableQcCrates: Number(jobEditForm.availableQcCrates) || 0,
           pcsPerCrateCutting: Number(jobEditForm.pcsPerCrateCutting) || undefined,
           pcsPerCrateForming: Number(jobEditForm.pcsPerCrateForming) || undefined,
           totalCutPieces: Number(jobEditForm.totalCutPieces) || undefined,
           totalFormedPieces: Number(jobEditForm.totalFormedPieces) || undefined,
-          totalQcPieces: Number(jobEditForm.totalQcPieces) || undefined,
-          runningBatches,
-          isAuthoritativeMasterEdit: true,
-          updatedAt: new Date().toISOString()
+          totalQcPieces: Number(jobEditForm.totalQcPieces) || undefined
         };
       }
       return j;
@@ -1235,7 +1257,7 @@ _If you received this message, your contact number and routing configuration are
       stage: 'Admin Master',
       machine: 'MASTER-OVERWRITE',
       shift: 'DAY',
-      action: `🛠️ Master Overwrite on Job [${cleanId}]: Admin modified details (Reels: ${summaryReelNo || '-'}, Stage: ${jobEditForm.stage || '-'}, Cut: ${jobEditForm.availableCuttingCrates || 0} Crates, Form: ${jobEditForm.availableFormingCrates || 0} Crates, In: ${inKg}kg, Out: ${outKg}kg, Scrap: ${actualScrapKg}kg)`,
+      action: `🛠️ Master Overwrite on Job [${cleanId}]: Admin modified details (Reel: ${jobEditForm.reelNo || '-'}, GSM: ${jobEditForm.gsm || '-'}, In: ${inKg}kg, Out: ${outKg}kg, Scrap: ${actualScrapKg}kg)`,
       worker: 'ADMIN',
       user: 'admin',
       rawDate: new Date().toISOString().split('T')[0],
@@ -1446,11 +1468,7 @@ _If you received this message, your contact number and routing configuration are
     if (!planEditForm) return;
     const updatedPlans = (state.productionPlans || []).map((p) => {
       if (p.id === selectedPlanIdToEdit) {
-        return {
-          ...planEditForm,
-          isAuthoritativeMasterEdit: true,
-          updatedAt: new Date().toISOString()
-        };
+        return { ...planEditForm };
       }
       return p;
     });
@@ -1538,9 +1556,7 @@ _If you received this message, your contact number and routing configuration are
           pcsPerBox: Number(orderEditForm.pcsPerBox) || 1,
           orderQty: Number(orderEditForm.orderQty) || 1,
           packedBoxes: Number(orderEditForm.packedBoxes) || 0,
-          dispatchedBoxes: Number(orderEditForm.dispatchedBoxes) || 0,
-          isAuthoritativeMasterEdit: true,
-          updatedAt: new Date().toISOString()
+          dispatchedBoxes: Number(orderEditForm.dispatchedBoxes) || 0
         };
       }
       return o;
@@ -1614,39 +1630,25 @@ _If you received this message, your contact number and routing configuration are
 
   const handleDeleteAllOrders = () => {
     if (state.packJobs.length === 0) return;
-    const pass = prompt(`Enter Master Password 'MANOJ' to Delete ALL Customer Packing Orders:`);
-    if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
-      alert('❌ Access Denied: Incorrect Password. Deletion aborted.');
-      return;
-    }
     const allOrdIds = state.packJobs.map((o) => o.id);
     setConfirmModal({
       isOpen: true,
       title: 'Delete ALL Customer Packing Orders',
-      message: `⚠️ Are you sure you want to permanently delete ALL ${state.packJobs.length} Customer Packing Orders? This action cannot be undone and will record deletion tombstones.`,
+      message: `⚠️ Are you sure you want to permanently delete ALL ${state.packJobs.length} Customer Packing Orders? This action cannot be undone.`,
       confirmLabel: 'Yes, Delete All Orders',
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
-        const newLog: LogEntry = {
-          jobId: 'ALL-ORDERS',
-          stage: 'Admin Master',
-          machine: 'BULK-DELETE',
-          shift: 'DAY',
-          action: `🗑️ Bulk deleted all ${allOrdIds.length} customer packing orders`,
-          worker: 'ADMIN',
-          user: 'admin',
-          rawDate: new Date().toISOString().split('T')[0],
-          timestamp: new Date().toLocaleString()
-        };
         onSaveState({
           ...state,
           deletedOrderIds: Array.from(new Set([...(state.deletedOrderIds || []), ...allOrdIds])),
-          packJobs: [],
-          logs: [...state.logs, newLog]
+          packJobs: []
         });
         setSelectedOrderIdToEdit('');
         setOrderEditForm(null);
         setConfirmModal(null);
+        setDeletePassword('');
         showToast(`✅ All ${allOrdIds.length} Customer Packing Orders deleted successfully.`);
       }
     });
@@ -2149,22 +2151,60 @@ _If you received this message, your contact number and routing configuration are
       ? `[${targetLog.stage || 'Log'} - ${targetLog.action ? targetLog.action.slice(0, 60) : 'Entry'}...]`
       : 'this audit log entry';
 
-    setConfirmModal({
-      isOpen: true,
-      title: 'Delete Audit Log Entry',
-      message: `Are you sure you want to permanently delete this audit log entry from database: ${logDesc}?`,
-      confirmLabel: 'Yes, Delete Entry',
-      isDanger: true,
-      onConfirm: () => {
-        const updatedLogs = state.logs.filter((_, idx) => idx !== originalIndex);
-        onSaveState({
-          ...state,
-          logs: updatedLogs
-        });
-        setConfirmModal(null);
-        showToast('🗑️ Audit log entry deleted successfully.');
-      }
+    const confirmed = window.confirm(`🗑️ DELETE AUDIT LOG ENTRY?\n\nAre you sure you want to permanently delete this audit log entry:\n${logDesc}?`);
+    if (!confirmed) return;
+
+    const updatedLogs = state.logs.filter((_, idx) => idx !== originalIndex);
+    onSaveState({
+      ...state,
+      logs: updatedLogs
     });
+    showToast('🗑️ Audit log entry deleted successfully.');
+  };
+
+  const handleClearAllShiftHandovers = () => {
+    if ((state.shiftHandovers || []).length === 0) {
+      showToast('No shift handovers to clear.', 'info');
+      return;
+    }
+    const confirmed = window.confirm(
+      `🧹 CLEAR ALL SHIFT HANDOVERS?\n\n` +
+      `Are you sure you want to permanently delete all ${(state.shiftHandovers || []).length} shift custody handover records?`
+    );
+    if (!confirmed) return;
+
+    onSaveState({
+      ...state,
+      shiftHandovers: []
+    });
+    showToast('🧹 All shift handover records cleared successfully.');
+  };
+
+  const handleClearAllInFlightBatches = () => {
+    let totalBatches = 0;
+    (state.jobs || []).forEach(j => {
+      totalBatches += (j.runningBatches || []).length;
+    });
+    if (totalBatches === 0) {
+      showToast('No active in-flight batches found.', 'info');
+      return;
+    }
+    const confirmed = window.confirm(
+      `🧹 CLEAR ALL IN-FLIGHT & RUNNING BATCHES?\n\n` +
+      `Are you sure you want to cancel and remove all ${totalBatches} running batches across Cutting, Slitting, Forming, and QC?`
+    );
+    if (!confirmed) return;
+
+    const updatedJobs = (state.jobs || []).map(j => ({
+      ...j,
+      runningBatches: []
+    }));
+
+    onSaveState({
+      ...state,
+      jobs: updatedJobs
+    });
+    showToast(`🧹 Cleared all ${totalBatches} in-flight running batches across all stages.`);
   };
 
   // ==========================================
@@ -2212,9 +2252,7 @@ _If you received this message, your contact number and routing configuration are
           availableQcCrates: newQcCrates,
           totalCutPieces: Number(reconcileJobTarget.totalCutPieces) || undefined,
           totalFormedPieces: Number(reconcileJobTarget.totalFormedPieces) || undefined,
-          totalQcPieces: Number(reconcileJobTarget.totalQcPieces) || undefined,
-          isAuthoritativeMasterEdit: true,
-          updatedAt: new Date().toISOString()
+          totalQcPieces: Number(reconcileJobTarget.totalQcPieces) || undefined
         };
       }
       return j;
@@ -2280,9 +2318,7 @@ _If you received this message, your contact number and routing configuration are
         };
         return {
           ...j,
-          runningBatches: batches,
-          isAuthoritativeMasterEdit: true,
-          updatedAt: new Date().toISOString()
+          runningBatches: batches
         };
       }
       return j;
@@ -2477,28 +2513,13 @@ _If you received this message, your contact number and routing configuration are
       message: `Are you sure you want to permanently delete all ${purgedCount} Completed & Cancelled production plans? Active / Scheduled plans will be kept intact.`,
       confirmLabel: `Purge ${purgedCount} Plans`,
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
-        const pass = prompt("Enter Master Password 'MANOJ' to Confirm Purge of Completed Plans:");
-        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
-          showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
-          return;
-        }
-        const newLog: LogEntry = {
-          jobId: 'PLAN-PURGE',
-          stage: 'Admin Master',
-          machine: 'EXPUNGE-DESK',
-          shift: 'DAY',
-          action: `🗑️ Purged ${purgedCount} completed / cancelled production plans from database`,
-          worker: 'SUPER-ADMIN',
-          user: currentUser?.username || 'admin',
-          rawDate: new Date().toISOString().split('T')[0],
-          timestamp: new Date().toLocaleString()
-        };
         const nextPlan = activePlans[0];
         onSaveState({
           ...state,
-          productionPlans: activePlans,
-          logs: [...state.logs, newLog]
+          productionPlans: activePlans
         });
         if (nextPlan) {
           handleSelectPlanToEdit(nextPlan.id, activePlans);
@@ -2507,6 +2528,7 @@ _If you received this message, your contact number and routing configuration are
           setPlanEditForm(null);
         }
         setConfirmModal(null);
+        setDeletePassword('');
         showToast(`✅ Successfully purged ${purgedCount} completed/cancelled plans.`);
       }
     });
@@ -2522,31 +2544,17 @@ _If you received this message, your contact number and routing configuration are
       message: `⚠️ DANGER: Are you sure you want to permanently purge ALL ${totalPlans} production plans in the database? This cannot be undone.`,
       confirmLabel: 'Yes, Purge ALL Plans',
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
-        const pass = prompt("Enter Master Password 'MANOJ' to Purge ALL Production Plans:");
-        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
-          showToast('❌ Incorrect Master Password! Expunge aborted.', 'error');
-          return;
-        }
-        const newLog: LogEntry = {
-          jobId: 'ALL-PLANS',
-          stage: 'Admin Master',
-          machine: 'EXPUNGE-DESK',
-          shift: 'DAY',
-          action: `🗑️ Super-Admin permanently expunged ALL ${totalPlans} production plans`,
-          worker: 'SUPER-ADMIN',
-          user: currentUser?.username || 'admin',
-          rawDate: new Date().toISOString().split('T')[0],
-          timestamp: new Date().toLocaleString()
-        };
         onSaveState({
           ...state,
-          productionPlans: [],
-          logs: [...state.logs, newLog]
+          productionPlans: []
         });
         setSelectedPlanIdToEdit('');
         setPlanEditForm(null);
         setConfirmModal(null);
+        setDeletePassword('');
         showToast(`✅ All ${totalPlans} production plans expunged.`);
       }
     });
@@ -2568,31 +2576,17 @@ _If you received this message, your contact number and routing configuration are
       message: `Are you sure you want to permanently delete ${purgedCount} Dispatched & Completed packing orders? Pending & In-Progress orders will remain intact.`,
       confirmLabel: `Purge ${purgedCount} Orders`,
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
-        const pass = prompt("Enter Master Password 'MANOJ' to Purge Dispatched Orders:");
-        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
-          showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
-          return;
-        }
-        const newLog: LogEntry = {
-          jobId: 'ORDER-PURGE',
-          stage: 'Admin Master',
-          machine: 'EXPUNGE-DESK',
-          shift: 'DAY',
-          action: `🗑️ Purged ${purgedCount} dispatched / completed packing orders from database`,
-          worker: 'SUPER-ADMIN',
-          user: currentUser?.username || 'admin',
-          rawDate: new Date().toISOString().split('T')[0],
-          timestamp: new Date().toLocaleString()
-        };
         onSaveState({
           ...state,
-          packJobs: activeOrders,
-          logs: [...state.logs, newLog]
+          packJobs: activeOrders
         });
         setSelectedOrderIdToEdit(activeOrders[0]?.id || '');
         setOrderEditForm(activeOrders[0] ? JSON.parse(JSON.stringify(activeOrders[0])) : null);
         setConfirmModal(null);
+        setDeletePassword('');
         showToast(`✅ Successfully purged ${purgedCount} dispatched/completed orders.`);
       }
     });
@@ -2609,64 +2603,41 @@ _If you received this message, your contact number and routing configuration are
       message: `Are you sure you want to permanently delete all ${filteredLogs.length} logs currently matching your search/stage filters?`,
       confirmLabel: `Purge ${filteredLogs.length} Logs`,
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
-        const pass = prompt("Enter Master Password 'MANOJ' to Purge Filtered Logs:");
-        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
-          showToast('❌ Incorrect Master Password! Purge aborted.', 'error');
-          return;
-        }
-        const newLog: LogEntry = {
-          jobId: 'LOG-PURGE',
-          stage: 'Admin Master',
-          machine: 'EXPUNGE-DESK',
-          shift: 'DAY',
-          action: `🗑️ Purged ${filteredLogs.length} audit logs matching filter [Search: "${logSearchQuery}", Stage: "${logFilterStage || 'All'}"]`,
-          worker: 'SUPER-ADMIN',
-          user: currentUser?.username || 'admin',
-          rawDate: new Date().toISOString().split('T')[0],
-          timestamp: new Date().toLocaleString()
-        };
         onSaveState({
           ...state,
-          logs: [...remainingLogs, newLog]
+          logs: remainingLogs
         });
         setConfirmModal(null);
+        setDeletePassword('');
         showToast(`✅ Successfully purged ${filteredLogs.length} audit log entries.`);
       }
     });
   };
 
   const handlePurgeAllLogs = () => {
-    if (state.logs.length === 0) return;
+    if (state.logs.length === 0) {
+      showToast('No audit logs to purge.', 'info');
+      return;
+    }
     setConfirmModal({
       isOpen: true,
       title: 'Expunge ALL Audit Logs',
-      message: `⚠️ DANGER: Are you sure you want to permanently delete ALL ${state.logs.length} audit log entries from the database?`,
+      message: `⚠️ DANGER: Are you sure you want to permanently delete ALL ${state.logs.length} audit log entries from the database? This cannot be undone.`,
       confirmLabel: 'Yes, Expunge ALL Logs',
       isDanger: true,
+      requiresPassword: true,
+      passwordTarget: 'MANOJ',
       onConfirm: () => {
-        const pass = prompt("Enter Master Password 'MANOJ' to Expunge ALL Audit Logs:");
-        if (!pass || (pass.toUpperCase() !== 'MANOJ' && pass !== (state.adminPassword || '1234'))) {
-          showToast('❌ Incorrect Master Password! Expunge aborted.', 'error');
-          return;
-        }
-        const freshLog: LogEntry = {
-          jobId: 'SYSTEM-PURGE',
-          stage: 'Admin Master',
-          machine: 'EXPUNGE-DESK',
-          shift: 'DAY',
-          action: `⚡ Super-Admin purged entire audit log history (${state.logs.length} entries expunged)`,
-          worker: 'SUPER-ADMIN',
-          user: currentUser?.username || 'admin',
-          rawDate: new Date().toISOString().split('T')[0],
-          timestamp: new Date().toLocaleString()
-        };
         onSaveState({
           ...state,
-          logs: [freshLog]
+          logs: []
         });
         setConfirmModal(null);
-        showToast('✅ All historical audit logs expunged.');
+        setDeletePassword('');
+        showToast('✅ All historical audit logs successfully expunged.');
       }
     });
   };
@@ -3451,7 +3422,6 @@ ${formLines.join('\n')}
     { key: 'Stock', label: '📊 Raw & WIP Stock Matrix', desc: 'Real-time inventory levels' },
     { key: 'Orders', label: '📋 Orders Book & Customer Specs', desc: 'View customer orders list' },
     { key: 'Analytics', label: '📈 Scrap & Efficiency Analytics', desc: 'Output yield & machine metrics' },
-    { key: 'Scrap', label: '♻️ Scrap Desk & Wastage Entries', desc: 'Direct access to record Scrap and Wastage logs' },
     { key: 'Search', label: '🔎 Universal Search Desk', desc: 'Search Job ID, Invoices, Customers & Operators' },
     { key: 'Audit', label: '📜 Traceability & Batch Reports', desc: 'Box-to-raw trace, customer complaints & audit logs' }
   ];
@@ -4979,7 +4949,7 @@ ${formLines.join('\n')}
 
               {jobEditForm ? (
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4 shadow-2xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-blue-900 uppercase mb-1">
                         Job ID (Job Number):
@@ -4993,7 +4963,7 @@ ${formLines.join('\n')}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Product Item:
+                        Product Item (Item Type):
                       </label>
                       <select
                         value={jobEditForm.product}
@@ -5009,7 +4979,7 @@ ${formLines.join('\n')}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Paper Brand:
+                        Paper Brand / Mill:
                       </label>
                       <select
                         value={jobEditForm.paperBrand || PAPER_BRANDS[0]}
@@ -5023,212 +4993,42 @@ ${formLines.join('\n')}
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-indigo-800 uppercase mb-1">
-                        Job Stage:
-                      </label>
-                      <select
-                        value={jobEditForm.stage || 'Slitting'}
-                        onChange={(e) => setJobEditForm({ ...jobEditForm, stage: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                      >
-                        <option value="Slitting">1. Slitting</option>
-                        <option value="Slitting Completed">1b. Slitting Completed</option>
-                        <option value="Cutting">2. Cutting</option>
-                        <option value="Cutting Completed">2b. Cutting Completed</option>
-                        <option value="Forming">3. Forming</option>
-                        <option value="Forming Completed">3b. Forming Completed</option>
-                        <option value="QC">4. Quality Control (QC)</option>
-                        <option value="Packing">5. Packing / Dispatch</option>
-                        <option value="Completed">6. Completed</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-purple-800 uppercase mb-1">
-                        Job Status:
-                      </label>
-                      <select
-                        value={jobEditForm.status || 'READY_FOR_CUTTING'}
-                        onChange={(e) => setJobEditForm({ ...jobEditForm, status: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-purple-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                      >
-                        <option value="SLITTING_IN_PROGRESS">Slitting In Progress</option>
-                        <option value="READY_FOR_CUTTING">Ready for Cutting</option>
-                        <option value="CUTTING_IN_PROGRESS">Cutting In Progress</option>
-                        <option value="READY_FOR_FORMING">Ready for Forming</option>
-                        <option value="FORMING_IN_PROGRESS">Forming In Progress</option>
-                        <option value="READY_FOR_QC">Ready for QC</option>
-                        <option value="COMPLETED">Completed</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-teal-800 uppercase mb-1">
-                        Planned Layers / Reels:
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="16"
-                        value={jobEditForm.targetLayers || (jobEditForm.reelsList || []).length || 8}
-                        onChange={(e) => setJobEditForm({ ...jobEditForm, targetLayers: Number(e.target.value) })}
-                        className="w-full px-3 py-2 bg-white border border-teal-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                      />
-                    </div>
                   </div>
 
-                  {/* Reel Traceability & Full Reels/GSM Management Suite */}
-                  <div className="border border-blue-200 rounded-xl p-3 bg-blue-50/40 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-blue-900 uppercase">
-                          🎯 Job Card Reels & GSM Master Suite:
-                        </span>
-                        <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full border border-purple-200">
-                          {(jobEditForm.reelsList || []).length} Jumbo Reels Configured
-                        </span>
+                  {/* Reel Traceability & Weight Scrap Inputs */}
+                  <div className="border border-blue-200 rounded-xl p-3 bg-blue-50/40 space-y-2">
+                    <label className="text-xs font-extrabold text-blue-900 uppercase block flex items-center justify-between">
+                      <span>🎯 Reel Traceability & Jumbo Weights (Correct Reel Number & Weight):</span>
+                      <span className="text-[11px] font-bold text-purple-700">Admin Master Edit</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-blue-800 uppercase mb-1">
+                          Reel No. (Reel Number):
+                        </label>
+                        <input
+                          type="text"
+                          value={jobEditForm.reelNo || ''}
+                          onChange={(e) => setJobEditForm({ ...jobEditForm, reelNo: e.target.value.toUpperCase() })}
+                          placeholder="e.g. RL-ITC-0012"
+                          className="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-slate-800 outline-none uppercase"
+                        />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const currentList = [...(jobEditForm.reelsList || [])];
-                          const nextIdx = currentList.length + 1;
-                          const newReel = {
-                            reelNo: `RL-${jobEditForm.paperBrand || 'ITC'}-${String(nextIdx).padStart(2, '0')}`,
-                            gsm: jobEditForm.gsm || (state.targetGsmMaster && state.targetGsmMaster[0]) || '120 GSM',
-                            rolls: 0,
-                            weightKg: 200
-                          };
-                          setJobEditForm({
-                            ...jobEditForm,
-                            reelsList: [...currentList, newReel],
-                            targetLayers: currentList.length + 1
-                          });
-                        }}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> ➕ Add Reel to Job
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {(jobEditForm.reelsList || []).map((reel, rIdx) => (
-                        <div
-                          key={rIdx}
-                          className="p-2.5 bg-white border border-blue-200 rounded-xl grid grid-cols-1 sm:grid-cols-6 gap-2 text-xs items-center shadow-2xs"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">
-                              {rIdx + 1}
-                            </span>
-                            <div className="flex-1">
-                              <span className="text-[10px] font-bold text-slate-500 uppercase block">Reel Number:</span>
-                              <input
-                                type="text"
-                                value={reel.reelNo}
-                                onChange={(e) => {
-                                  const updated = [...(jobEditForm.reelsList || [])];
-                                  updated[rIdx] = { ...updated[rIdx], reelNo: e.target.value.toUpperCase() };
-                                  setJobEditForm({ ...jobEditForm, reelsList: updated });
-                                }}
-                                className="w-full px-2 py-1 border border-blue-300 rounded font-mono font-bold text-xs uppercase"
-                                placeholder="e.g. RL-01"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] font-bold text-amber-800 uppercase block">GSM Specification:</span>
-                            <input
-                              type="text"
-                              value={reel.gsm}
-                              onChange={(e) => {
-                                const updated = [...(jobEditForm.reelsList || [])];
-                                updated[rIdx] = { ...updated[rIdx], gsm: e.target.value };
-                                setJobEditForm({ ...jobEditForm, reelsList: updated });
-                              }}
-                              className="w-full px-2 py-1 border border-amber-300 rounded font-bold text-xs"
-                              placeholder="e.g. 120 GSM"
-                            />
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] font-bold text-blue-700 uppercase block">Jumbo In Weight (KG):</span>
-                            <input
-                              type="number"
-                              value={reel.weightKg || ''}
-                              onChange={(e) => {
-                                const updated = [...(jobEditForm.reelsList || [])];
-                                updated[rIdx] = { ...updated[rIdx], weightKg: Number(e.target.value) };
-                                const totalWeight = updated.reduce((sum, r) => sum + (r.weightKg || 0), 0);
-                                setJobEditForm({ ...jobEditForm, reelsList: updated, inputWeightKg: totalWeight });
-                              }}
-                              className="w-full px-2 py-1 border border-blue-300 rounded font-bold text-xs"
-                              placeholder="KG"
-                            />
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] font-bold text-teal-700 uppercase block">Rolls Count:</span>
-                            <input
-                              type="number"
-                              value={reel.rolls || ''}
-                              onChange={(e) => {
-                                const updated = [...(jobEditForm.reelsList || [])];
-                                updated[rIdx] = { ...updated[rIdx], rolls: Number(e.target.value) };
-                                setJobEditForm({ ...jobEditForm, reelsList: updated });
-                              }}
-                              className="w-full px-2 py-1 border border-teal-300 rounded font-bold text-xs"
-                              placeholder="Rolls"
-                            />
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase block">Layer Type:</span>
-                            <select
-                              value={reel.isPrintedRoll ? 'Printed' : 'Plain'}
-                              onChange={(e) => {
-                                const updated = [...(jobEditForm.reelsList || [])];
-                                updated[rIdx] = { ...updated[rIdx], isPrintedRoll: e.target.value === 'Printed' };
-                                setJobEditForm({ ...jobEditForm, reelsList: updated });
-                              }}
-                              className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-bold"
-                            >
-                              <option value="Plain">Plain Paper</option>
-                              <option value="Printed">Printed Layer</option>
-                            </select>
-                          </div>
-
-                          <div className="flex items-center justify-end">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = (jobEditForm.reelsList || []).filter((_, idx) => idx !== rIdx);
-                                setJobEditForm({
-                                  ...jobEditForm,
-                                  reelsList: updated,
-                                  targetLayers: updated.length
-                                });
-                              }}
-                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
-                              title="Delete this reel from Job Card"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      {(!jobEditForm.reelsList || jobEditForm.reelsList.length === 0) && (
-                        <div className="text-xs text-slate-400 text-center py-3 bg-white rounded-lg border border-dashed border-blue-200">
-                          No jumbo reels configured. Click "+ Add Reel to Job" above to add reels.
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-blue-200/60">
+                      <div>
+                        <label className="block text-[11px] font-bold text-amber-800 uppercase mb-1">
+                          GSM Thickness:
+                        </label>
+                        <input
+                          type="text"
+                          value={jobEditForm.gsm || ''}
+                          onChange={(e) => setJobEditForm({ ...jobEditForm, gsm: e.target.value })}
+                          placeholder="e.g. 120 GSM"
+                          className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                        />
+                      </div>
                       <div>
                         <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">
-                          Total Jumbo In Weight (KG):
+                          Jumbo In Weight (KG):
                         </label>
                         <input
                           type="number"
@@ -5865,13 +5665,26 @@ ${formLines.join('\n')}
 
               {/* Batches Table */}
               <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
-                    Active & Completed Floor Batches Across All Jobs
-                  </h4>
-                  <span className="text-[11px] font-bold text-slate-500">
-                    Correct timestamps/machines or perform safe material un-issue
-                  </span>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide m-0">
+                      Active & Completed Floor Batches Across All Jobs
+                    </h4>
+                    <span className="text-[11px] font-bold text-slate-500">
+                      Correct timestamps/machines or perform safe material un-issue
+                    </span>
+                  </div>
+                  {state.jobs.some(j => (j.runningBatches || []).length > 0) && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllInFlightBatches}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Clear and remove all running/in-flight batches across all machines"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Clear ALL In-Flight Batches</span>
+                    </button>
+                  )}
                 </div>
 
                 {(() => {
@@ -7390,26 +7203,38 @@ ${formLines.join('\n')}
                       Official supervisor & operator custody handovers, checklist statuses, and production run outputs.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const rows = (state.shiftHandovers || []).map((h) => ({
-                        ID: h.id,
-                        Date: h.date,
-                        Department: h.department,
-                        Machine: h.machine,
-                        OutgoingOperator: h.outgoingOperator,
-                        RelievingOperator: h.relievedByOperator,
-                        ProducedQty: h.producedQty,
-                        ScrapQty: h.scrapQty,
-                        ChecklistPassed: h.checklistPassed ? 'YES' : 'NO'
-                      }));
-                      exportToCSV(`shift_handovers_audit_${new Date().toISOString().split('T')[0]}.csv`, rows);
-                    }}
-                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Export Handovers
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(state.shiftHandovers || []).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAllShiftHandovers}
+                        className="flex items-center gap-1.5 text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 px-3 py-1.5 rounded-lg transition cursor-pointer shadow-xs"
+                        title="Clear all shift handover records permanently"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Clear ALL Handovers
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rows = (state.shiftHandovers || []).map((h) => ({
+                          ID: h.id,
+                          Date: h.date,
+                          Department: h.department,
+                          Machine: h.machine,
+                          OutgoingOperator: h.outgoingOperator,
+                          RelievingOperator: h.relievedByOperator,
+                          ProducedQty: h.producedQty,
+                          ScrapQty: h.scrapQty,
+                          ChecklistPassed: h.checklistPassed ? 'YES' : 'NO'
+                        }));
+                        exportToCSV(`shift_handovers_audit_${new Date().toISOString().split('T')[0]}.csv`, rows);
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Export Handovers
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -8712,66 +8537,142 @@ ${formLines.join('\n')}
             </div>
           </div>
 
-          {/* Central Sync Bridge (100_2026_V1 Multi-Device Bidirectional Sync) */}
-          <div className="bg-white border border-blue-200 rounded-2xl p-5 shadow-sm">
+          {/* Central Sync Bridge & Cloud Firestore Sync Controls */}
+          <div className="bg-white border border-blue-200 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center font-black">
                   <Cloud className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Central Sync Bridge (100_2026_V1)</div>
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cloud Firestore & Central Sync Bridge</div>
                   <div className="text-base font-black text-slate-900 flex items-center gap-2">
-                    <span>Multi-Device Convergence & Offline Write-Queue</span>
-                    <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                      <Wifi className="w-3 h-3" /> LIVE BIDIRECTIONAL
-                    </span>
+                    <span>Multi-Device Fleet & Production Sync</span>
+                    {cloudSyncMode === 'manual' ? (
+                      <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                        🛡️ SAFE MANUAL MODE (STUDIO SANDBOX)
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                        <Wifi className="w-3 h-3" /> ⚡ REAL-TIME AUTO SYNC ACTIVE
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handlePullFromCloud}
+                  disabled={isPullingCloud || isSyncingBridge}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-800 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-300 shadow-2xs"
+                  title="Pull latest data from Firestore Cloud into Studio"
+                >
+                  <Download className={`w-3.5 h-3.5 ${isPullingCloud ? 'animate-bounce' : ''}`} />
+                  <span>{isPullingCloud ? 'Pulling...' : 'Pull from Live Cloud'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleManualCentralSync}
-                  disabled={isSyncingBridge}
+                  disabled={isSyncingBridge || isPullingCloud}
                   className="px-4 py-2 bg-[#2b6cb0] hover:bg-[#1a365d] disabled:opacity-50 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="Push current Studio data to Firestore Cloud and live website"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingBridge ? 'animate-spin' : ''}`} />
-                  <span>{isSyncingBridge ? 'Synchronizing...' : 'Force Central Sync Now'}</span>
+                  <Upload className={`w-3.5 h-3.5 ${isSyncingBridge ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingBridge ? 'Pushing to Cloud...' : '🚀 Push to Live Cloud Now'}</span>
                 </button>
               </div>
             </div>
 
+            {/* Cloud Sync Mode Selector & Notice Banner */}
+            <div className={`p-3.5 rounded-xl border text-xs ${
+              cloudSyncMode === 'manual'
+                ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+            }`}>
+              <div className="flex items-start justify-between flex-wrap gap-3">
+                <div className="space-y-1 max-w-2xl">
+                  <div className="font-extrabold flex items-center gap-1.5 text-sm">
+                    {cloudSyncMode === 'manual' ? (
+                      <>
+                        <span className="text-base">🛡️</span>
+                        <span>Safe Manual Mode is Active in AI Studio</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-base">⚡</span>
+                        <span>Real-Time Auto Sync is Active</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs leading-relaxed opacity-90 m-0">
+                    {cloudSyncMode === 'manual'
+                      ? 'Testing, edits, deletions, and script updates made here in AI Studio remain strictly local. Live devices and GitHub Pages will NOT be altered until you explicitly click "🚀 Push to Live Cloud Now".'
+                      : 'Every change made on any device immediately syncs in real-time to Firestore Cloud and all other screens.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-[11px] font-bold text-slate-600">Mode:</span>
+                  <div className="inline-flex rounded-lg p-0.5 bg-slate-200/80 border border-slate-300">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSyncMode('manual')}
+                      className={`px-2.5 py-1 text-[11px] font-extrabold rounded-md transition cursor-pointer ${
+                        cloudSyncMode === 'manual'
+                          ? 'bg-amber-500 text-white shadow-2xs'
+                          : 'text-slate-700 hover:text-slate-900'
+                      }`}
+                    >
+                      🛡️ Safe Manual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSyncMode('auto')}
+                      className={`px-2.5 py-1 text-[11px] font-extrabold rounded-md transition cursor-pointer ${
+                        cloudSyncMode === 'auto'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-700 hover:text-slate-900'
+                      }`}
+                    >
+                      ⚡ Auto-Sync
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {syncStatusMsg && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold flex items-center gap-2">
+              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>{syncStatusMsg}</span>
               </div>
             )}
 
             {/* Cloud Real-Time Sync Banner */}
-            <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between flex-wrap gap-2">
+            <div className="p-3 bg-slate-50 border border-slate-200 text-slate-800 rounded-xl text-xs flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="font-extrabold">Cloud Database Engine: Firebase Firestore Active</span>
-                <span className="text-[11px] text-emerald-700 font-normal">
-                  (Permits 100% Real-Time sync on GitHub Pages across different phones & computers)
+                <span className="font-extrabold">Cloud Database: Google Firestore</span>
+                <span className="text-[11px] text-slate-500 font-normal">
+                  (Project: <span className="font-mono font-bold text-slate-700">{getCloudSyncStatus().projectId}</span>)
                 </span>
               </div>
-              <div className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
-                Project: {getCloudSyncStatus().projectId} | Device: {getCloudSyncStatus().deviceId}
+              <div className="text-[10px] font-mono bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">
+                Device ID: {getCloudSyncStatus().deviceId}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 text-xs">
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <span className="text-[11px] text-slate-500 font-bold block">GitHub Pages & Cloud Sync</span>
-                <span className="font-bold text-emerald-700 flex items-center gap-1.5 mt-1">
-                  <CheckCircle2 className="w-4 h-4" /> Live Multi-Device Sync Active
+                <span className="text-[11px] text-slate-500 font-bold block">GitHub Pages & Production</span>
+                <span className="font-bold text-slate-800 flex items-center gap-1.5 mt-1">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Protected by Safe Mode
                 </span>
                 <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                  Entries saved on any phone, tablet, or PC automatically sync via Google Cloud Firestore. No separate Node server required for GitHub Pages.
+                  Your live website and devices remain steady. Code updates require GitHub upload, and database changes require explicit Push.
                 </p>
               </div>
 
@@ -8782,7 +8683,7 @@ ${formLines.join('\n')}
                   <span className="text-[11px] text-slate-500">entries in local buffer</span>
                 </div>
                 <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                  Entries made during factory floor WiFi dropouts remain securely preserved in browser IndexedDB and automatically flush when connectivity resumes.
+                  Entries made during factory floor WiFi dropouts remain securely preserved in browser IndexedDB.
                 </p>
               </div>
 
@@ -8880,134 +8781,168 @@ ${formLines.join('\n')}
 
           {/* Cascade Deletions Backup Repository */}
           <div className="bg-indigo-50/40 border border-indigo-200 rounded-2xl p-5 mt-6 shadow-[inset_0_2px_10px_rgba(99,102,241,0.02)]">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-indigo-100 pb-3 mb-4 gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-indigo-100 pb-3 mb-4 gap-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                   <Trash2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h5 className="text-sm font-black text-indigo-950 uppercase m-0">Cascade Deletions Backup Repository</h5>
+                  <h5 className="text-sm font-black text-indigo-950 uppercase m-0 flex items-center gap-2">
+                    <span>Cascade Deletions Backup Repository</span>
+                    <span className="text-[10px] bg-indigo-200/80 text-indigo-900 px-2 py-0.5 rounded-full font-bold">
+                      {cascadeBackups.length} Archived
+                    </span>
+                  </h5>
                   <p className="text-[11px] text-indigo-700 mt-0.5 m-0 font-medium">
                     All cascade deletions of production jobs and plans are securely archived here. You can view, download, or restore them instantly.
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirm('Are you sure you want to permanently clear the deleted backups history? This cannot be undone.')) return;
-                  localStorage.removeItem('paperware_deleted_backups');
-                  showToast('🧹 Deleted backups repository cleared successfully.');
-                  // force re-render
-                  onSaveState({ ...state });
-                }}
-                className="px-3 py-1.5 text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold border border-rose-200 hover:border-rose-300 rounded-lg transition self-start sm:self-auto cursor-pointer"
-              >
-                Clear Repository
-              </button>
+              <div className="flex items-center gap-2">
+                {cascadeBackups.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        '🧹 CLEAR CASCADE DELETIONS BACKUP REPOSITORY?\n\n' +
+                        'Are you sure you want to permanently clear all deleted cascade backups? This cannot be undone.'
+                      );
+                      if (!confirmed) return;
+                      try {
+                        localStorage.removeItem('paperware_deleted_backups');
+                        sessionStorage.removeItem('paperware_deleted_backups');
+                      } catch (e) {}
+                      setCascadeBackups([]);
+                      onSaveState({
+                        ...state,
+                        deletedVaultItems: []
+                      });
+                      showToast('🧹 Cascade Deletions Backup Repository cleared successfully.');
+                    }}
+                    className="px-3 py-1.5 text-xs bg-rose-600 hover:bg-rose-700 text-white font-black rounded-lg transition self-start sm:self-auto cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear Repository</span>
+                  </button>
+                )}
+              </div>
             </div>
 
-            {(() => {
-              const backupsRaw = localStorage.getItem('paperware_deleted_backups');
-              const backups = backupsRaw ? JSON.parse(backupsRaw) : [];
-
-              if (backups.length === 0) {
-                return (
-                  <div className="text-center py-6 text-xs text-slate-500 italic bg-white rounded-xl border border-dashed border-indigo-100">
-                    No deleted records in the archive. Every job or plan deletion automatically triggers a secure snapshot backup.
-                  </div>
-                );
-              }
-
-              return (
-                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
-                  {backups.map((b: any) => (
-                    <div key={b.backupId} className="bg-white border border-indigo-100 rounded-xl p-3.5 shadow-xs flex items-center justify-between text-xs hover:border-indigo-200 transition">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-extrabold text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md text-[10px]">{b.backupId}</span>
-                          <span className="font-black text-slate-800">Job: {b.jobId}</span>
-                          {b.planId && <span className="text-slate-500 font-semibold">• Plan: {b.planId}</span>}
-                          <span className="text-slate-400">• {b.date || 'N/A'}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-2 flex-wrap">
-                          <span>Deleted: <strong>{b.deletedAt}</strong></span>
-                          <span>• By: <strong>{b.deletedBy}</strong></span>
-                          <span>• Active Runs Purged: <strong className="text-indigo-700">{b.job?.runningBatches?.length || 0} batches</strong></span>
-                        </div>
+            {cascadeBackups.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-500 italic bg-white rounded-xl border border-dashed border-indigo-200">
+                ✨ No deleted records in the archive. Every job or plan deletion automatically triggers a secure snapshot backup.
+              </div>
+            ) : (
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                {cascadeBackups.map((b: any) => (
+                  <div key={b.backupId} className="bg-white border border-indigo-100 rounded-xl p-3.5 shadow-xs flex items-center justify-between flex-wrap gap-3 text-xs hover:border-indigo-300 transition">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md text-[10px]">{b.backupId}</span>
+                        <span className="font-black text-slate-800">Job: {b.jobId}</span>
+                        {b.planId && <span className="text-slate-500 font-semibold">• Plan: {b.planId}</span>}
+                        <span className="text-slate-400">• {b.date || 'N/A'}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const blob = new Blob([JSON.stringify(b, null, 2)], { type: 'application/json' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `Backup_Deleted_${b.jobId}_${b.backupId}.json`;
-                            a.click();
-                          }}
-                          className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 transition cursor-pointer"
-                          title="Download JSON Snapshot"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!confirm(`Are you sure you want to RESTORE Job [${b.jobId}] and Plan [${b.planId}] from backup #${b.backupId}?\nThis will recreate the plan and job records back to the factory database.`)) return;
-                            
-                            const nextJobs = [...state.jobs];
-                            if (b.job && !nextJobs.some(j => j.id === b.jobId)) {
-                              nextJobs.push(b.job);
-                            }
-
-                            const nextPlans = [...(state.productionPlans || [])];
-                            if (b.productionPlan && !nextPlans.some(p => p.id === b.planId)) {
-                              nextPlans.push(b.productionPlan);
-                            }
-
-                            // Remove from deleted list
-                            const nextDeletedJobs = (state.deletedJobIds || []).filter(id => id !== b.jobId);
-                            const nextDeletedPlans = (state.deletedPlanIds || []).filter(id => id !== b.planId);
-
-                            const newLog: LogEntry = {
-                              jobId: b.jobId,
-                              stage: 'Admin Master',
-                              machine: 'BACKUP-RESTORE',
-                              shift: 'DAY',
-                              action: `🔄 Restored Job [${b.jobId}] & Plan [${b.planId}] from Cascade Backup Archive #${b.backupId}`,
-                              worker: 'ADMIN',
-                              user: currentUser?.username || 'admin',
-                              rawDate: new Date().toISOString().split('T')[0],
-                              timestamp: new Date().toLocaleString()
-                            };
-
-                            onSaveState({
-                              ...state,
-                              jobs: nextJobs,
-                              productionPlans: nextPlans,
-                              deletedJobIds: nextDeletedJobs,
-                              deletedPlanIds: nextDeletedPlans,
-                              logs: [...state.logs, newLog]
-                            });
-
-                            // remove this backup from localStorage list
-                            const updatedBackups = backups.filter((bk: any) => bk.backupId !== b.backupId);
-                            localStorage.setItem('paperware_deleted_backups', JSON.stringify(updatedBackups));
-
-                            showToast(`✅ Successfully Restored Job [${b.jobId}] and production plan!`);
-                          }}
-                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] transition cursor-pointer shadow-xs"
-                        >
-                          Restore Data
-                        </button>
+                      <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-2 flex-wrap">
+                        <span>Deleted: <strong>{b.deletedAt}</strong></span>
+                        <span>• By: <strong>{b.deletedBy}</strong></span>
+                        <span>• Active Runs Purged: <strong className="text-indigo-700">{b.job?.runningBatches?.length || 0} batches</strong></span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              );
-            })()}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const blob = new Blob([JSON.stringify(b, null, 2)], { type: 'application/json' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `Backup_Deleted_${b.jobId}_${b.backupId}.json`;
+                          a.click();
+                        }}
+                        className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 transition cursor-pointer"
+                        title="Download JSON Snapshot"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const confirmed = window.confirm(
+                            `🔄 RESTORE JOB & PLAN FROM BACKUP #${b.backupId}?\n\n` +
+                            `Job: ${b.jobId}\n` +
+                            `Plan: ${b.planId || 'N/A'}\n\n` +
+                            `This will recreate the plan and job records back to the factory database.`
+                          );
+                          if (!confirmed) return;
+
+                          const nextJobs = [...state.jobs];
+                          if (b.job && !nextJobs.some((j: any) => j.id === b.jobId)) {
+                            nextJobs.push(b.job);
+                          }
+
+                          const nextPlans = [...(state.productionPlans || [])];
+                          if (b.productionPlan && !nextPlans.some((p: any) => p.id === b.planId)) {
+                            nextPlans.push(b.productionPlan);
+                          }
+
+                          const nextDeletedJobs = (state.deletedJobIds || []).filter((id: string) => id !== b.jobId);
+                          const nextDeletedPlans = (state.deletedPlanIds || []).filter((id: string) => id !== b.planId);
+
+                          const newLog: LogEntry = {
+                            jobId: b.jobId,
+                            stage: 'Admin Master',
+                            machine: 'BACKUP-RESTORE',
+                            shift: 'DAY',
+                            action: `🔄 Restored Job [${b.jobId}] & Plan [${b.planId}] from Cascade Backup Archive #${b.backupId}`,
+                            worker: 'ADMIN',
+                            user: currentUser?.username || 'admin',
+                            rawDate: new Date().toISOString().split('T')[0],
+                            timestamp: new Date().toLocaleString()
+                          };
+
+                          const updatedBackups = cascadeBackups.filter((bk: any) => bk.backupId !== b.backupId);
+                          try {
+                            localStorage.setItem('paperware_deleted_backups', JSON.stringify(updatedBackups));
+                          } catch (e) {}
+                          setCascadeBackups(updatedBackups);
+
+                          onSaveState({
+                            ...state,
+                            jobs: nextJobs,
+                            productionPlans: nextPlans,
+                            deletedJobIds: nextDeletedJobs,
+                            deletedPlanIds: nextDeletedPlans,
+                            logs: [...state.logs, newLog]
+                          });
+
+                          showToast(`✅ Successfully Restored Job [${b.jobId}] and production plan!`);
+                        }}
+                        className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] transition cursor-pointer shadow-xs flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Restore Data</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = cascadeBackups.filter((bk: any) => bk.backupId !== b.backupId);
+                          try {
+                            localStorage.setItem('paperware_deleted_backups', JSON.stringify(updated));
+                          } catch (e) {}
+                          setCascadeBackups(updated);
+                          showToast(`🗑️ Deleted backup #${b.backupId} from repository.`);
+                        }}
+                        className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-lg transition cursor-pointer"
+                        title="Delete single backup permanently"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-6 border border-rose-200 bg-rose-50/30 rounded-2xl overflow-hidden">

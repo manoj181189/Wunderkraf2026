@@ -25,8 +25,6 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
     const isPinCorrect =
       trimmed === correctPassword ||
       trimmed.toUpperCase() === 'WKF1811' ||
-      trimmed === '1811' ||
-      trimmed === '1234' ||
       trimmed === 'admin' ||
       trimmed.toUpperCase() === 'MANOJ';
 

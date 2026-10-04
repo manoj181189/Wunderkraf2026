@@ -190,14 +190,36 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
 
   // Modals
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+  const [cancelBatchTarget, setCancelBatchTarget] = useState<{ job: Job; batch: RunningBatch } | null>(null);
   const [isAddReelModalOpen, setIsAddReelModalOpen] = useState(false);
   const [addReelJobId, setAddReelJobId] = useState('');
   const [addReelWorker, setAddReelWorker] = useState(slitWorkers[0] || 'Abhay');
   const [addReelNo, setAddReelNo] = useState('');
   const [addReelGsm, setAddReelGsm] = useState(() => (state.targetGsmMaster && state.targetGsmMaster.length > 0 ? state.targetGsmMaster[0] : '120 GSM'));
+
+  const handleOpenAddReelModal = (jobId: string) => {
+    setAddReelJobId(jobId);
+    const targetJob = jobs.find(j => j.id === jobId);
+    if (targetJob) {
+      const targetPlan = targetJob.planId ? productionPlans.find(p => p.id === targetJob.planId) : null;
+      const jobPlannedGsms = targetPlan?.plannedGsms && targetPlan.plannedGsms.length > 0
+        ? targetPlan.plannedGsms
+        : (targetPlan?.targetGsm ? targetPlan.targetGsm.split(/[,+/]/).map(s => s.trim()).filter(Boolean) : []);
+      
+      if (jobPlannedGsms.length > 0) {
+        setAddReelGsm(jobPlannedGsms[0]);
+      } else if (targetJob.gsm) {
+        setAddReelGsm(targetJob.gsm);
+      } else {
+        setAddReelGsm('120 GSM');
+      }
+    } else {
+      setAddReelGsm('120 GSM');
+    }
+    setIsAddReelModalOpen(true);
+  };
   const [addReelRemarks, setAddReelRemarks] = useState('');
   const [addReelWeightKg, setAddReelWeightKg] = useState('');
-  const [showCompletedJobsInAddReel, setShowCompletedJobsInAddReel] = useState(false);
 
   // Synchronize isPrintedRoll dynamically when selectedPlanId or selected GSM changes
   useEffect(() => {
@@ -350,7 +372,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
 
     // Strict PPC Job Requirement
     if (!selectedPlanId) {
-      alert('⚠️ Mandatory: You must select a Scheduled PPC Plan to start slitting. Direct runs are disabled.');
+      alert('⚠️ MANDATORY: कृपया आज का असाइनमेंट (Scheduled PPC Plan) सेलेक्ट करें! इसके बिना मशीन रन शुरू नहीं किया जा सकता।');
       return;
     }
 
@@ -672,20 +694,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       printedRollIcon: addReelIsPrintedRoll ? addReelPrintedRollIcon : undefined
     };
 
-    // If a reel with the same reelNo already exists as an empty placeholder (rolls=0 and without active batchId), update it rather than duplicating
-    const placeholderIndex = existingReelsList.findIndex(
-      (r) => r.reelNo.toLowerCase() === effectiveReelNo.toLowerCase() && (r.rolls || 0) === 0 && !r.batchId
-    );
-    let updatedReelsList: JobReelItem[];
-    if (placeholderIndex >= 0) {
-      updatedReelsList = [...existingReelsList];
-      updatedReelsList[placeholderIndex] = {
-        ...updatedReelsList[placeholderIndex],
-        ...newReelItem
-      };
-    } else {
-      updatedReelsList = [...existingReelsList, newReelItem];
-    }
+    const updatedReelsList = [...existingReelsList, newReelItem];
 
     const updatedJobs = baseJobsListForAdd.map((j) => {
       if (j.id !== targetJob.id) return j;
@@ -697,8 +706,6 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       const hasPrintedRoll = j.printedRollRequired || addReelIsPrintedRoll;
       return {
         ...j,
-        stage: 'Slitting',
-        status: 'SLITTING_IN_PROGRESS',
         reelNo: combinedReelNoStr,
         reelNumbers: updatedReelNumbers,
         reelsList: updatedReelsList,
@@ -1055,20 +1062,14 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
         return rItem;
       });
 
-      const hasOtherActiveBatches = (j.runningBatches || []).some(
-        (b) => b.batchId !== batch.batchId && (b.status === 'Running' || b.status === 'Held')
-      );
-      const targetStage = hasOtherActiveBatches ? 'Slitting' : 'Slitting Completed';
-      const targetStatus = hasOtherActiveBatches ? 'SLITTING_IN_PROGRESS' : 'READY_FOR_CUTTING';
-
       return {
         ...j,
         reelNo: effectiveReelNumbers.join(', '),
         reelNumbers: effectiveReelNumbers,
         reelsList: updatedReelsList,
         availableRolls: (j.availableRolls || 0) + rollsCount,
-        stage: targetStage,
-        status: targetStatus,
+        stage: 'Slitting Completed',
+        status: 'READY_FOR_CUTTING',
         outputWeightKg: newOutKg,
         scrapKg: newScrapKg,
         scrapPercent: totalScrapPct,
@@ -1175,39 +1176,75 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     alert(`✅ Slitting Finished!\n• Output: ${rollsCount} Rolls (${weightKg} KG)\n• Jumbo Loaded: ${inputWeight} KG\n• Scrap Wastage: ${finalScrapKg} KG (${finalScrapPercent}%)\nLogged to Total Traceability and Inventory!`);
   };
 
-  const handleConfirmCancelRun = () => {
-    if (!activeBatchObj) return;
-    const { job, batch } = activeBatchObj;
+  const handleConfirmCancelRun = (targetOverride?: { job: Job; batch: RunningBatch }) => {
+    const target = targetOverride || cancelBatchTarget || activeBatchObj;
+    if (!target) {
+      alert('⚠️ No active batch selected to cancel.');
+      return;
+    }
+    const { job, batch } = target;
 
-    const updatedJobs = jobs.map((j) => {
-      if (j.id !== job.id) return j;
-      return {
-        ...j,
-        runningBatches: (j.runningBatches || []).filter((b) => b.batchId !== batch.batchId)
-      };
+    // 1. Remove the running batch from the job
+    const updatedJobs = jobs
+      .map((j) => {
+        if (j.id !== job.id) return j;
+        const remainingBatches = (j.runningBatches || []).filter((b) => b.batchId !== batch.batchId);
+        return {
+          ...j,
+          runningBatches: remainingBatches
+        };
+      })
+      .filter((j) => {
+        // If the job has no running batches, zero output rolls, and zero reels recorded, remove empty job
+        const hasBatches = (j.runningBatches || []).length > 0;
+        const hasOutput = (j.availableRolls || 0) > 0 || (j.outputRolls || 0) > 0 || (j.outputWeightKg || 0) > 0;
+        const hasReels = (j.reelsList || []).length > 0;
+        if (j.id === job.id && !hasBatches && !hasOutput && !hasReels) {
+          return false;
+        }
+        return true;
+      });
+
+    // 2. Revert any linked Production Plan if job was removed
+    const updatedPlans = (productionPlans || []).map((p) => {
+      if (job.planId && p.id === job.planId) {
+        const matchingJob = updatedJobs.find((j) => j.id === job.id);
+        if (!matchingJob) {
+          return { ...p, status: 'Scheduled' as const, jobId: undefined };
+        }
+      }
+      return p;
     });
 
-    const allocatedReelIds = batch.motherReelsAllocated || [];
-    const updatedMotherReels = motherReelInventory.map((mr) => {
-      if (allocatedReelIds.includes(mr.id)) {
+    // 3. Release Mother Reels back to Available
+    const allocatedReelIds = [
+      ...(batch.motherReelsAllocated || []),
+      ...(job.motherReelsAllocated || []),
+      batch.motherReelId,
+      job.motherReelId
+    ].filter(Boolean) as string[];
+
+    const updatedMotherReels = (motherReelInventory || []).map((mr) => {
+      if (allocatedReelIds.includes(mr.id) || mr.allocatedJobId === job.id) {
         return {
           ...mr,
           status: 'Available' as const,
-          allocatedJobId: undefined
+          allocatedJobId: undefined,
+          allocatedDate: undefined
         };
       }
       return mr;
     });
 
-    const newLog = {
+    const newLog: LogEntry = {
       jobId: job.id,
       product: job.product,
       stage: 'Slitting Cancelled',
       machine: selectedMachine,
-      shift: batch.shift,
+      shift: batch.shift || 'DAY',
       action: `❌ Slitting Run Cancelled & Reverted (Batch ${batch.batchId} deleted, Mother Reels released)`,
-      worker: batch.worker,
-      user: 'slit_user',
+      worker: batch.worker || operatorName,
+      user: currentUser?.username || 'slit_user',
       rawDate: new Date().toISOString().split('T')[0],
       timestamp: new Date().toLocaleString()
     };
@@ -1215,13 +1252,18 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     onSaveState({
       ...state,
       jobs: updatedJobs,
+      productionPlans: updatedPlans,
       motherReelInventory: updatedMotherReels,
       logs: [...state.logs, newLog]
     });
 
     setIsCancelConfirmOpen(false);
+    setCancelBatchTarget(null);
     setSelectedActiveBatchId('');
-    alert('✅ Slitting run cancelled, batch removed, and Mother Reels returned to Inventory.');
+    setOutputRolls('');
+    setOutputWeightKg('');
+    setScrapKgInput('');
+    alert(`✅ Slitting run #${batch.batchId} for Job [${job.id}] successfully cancelled and removed. Mother Reels released.`);
   };
 
   return (
@@ -1302,17 +1344,16 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
               const displayGsm = batch.gsm || job.gsm || (job.plannedGsms && job.plannedGsms.join(', ')) || job.targetGsm || 'N/A';
               const displayWeight = batch.inputWeightKg || job.inputWeightKg || 200;
               return (
-                <button
+                <div
                   key={batch.batchId}
-                  type="button"
                   onClick={() => setSelectedActiveBatchId(batch.batchId)}
-                  className={`text-left p-3 rounded-lg border text-xs transition cursor-pointer flex justify-between items-center ${
+                  className={`text-left p-3 rounded-xl border text-xs transition cursor-pointer flex justify-between items-center gap-2 ${
                     isSelected
-                      ? 'border-blue-600 bg-blue-50/50 font-bold text-blue-900 shadow-xs ring-1 ring-blue-500'
+                      ? 'border-blue-600 bg-blue-50/60 font-bold text-blue-900 shadow-xs ring-1 ring-blue-500'
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="font-extrabold flex items-center gap-1.5 flex-wrap">
                       <span>{job.id} — {job.product}</span>
                       <span className="font-mono text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold border border-blue-200">
@@ -1325,18 +1366,33 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                         {displayWeight} KG In
                       </span>
                     </div>
-                    <div className="text-slate-500 text-[11px] mt-0.5">
+                    <div className="text-slate-500 text-[11px] mt-0.5 truncate">
                       Batch #{batch.batchId} | Op: {batch.worker} | Mill: {job.paperBrand || 'ITC'} | Start: {batch.startTime}
                     </div>
                   </div>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded shrink-0 ${
-                      batch.status === 'Held' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    {batch.status}
-                  </span>
-                </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        batch.status === 'Held' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      {batch.status}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCancelBatchTarget({ job, batch });
+                        setIsCancelConfirmOpen(true);
+                      }}
+                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded font-bold text-[10px] transition cursor-pointer flex items-center gap-0.5"
+                      title="Cancel and remove this slitting run"
+                    >
+                      <XCircle className="w-3 h-3 text-rose-600" />
+                      <span>Cancel</span>
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -1697,8 +1753,15 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsCancelConfirmOpen(true)}
-                  className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                  onClick={() => {
+                    if (activeBatchObj) {
+                      setCancelBatchTarget(activeBatchObj);
+                      setIsCancelConfirmOpen(true);
+                    } else {
+                      alert('⚠️ No active slitting batch selected to cancel.');
+                    }
+                  }}
+                  className="py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                 >
                   <XCircle className="w-3.5 h-3.5" /> Cancel Run
                 </button>
@@ -1737,8 +1800,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
               <button
                 type="button"
                 onClick={() => {
-                  setAddReelJobId(currentRunningBatch.job.id);
-                  setIsAddReelModalOpen(true);
+                  handleOpenAddReelModal(currentRunningBatch.job.id);
                 }}
                 className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow-xs"
               >
@@ -1770,8 +1832,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                Select Active/Scheduled PPC Plan:
+              <label className="block text-xs font-black text-rose-700 uppercase mb-1">
+                Select Today's Assignment / आज का असाइनमेंट <span className="text-rose-600 font-extrabold">*MANDATORY</span>:
               </label>
               <select
                 value={selectedPlanId}
@@ -1830,21 +1892,10 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 }}
                 className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
               >
-                <option value="" disabled>-- Select a Scheduled PPC Plan --</option>
-                {productionPlans
-                  .filter((p) => {
-                    if (p.status === 'Completed' || p.status === 'Cancelled') return false;
-                    if (p.jobId) {
-                      const linkedJob = jobs.find((j) => j.id === p.jobId);
-                      if (linkedJob) {
-                        const reels = getJobAllReels(linkedJob);
-                        const plannedLimit = p.targetLayers || linkedJob.targetLayers || 8;
-                        const isJobDone = (linkedJob.stage === 'Slitting Completed' || linkedJob.status === 'READY_FOR_CUTTING' || linkedJob.stage === 'Cutting') && reels.length >= plannedLimit;
-                        if (isJobDone) return false;
-                      }
-                    }
-                    return p.status === 'Scheduled' || p.status === 'In-Progress';
-                  })
+                <option value="" disabled>-- Select Today\'s Assignment / आज का असाइनमेंट --</option>
+                {[...productionPlans]
+                  .filter((p) => p.status === 'Scheduled' || p.status === 'In-Progress')
+                  .sort((a, b) => b.id.localeCompare(a.id))
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       [{p.id}] {p.product} • {p.targetLayers}L • {p.targetLengthMeters}M • {p.paperBrand || 'ITC'} ({p.status})
@@ -2355,9 +2406,10 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
             type="button"
             onClick={() => {
               if (currentRunningBatch) {
-                setAddReelJobId(currentRunningBatch.job.id);
+                handleOpenAddReelModal(currentRunningBatch.job.id);
+              } else {
+                setIsAddReelModalOpen(true);
               }
-              setIsAddReelModalOpen(true);
             }}
             className={`px-4 py-3 font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
               currentRunningBatch
@@ -2412,9 +2464,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
           const entryTime = latestLog?.startTime || (latestLog?.timestamp ? latestLog.timestamp.split(',')[1]?.trim() : '');
           const paperBrand = j.paperBrand || 'ITC';
           const remark = j.customRemark || 'Standard';
-          const totalSlitRolls = (j.reelsList || []).reduce((s, r) => s + (r.rolls || 0), 0) ||
-            (j.runningBatches || []).filter(b => b.stage === 'Slitting' && b.status === 'Completed').reduce((s, b) => s + (b.producedQty || 0), 0);
-          const stock = (j.availableRolls !== undefined && j.availableRolls > 0) ? j.availableRolls : totalSlitRolls;
+          const stock = j.availableRolls || 0;
 
           return {
             job: j,
@@ -2847,110 +2897,32 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                   </span>
                 )}
               </div>
-              {(() => {
-                const activeOrPartial: Array<{
-                  job: Job;
-                  currReelsCount: number;
-                  plannedLimit: number;
-                  isRunningNow: boolean;
-                  isPartial: boolean;
-                }> = [];
-                const completedJobsList: Array<{
-                  job: Job;
-                  currReelsCount: number;
-                  plannedLimit: number;
-                }> = [];
-
-                jobs.forEach((j) => {
-                  const currReels = getJobAllReels(j);
-                  const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
-                  const plannedLimit = targetPlan?.targetLayers || j.targetLayers || 8;
-                  const isRunningNow = currentRunningBatch?.job.id === j.id;
-                  const isLimitReached = currReels.length >= plannedLimit;
-                  const isSlittingFinished = j.stage === 'Slitting Completed' || j.status === 'READY_FOR_CUTTING' || j.stage === 'Cutting' || j.status === 'CUTTING_IN_PROGRESS';
-                  const is100PercentDone = isLimitReached && isSlittingFinished;
-
-                  if (isRunningNow) {
-                    activeOrPartial.unshift({
-                      job: j,
-                      currReelsCount: currReels.length,
-                      plannedLimit,
-                      isRunningNow: true,
-                      isPartial: !isLimitReached
-                    });
-                  } else if (!is100PercentDone) {
-                    activeOrPartial.push({
-                      job: j,
-                      currReelsCount: currReels.length,
-                      plannedLimit,
-                      isRunningNow: false,
-                      isPartial: currReels.length > 0 && currReels.length < plannedLimit
-                    });
-                  } else {
-                    completedJobsList.push({
-                      job: j,
-                      currReelsCount: currReels.length,
-                      plannedLimit
-                    });
-                  }
-                });
-
-                return (
-                  <>
-                    <select
-                      value={addReelJobId}
-                      onChange={(e) => setAddReelJobId(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                    >
-                      <option value="">-- SELECT JOB ID --</option>
-                      {activeOrPartial.length === 0 && !showCompletedJobsInAddReel && (
-                        <option value="" disabled>
-                          ✅ All slitting jobs have completed their 100% reels quota!
-                        </option>
-                      )}
-                      {activeOrPartial.map(({ job: j, currReelsCount, plannedLimit, isRunningNow, isPartial }) => {
-                        const reelsList = getJobAllReels(j);
-                        return (
-                          <option key={j.id} value={j.id}>
-                            {isRunningNow ? '⭐ [ACTIVE RUNNING] ' : isPartial ? `⏳ [PARTIAL - ${currReelsCount}/${plannedLimit} REELS DONE, ${plannedLimit - currReelsCount} PENDING] ` : ''}
-                            {j.id} - {j.product} [{j.paperBrand || 'ITC'}]{' '}
-                            {reelsList.length > 0 ? `(Reels: ${reelsList.join(', ')})` : ''}
-                          </option>
-                        );
-                      })}
-                      {showCompletedJobsInAddReel && completedJobsList.length > 0 && (
-                        <optgroup label="🔒 100% Completed Jobs (Supervisor Override)">
-                          {completedJobsList.map(({ job: j, currReelsCount, plannedLimit }) => {
-                            const reelsList = getJobAllReels(j);
-                            return (
-                              <option key={j.id} value={j.id}>
-                                🔒 [100% DONE - {currReelsCount}/{plannedLimit} REELS] {j.id} - {j.product} [{j.paperBrand || 'ITC'}] {reelsList.length > 0 ? `(${reelsList.join(', ')})` : ''}
-                              </option>
-                            );
-                          })}
-                        </optgroup>
-                      )}
-                    </select>
-
-                    <div className="flex items-center justify-between mt-1.5 pt-1 text-[11px] text-slate-500">
-                      <span>
-                        {activeOrPartial.length} Active/Partial lot{activeOrPartial.length !== 1 ? 's' : ''} awaiting reels
-                      </span>
-                      {completedJobsList.length > 0 && (
-                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-600 hover:text-slate-900 select-none">
-                          <input
-                            type="checkbox"
-                            checked={showCompletedJobsInAddReel}
-                            onChange={(e) => setShowCompletedJobsInAddReel(e.target.checked)}
-                            className="rounded text-blue-600 focus:ring-0 cursor-pointer"
-                          />
-                          <span>Show 100% Completed Jobs ({completedJobsList.length})</span>
-                        </label>
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
+              <select
+                value={addReelJobId}
+                onChange={(e) => setAddReelJobId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
+              >
+                <option value="">-- SELECT JOB ID --</option>
+                {jobs
+                  .filter((j) => {
+                    const currReels = getJobAllReels(j);
+                    const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
+                    const plannedLimit = targetPlan?.targetLayers || j.targetLayers || 8;
+                    const isRunningNow = currentRunningBatch?.job.id === j.id;
+                    if (isRunningNow) return true;
+                    return currReels.length < plannedLimit;
+                  })
+                  .map((j) => {
+                    const isRunningNow = currentRunningBatch?.job.id === j.id;
+                    return (
+                      <option key={j.id} value={j.id}>
+                        {isRunningNow ? '⭐ [ACTIVE RUNNING] ' : ''}
+                        {j.id} - {j.product} [{j.paperBrand || 'ITC'}]{' '}
+                        {getJobAllReels(j).length > 0 ? `(Reels: ${getJobAllReels(j).join(', ')})` : ''}
+                      </option>
+                    );
+                  })}
+              </select>
               {currentRunningBatch && addReelJobId && addReelJobId !== currentRunningBatch.job.id && (
                 <div className="mt-1.5 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-900 font-semibold">
                   ⚠️ <b>Single Active Job Info:</b> Job <b>{currentRunningBatch.job.id}</b> is currently running on machine {selectedMachine}. Until it is Held or Completed, new reel/entry can only be added-on to this active job <b>{currentRunningBatch.job.id}</b>.
@@ -3227,40 +3199,53 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       )}
 
       {/* Cancel Run Confirm Modal */}
-      {isCancelConfirmOpen && activeBatchObj && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border border-rose-200 animate-in fade-in duration-150">
-            <div className="flex items-center gap-2 border-b border-rose-100 pb-3">
-              <AlertCircle className="w-5 h-5 text-rose-600" />
-              <div>
-                <h3 className="text-sm font-extrabold text-rose-950 m-0">Cancel Slitting Run</h3>
-                <p className="text-[11px] text-slate-500 m-0">Safely cancel this slitting run and delete batch</p>
+      {isCancelConfirmOpen && (cancelBatchTarget || activeBatchObj) && (() => {
+        const target = cancelBatchTarget || activeBatchObj;
+        if (!target) return null;
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border border-rose-200 animate-in fade-in duration-150">
+              <div className="flex items-center gap-2 border-b border-rose-100 pb-3">
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+                <div>
+                  <h3 className="text-sm font-extrabold text-rose-950 m-0">Cancel Slitting Run</h3>
+                  <p className="text-[11px] text-slate-500 m-0">Safely cancel this slitting run and release mother reels</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs space-y-2 text-rose-950">
+                <div>
+                  Are you sure you want to cancel and delete Slitting Batch <b className="font-mono bg-white px-1.5 py-0.5 rounded border border-rose-300 text-rose-900">#{target.batch.batchId}</b> for Job <b className="font-mono text-slate-900">{target.job.id}</b> ({target.job.product})?
+                </div>
+                <div className="text-[11px] text-rose-700 font-medium">
+                  • The running batch will be removed from the slitting desk.<br />
+                  • Allocated Jumbo Mother Reels will be released back to Available Inventory.
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCancelConfirmOpen(false);
+                    setCancelBatchTarget(null);
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
+                >
+                  Keep Running
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmCancelRun(target)}
+                  className="px-4 py-2 text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 rounded-xl cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <XCircle className="w-4 h-4" /> Cancel & Delete Batch
+                </button>
               </div>
             </div>
-
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs space-y-1.5 text-rose-900">
-              <div>Are you sure you want to cancel Slitting Batch <b>#{activeBatchObj.batch.batchId}</b> for Job <b>{activeBatchObj.job.id}</b>?</div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsCancelConfirmOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
-              >
-                Keep Running
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmCancelRun}
-                className="px-4 py-2 text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 rounded-xl cursor-pointer shadow-xs flex items-center gap-1"
-              >
-                <XCircle className="w-4 h-4" /> Cancel & Delete Batch
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {/* Lot Genealogy Modal */}
       <LotGenealogyModal
         isOpen={!!genealogyModalJob}

@@ -49,10 +49,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
       </div>
 
       <div className="text-center mb-6">
-        <h2 className="text-xl font-bold text-[#1a365d] m-0">Secure Workstation Login</h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Wünderkraf Factory ERP & AI Intelligence Access Gate
-        </p>
+        <h2 className="text-xl font-bold text-[#1a365d] m-0">Wunderkraf Paperware</h2>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -124,15 +121,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
           className="w-full py-3 bg-[#1a365d] hover:bg-[#2b6cb0] text-white font-bold rounded-lg text-sm transition shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
         >
           <KeyRound className="w-4 h-4" />
-          <span>Login & Open Floor Hub</span>
+          <span>Login</span>
         </button>
       </form>
-
-      <div className="mt-6 pt-5 border-t border-slate-100 text-center">
-        <p className="text-[11px] text-slate-400 m-0">
-          🔒 Unauthorized access is strictly prohibited. To manage accounts or reset credentials, contact the Admin / Production Head.
-        </p>
-      </div>
     </div>
   );
 };
