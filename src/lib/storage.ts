@@ -329,7 +329,10 @@ export async function persistFactoryState(
   let savedToLocalStorage = false;
 
   // Use nextState directly as the authoritative state to persist (do not merge old deleted items back)
-  const stateToSave = nextState;
+  const stateToSave: FactoryState = {
+    ...nextState,
+    lastUpdated: nextState.lastUpdated || new Date().toISOString()
+  };
 
   // 1. Primary IndexedDB write
   try {

@@ -321,6 +321,10 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   });
 
   // 9. Merge Numbering Series Counters (Take MAXIMUM to avoid collisions across devices)
+  const baseTime = base.lastUpdated ? new Date(base.lastUpdated).getTime() : 0;
+  const incTime = incoming.lastUpdated ? new Date(incoming.lastUpdated).getTime() : 0;
+  const incomingIsNewer = incTime > baseTime;
+
   const mergedSeriesConfig: SeriesConfig = {
     orderSeq: Math.max(base.seriesConfig?.orderSeq || 1, incoming.seriesConfig?.orderSeq || 1),
     productSeqs: {
@@ -329,38 +333,89 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     },
     numberingMaster: {
       jobSeries: {
-        prefix: incoming.seriesConfig?.numberingMaster?.jobSeries?.prefix || base.seriesConfig?.numberingMaster?.jobSeries?.prefix || 'WK-LOT',
-        paddingDigits: incoming.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits ?? base.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits ?? 3,
+        prefix:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.jobSeries?.prefix?.trim() : base.seriesConfig?.numberingMaster?.jobSeries?.prefix?.trim()) ||
+          base.seriesConfig?.numberingMaster?.jobSeries?.prefix?.trim() ||
+          incoming.seriesConfig?.numberingMaster?.jobSeries?.prefix?.trim() ||
+          'WK-LOT',
+        paddingDigits:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits : base.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits) ??
+          base.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits ??
+          incoming.seriesConfig?.numberingMaster?.jobSeries?.paddingDigits ??
+          3,
         nextSeq: Math.max(
           base.seriesConfig?.numberingMaster?.jobSeries?.nextSeq || 101,
           incoming.seriesConfig?.numberingMaster?.jobSeries?.nextSeq || 101
         )
       },
       slitSeries: {
-        prefix: incoming.seriesConfig?.numberingMaster?.slitSeries?.prefix || base.seriesConfig?.numberingMaster?.slitSeries?.prefix || 'SLIT',
-        paddingDigits: incoming.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits ?? base.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits ?? 2,
+        prefix:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.slitSeries?.prefix?.trim() : base.seriesConfig?.numberingMaster?.slitSeries?.prefix?.trim()) ||
+          base.seriesConfig?.numberingMaster?.slitSeries?.prefix?.trim() ||
+          incoming.seriesConfig?.numberingMaster?.slitSeries?.prefix?.trim() ||
+          'SLIT',
+        paddingDigits:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits : base.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits) ??
+          base.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits ??
+          incoming.seriesConfig?.numberingMaster?.slitSeries?.paddingDigits ??
+          2,
         nextSeq: Math.max(
           base.seriesConfig?.numberingMaster?.slitSeries?.nextSeq || 1,
           incoming.seriesConfig?.numberingMaster?.slitSeries?.nextSeq || 1
         )
       },
       cutSeries: {
-        prefix: incoming.seriesConfig?.numberingMaster?.cutSeries?.prefix || base.seriesConfig?.numberingMaster?.cutSeries?.prefix || 'CUT',
-        paddingDigits: incoming.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits ?? base.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits ?? 2,
+        prefix:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.cutSeries?.prefix?.trim() : base.seriesConfig?.numberingMaster?.cutSeries?.prefix?.trim()) ||
+          base.seriesConfig?.numberingMaster?.cutSeries?.prefix?.trim() ||
+          incoming.seriesConfig?.numberingMaster?.cutSeries?.prefix?.trim() ||
+          'CUT',
+        paddingDigits:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits : base.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits) ??
+          base.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits ??
+          incoming.seriesConfig?.numberingMaster?.cutSeries?.paddingDigits ??
+          2,
         nextSeq: Math.max(
           base.seriesConfig?.numberingMaster?.cutSeries?.nextSeq || 1,
           incoming.seriesConfig?.numberingMaster?.cutSeries?.nextSeq || 1
         )
       },
       qcSeries: {
-        prefix: incoming.seriesConfig?.numberingMaster?.qcSeries?.prefix || base.seriesConfig?.numberingMaster?.qcSeries?.prefix || 'QC',
-        paddingDigits: incoming.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits ?? base.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits ?? 2,
+        prefix:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.qcSeries?.prefix?.trim() : base.seriesConfig?.numberingMaster?.qcSeries?.prefix?.trim()) ||
+          base.seriesConfig?.numberingMaster?.qcSeries?.prefix?.trim() ||
+          incoming.seriesConfig?.numberingMaster?.qcSeries?.prefix?.trim() ||
+          'QC',
+        paddingDigits:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits : base.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits) ??
+          base.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits ??
+          incoming.seriesConfig?.numberingMaster?.qcSeries?.paddingDigits ??
+          2,
         nextSeq: Math.max(
           base.seriesConfig?.numberingMaster?.qcSeries?.nextSeq || 1,
           incoming.seriesConfig?.numberingMaster?.qcSeries?.nextSeq || 1
         )
       },
-      useGlobalJobPrefix: incoming.seriesConfig?.numberingMaster?.useGlobalJobPrefix ?? base.seriesConfig?.numberingMaster?.useGlobalJobPrefix
+      planSeries: {
+        prefix:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.planSeries?.prefix?.trim() : base.seriesConfig?.numberingMaster?.planSeries?.prefix?.trim()) ||
+          base.seriesConfig?.numberingMaster?.planSeries?.prefix?.trim() ||
+          incoming.seriesConfig?.numberingMaster?.planSeries?.prefix?.trim() ||
+          'PLAN',
+        paddingDigits:
+          (incomingIsNewer ? incoming.seriesConfig?.numberingMaster?.planSeries?.paddingDigits : base.seriesConfig?.numberingMaster?.planSeries?.paddingDigits) ??
+          base.seriesConfig?.numberingMaster?.planSeries?.paddingDigits ??
+          incoming.seriesConfig?.numberingMaster?.planSeries?.paddingDigits ??
+          3,
+        nextSeq: Math.max(
+          base.seriesConfig?.numberingMaster?.planSeries?.nextSeq || 1,
+          incoming.seriesConfig?.numberingMaster?.planSeries?.nextSeq || 1
+        )
+      },
+      useGlobalJobPrefix:
+        incomingIsNewer
+          ? (incoming.seriesConfig?.numberingMaster?.useGlobalJobPrefix ?? base.seriesConfig?.numberingMaster?.useGlobalJobPrefix ?? false)
+          : (base.seriesConfig?.numberingMaster?.useGlobalJobPrefix ?? incoming.seriesConfig?.numberingMaster?.useGlobalJobPrefix ?? false)
     }
   };
 
@@ -474,6 +529,47 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       });
       return updatedDeptWorkers;
     })(),
+    lastUpdated: incomingIsNewer ? incoming.lastUpdated : (base.lastUpdated || new Date().toISOString()),
+    targetGsmMaster: Array.from(new Set([
+      ...(base.targetGsmMaster || []),
+      ...(incoming.targetGsmMaster || [])
+    ])),
+    targetLayersMaster: Array.from(new Set([
+      ...(base.targetLayersMaster || []),
+      ...(incoming.targetLayersMaster || [])
+    ])),
+    products: Array.from(new Set([
+      ...(base.products || []),
+      ...(incoming.products || [])
+    ])),
+    paperBrands: Array.from(new Set([
+      ...(base.paperBrands || []),
+      ...(incoming.paperBrands || [])
+    ])),
+    glueBrands: Array.from(new Set([
+      ...(base.glueBrands || []),
+      ...(incoming.glueBrands || [])
+    ])),
+    productPrefixMap: {
+      ...(base.productPrefixMap || {}),
+      ...(incoming.productPrefixMap || {})
+    },
+    machinesMaster: {
+      ...(base.machinesMaster || {}),
+      ...(incoming.machinesMaster || {})
+    },
+    pcsPerKgMaster: {
+      ...(base.pcsPerKgMaster || {}),
+      ...(incoming.pcsPerKgMaster || {})
+    },
+    scrapLimitsMaster: {
+      ...(base.scrapLimitsMaster || {}),
+      ...(incoming.scrapLimitsMaster || {})
+    },
+    scrapToleranceKgMaster: Array.from(new Set([
+      ...(base.scrapToleranceKgMaster || []),
+      ...(incoming.scrapToleranceKgMaster || [])
+    ])),
     maintenanceContacts: incoming.maintenanceContacts !== undefined ? incoming.maintenanceContacts : base.maintenanceContacts,
     coordinationMatrix: incoming.coordinationMatrix?.length ? incoming.coordinationMatrix : base.coordinationMatrix,
     departmentHeads: incoming.departmentHeads?.length ? incoming.departmentHeads : base.departmentHeads,

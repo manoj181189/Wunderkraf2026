@@ -605,6 +605,7 @@ export interface WipLot {
 }
 
 export interface FactoryState {
+  lastUpdated?: string;
   lastResetTimestamp?: number;
   deletedJobIds?: string[];
   deletedOrderIds?: string[];

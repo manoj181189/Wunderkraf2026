@@ -363,7 +363,7 @@ _If you received this message, your contact number and routing configuration are
     }
   }, [activeTab]);
 
-  const handleToggleSyncMode = (mode: CloudSyncMode) => {
+  const handleToggleSyncMode = async (mode: CloudSyncMode) => {
     if (!isAdmin) {
       alert('⛔ Access Restricted: Only Administrators can configure Cloud Sync Mode.');
       return;
@@ -373,7 +373,14 @@ _If you received this message, your contact number and routing configuration are
     if (mode === 'manual') {
       alert('🛡️ Safe Manual Mode Active:\nChanges made in this Studio environment are saved locally and will NOT push to Firestore Cloud or Live devices automatically.\n\nUse the "Push to Live Cloud" button whenever you want to update live production.');
     } else {
-      alert('⚡ Auto-Sync Active:\nEvery edit and save will automatically push to Firestore Cloud in real-time across all devices.');
+      if (isFirebaseConfigured()) {
+        try {
+          await syncStateToCloud(state, true);
+        } catch (e) {
+          console.warn('[Sync] Initial push on auto mode switch deferred:', e);
+        }
+      }
+      alert('⚡ Auto-Sync Active:\nYour current Studio configuration has been pushed to Live Cloud and every edit will synchronize in real-time across all devices.');
     }
   };
 
@@ -478,10 +485,15 @@ _If you received this message, your contact number and routing configuration are
       ...(state.seriesConfig || { orderSeq: 1, productSeqs: {} }),
       numberingMaster: numberingForm
     };
-    onSaveState({
+    const nextState = {
       ...state,
+      lastUpdated: new Date().toISOString(),
       seriesConfig: nextConfig
-    });
+    };
+    onSaveState(nextState);
+    if (isFirebaseConfigured()) {
+      syncStateToCloud(nextState, true).catch(() => {});
+    }
     alert('✅ Auto-Numbering & Batch Prefix Master successfully saved and active!');
   };
 
