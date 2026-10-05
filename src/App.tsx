@@ -389,20 +389,68 @@ export const App: React.FC = () => {
 
   // Persistence effect: Writes to high-capacity IndexedDB and mirrors safely with auto-pruning to localStorage
   const handleSaveState = async (nextState: FactoryState) => {
+    let stampedState = nextState;
+    const nowIso = new Date().toISOString();
+
+    // 1. Stamp modified jobs
+    if (state?.jobs && nextState?.jobs) {
+      const stampedJobs = nextState.jobs.map(nj => {
+        const ej = state.jobs.find(j => j.id === nj.id);
+        if (!ej) return { ...nj, updatedAt: nowIso };
+        const njCompare = { ...nj, updatedAt: undefined };
+        const ejCompare = { ...ej, updatedAt: undefined };
+        if (JSON.stringify(njCompare) !== JSON.stringify(ejCompare)) {
+          return { ...nj, updatedAt: nowIso };
+        }
+        return nj;
+      });
+      stampedState = { ...stampedState, jobs: stampedJobs };
+    }
+
+    // 2. Stamp modified productionPlans
+    if (state?.productionPlans && nextState?.productionPlans) {
+      const stampedPlans = nextState.productionPlans.map(np => {
+        const ep = state.productionPlans.find(p => p.id === np.id);
+        if (!ep) return { ...np, updatedAt: nowIso };
+        const npCompare = { ...np, updatedAt: undefined };
+        const epCompare = { ...ep, updatedAt: undefined };
+        if (JSON.stringify(npCompare) !== JSON.stringify(epCompare)) {
+          return { ...np, updatedAt: nowIso };
+        }
+        return np;
+      });
+      stampedState = { ...stampedState, productionPlans: stampedPlans };
+    }
+
+    // 3. Stamp modified packJobs
+    if (state?.packJobs && nextState?.packJobs) {
+      const stampedPackJobs = nextState.packJobs.map(npj => {
+        const epj = state.packJobs.find(pj => pj.id === npj.id);
+        if (!epj) return { ...npj, updatedAt: nowIso };
+        const npjCompare = { ...npj, updatedAt: undefined };
+        const epjCompare = { ...epj, updatedAt: undefined };
+        if (JSON.stringify(npjCompare) !== JSON.stringify(epjCompare)) {
+          return { ...npj, updatedAt: nowIso };
+        }
+        return npj;
+      });
+      stampedState = { ...stampedState, packJobs: stampedPackJobs };
+    }
+
     try {
       const historyStr = localStorage.getItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY');
       const history = historyStr ? JSON.parse(historyStr) : [];
       const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-      const description = `Snapshot - ${dateStr} at ${timestamp} (Jobs: ${nextState.jobs?.length || 0}, Plans: ${nextState.productionPlans?.length || 0})`;
+      const description = `Snapshot - ${dateStr} at ${timestamp} (Jobs: ${stampedState.jobs?.length || 0}, Plans: ${stampedState.productionPlans?.length || 0})`;
       
       // Only push if different from last snapshot
-      if (history.length === 0 || JSON.stringify(history[0].state.jobs) !== JSON.stringify(nextState.jobs) || JSON.stringify(history[0].state.productionPlans) !== JSON.stringify(nextState.productionPlans)) {
+      if (history.length === 0 || JSON.stringify(history[0].state.jobs) !== JSON.stringify(stampedState.jobs) || JSON.stringify(history[0].state.productionPlans) !== JSON.stringify(stampedState.productionPlans)) {
         history.unshift({
           id: Date.now().toString(),
           timestamp: `${dateStr}, ${timestamp}`,
           description,
-          state: nextState
+          state: stampedState
         });
         localStorage.setItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY', JSON.stringify(history.slice(0, 10)));
       }
@@ -410,8 +458,8 @@ export const App: React.FC = () => {
       console.warn('[History] Failed to push snapshot:', e);
     }
 
-    setState(nextState);
-    const result = await persistFactoryState(nextState, state);
+    setState(stampedState);
+    const result = await persistFactoryState(stampedState, state);
     if (result.mergedState) {
       setState(result.mergedState);
     }

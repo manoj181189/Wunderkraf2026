@@ -581,7 +581,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
               : newOp;
 
             const currentLots = b.sourceLotId || '';
-            const newLotId = selectedCuttingBatchId || '';
+            const newLotId = activeCuttingBatchId || '';
             const nextSourceLotId = currentLots
               ? (currentLots.split(', ').includes(newLotId) ? currentLots : `${currentLots}, ${newLotId}`)
               : newLotId;
@@ -597,13 +597,13 @@ export const FormingView: React.FC<FormingViewProps> = ({
           })
         };
       });
-      logMessage = `Forming Top-up on ${selectedMachine} (+${cratesCount} Crates = +${issuedInputPieces.toLocaleString()} Net Blanks Added from Lot ${selectedCuttingBatchId || 'Cut'} by ${selectedCuttingLotWorker || 'Operator'})`;
+      logMessage = `Forming Top-up on ${selectedMachine} (+${cratesCount} Crates = +${issuedInputPieces.toLocaleString()} Net Blanks Added from Lot ${activeCuttingBatchId || 'Cut'} by ${selectedCuttingLotWorker || 'Operator'})`;
       alert(`✅ Top-up Successful! Added ${cratesCount} more crates (+${issuedInputPieces.toLocaleString()} Net Blanks @ ${netCutPcsPerCrate.toLocaleString()} pcs/crate) to running Job ${job.id} on ${selectedMachine}.`);
     } else {
       // Fresh batch
       const master = getNumberingMaster(state.seriesConfig);
       const batchId = generateFormingBatchId(job.id, job.runningBatches || [], master);
-      const upstreamBatchId = selectedCuttingBatchId || job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
+      const upstreamBatchId = activeCuttingBatchId || job.tracedLots?.Cutting || job.tracedLots?.Slitting || job.id;
       const newBatch: RunningBatch = {
         batchId,
         stage: 'Forming',
@@ -612,7 +612,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
         startTime: nowTime,
         status: 'Running',
         parentBatchId: upstreamBatchId,
-        sourceLotId: selectedCuttingBatchId || undefined,
+        sourceLotId: activeCuttingBatchId || undefined,
         sourceOperator: selectedCuttingLotWorker || undefined,
         issuedQty: cratesCount,
         inputCrates: cratesCount,
@@ -627,7 +627,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
         if (j.id !== job.id) return j;
         return {
           ...j,
-          tracedLots: { ...(j.tracedLots || {}), Forming: batchId, Cutting: selectedCuttingBatchId || j.tracedLots?.Cutting },
+          tracedLots: { ...(j.tracedLots || {}), Forming: batchId, Cutting: activeCuttingBatchId || j.tracedLots?.Cutting },
           availableCuttingCrates: Math.max(0, (j.availableCuttingCrates || 0) - cratesCount),
           runningBatches: [...modifiedCuttingBatches, newBatch]
         };

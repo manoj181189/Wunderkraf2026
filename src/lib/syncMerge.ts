@@ -55,18 +55,10 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     if (!existing) {
       jobMap.set(incJob.id, { ...incJob });
     } else {
-      const isMasterEdit = Boolean(
+      const preferInc = Boolean(
         incJob.isAuthoritativeMasterEdit ||
         (incJob.updatedAt && (!existing.updatedAt || incJob.updatedAt >= existing.updatedAt))
       );
-
-      if (isMasterEdit) {
-        jobMap.set(incJob.id, {
-          ...existing,
-          ...incJob
-        });
-        return;
-      }
 
       // Merge runningBatches by batchId
       const batchMap = new Map<string, RunningBatch>();
@@ -142,9 +134,8 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         (b) => b.stage === 'Slitting' && (b.status === 'Running' || b.status === 'Held')
       );
       
-      // If there is an active running/held slitting run or incoming stage was explicitly re-opened to Slitting, honor Slitting
-      let resolvedStage = incPrio >= existingPrio ? incJob.stage : existing.stage;
-      if (hasActiveSlittingRun || incJob.stage === 'Slitting' || incJob.status === 'SLITTING_IN_PROGRESS') {
+      let resolvedStage = preferInc ? incJob.stage : existing.stage;
+      if (hasActiveSlittingRun || (preferInc ? incJob.stage === 'Slitting' : existing.stage === 'Slitting') || (preferInc ? incJob.status === 'SLITTING_IN_PROGRESS' : existing.status === 'SLITTING_IN_PROGRESS')) {
         resolvedStage = 'Slitting';
       }
 
@@ -162,7 +153,27 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       const resolvedReelsList = Array.from(reelMap.values());
 
       const resolvedReelNumbers = Array.from(new Set([...(existing.reelNumbers || []), ...(incJob.reelNumbers || [])]));
-      const resolvedReelNo = resolvedReelNumbers.length > 0 ? resolvedReelNumbers.join(', ') : (incJob.reelNo || existing.reelNo);
+      const resolvedReelNo = resolvedReelNumbers.length > 0 ? resolvedReelNumbers.join(', ') : (preferInc ? (incJob.reelNo || existing.reelNo) : (existing.reelNo || incJob.reelNo));
+
+      const resolvedAvailableCuttingCrates = preferInc 
+        ? (incJob.availableCuttingCrates !== undefined ? incJob.availableCuttingCrates : (existing.availableCuttingCrates || 0))
+        : (existing.availableCuttingCrates !== undefined ? existing.availableCuttingCrates : (incJob.availableCuttingCrates || 0));
+
+      const resolvedAvailableFormingCrates = preferInc
+        ? (incJob.availableFormingCrates !== undefined ? incJob.availableFormingCrates : (existing.availableFormingCrates || 0))
+        : (existing.availableFormingCrates !== undefined ? existing.availableFormingCrates : (incJob.availableFormingCrates || 0));
+
+      const resolvedAvailableForQcCrates = preferInc
+        ? (incJob.availableForQcCrates !== undefined ? incJob.availableForQcCrates : (existing.availableForQcCrates || 0))
+        : (existing.availableForQcCrates !== undefined ? existing.availableForQcCrates : (incJob.availableForQcCrates || 0));
+
+      const resolvedAvailableQcCrates = preferInc
+        ? (incJob.availableQcCrates !== undefined ? incJob.availableQcCrates : (existing.availableQcCrates || 0))
+        : (existing.availableQcCrates !== undefined ? existing.availableQcCrates : (incJob.availableQcCrates || 0));
+
+      const resolvedIsReadyForQcInspection = preferInc
+        ? (incJob.isReadyForQcInspection !== undefined ? incJob.isReadyForQcInspection : existing.isReadyForQcInspection)
+        : (existing.isReadyForQcInspection !== undefined ? existing.isReadyForQcInspection : incJob.isReadyForQcInspection);
 
       jobMap.set(incJob.id, {
         ...existing,
@@ -173,22 +184,22 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         inputWeightKg: Math.max(existing.inputWeightKg || 0, incJob.inputWeightKg || 0),
         outputWeightKg: Math.max(existing.outputWeightKg || 0, incJob.outputWeightKg || 0),
         scrapKg: Math.max(existing.scrapKg || 0, incJob.scrapKg || 0),
-        status: hasActiveSlittingRun ? 'SLITTING_IN_PROGRESS' : (incJob.status || existing.status),
-        plannedGsms: incJob.plannedGsms || existing.plannedGsms,
-        plannedLayers: incJob.plannedLayers || existing.plannedLayers,
-        targetLayers: incJob.targetLayers || existing.targetLayers,
-        targetLengthMeters: incJob.targetLengthMeters || existing.targetLengthMeters,
-        targetGlueBrand: incJob.targetGlueBrand || existing.targetGlueBrand,
-        printedRollRequired: incJob.printedRollRequired ?? existing.printedRollRequired,
-        printedRollDesign: incJob.printedRollDesign || existing.printedRollDesign,
-        printedRollIcon: incJob.printedRollIcon || existing.printedRollIcon,
+        status: hasActiveSlittingRun ? 'SLITTING_IN_PROGRESS' : (preferInc ? (incJob.status || existing.status) : (existing.status || incJob.status)),
+        plannedGsms: preferInc ? (incJob.plannedGsms || existing.plannedGsms) : (existing.plannedGsms || incJob.plannedGsms),
+        plannedLayers: preferInc ? (incJob.plannedLayers || existing.plannedLayers) : (existing.plannedLayers || incJob.plannedLayers),
+        targetLayers: preferInc ? (incJob.targetLayers || existing.targetLayers) : (existing.targetLayers || incJob.targetLayers),
+        targetLengthMeters: preferInc ? (incJob.targetLengthMeters || existing.targetLengthMeters) : (existing.targetLengthMeters || incJob.targetLengthMeters),
+        targetGlueBrand: preferInc ? (incJob.targetGlueBrand || existing.targetGlueBrand) : (existing.targetGlueBrand || incJob.targetGlueBrand),
+        printedRollRequired: preferInc ? (incJob.printedRollRequired ?? existing.printedRollRequired) : (existing.printedRollRequired ?? incJob.printedRollRequired),
+        printedRollDesign: preferInc ? (incJob.printedRollDesign || existing.printedRollDesign) : (existing.printedRollDesign || incJob.printedRollDesign),
+        printedRollIcon: preferInc ? (incJob.printedRollIcon || existing.printedRollIcon) : (existing.printedRollIcon || incJob.printedRollIcon),
         stage: resolvedStage,
         availableRolls: Math.max(existing.availableRolls || 0, incJob.availableRolls || 0),
-        availableCuttingCrates: incJob.availableCuttingCrates !== undefined ? incJob.availableCuttingCrates : (existing.availableCuttingCrates || 0),
-        availableFormingCrates: incJob.availableFormingCrates !== undefined ? incJob.availableFormingCrates : (existing.availableFormingCrates || 0),
-        availableForQcCrates: incJob.availableForQcCrates !== undefined ? incJob.availableForQcCrates : (existing.availableForQcCrates || 0),
-        availableQcCrates: incJob.availableQcCrates !== undefined ? incJob.availableQcCrates : (existing.availableQcCrates || 0),
-        isReadyForQcInspection: incJob.isReadyForQcInspection !== undefined ? incJob.isReadyForQcInspection : existing.isReadyForQcInspection,
+        availableCuttingCrates: resolvedAvailableCuttingCrates,
+        availableFormingCrates: resolvedAvailableFormingCrates,
+        availableForQcCrates: resolvedAvailableForQcCrates,
+        availableQcCrates: resolvedAvailableQcCrates,
+        isReadyForQcInspection: resolvedIsReadyForQcInspection,
         tracedLots: { ...(existing.tracedLots || {}), ...(incJob.tracedLots || {}) },
         totalCutPieces: Math.max(existing.totalCutPieces || 0, incJob.totalCutPieces || 0),
         totalFormedPieces: Math.max(existing.totalFormedPieces || 0, incJob.totalFormedPieces || 0),
@@ -214,30 +225,26 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     if (!existing) {
       planMap.set(p.id, { ...p });
     } else {
-      const isMasterEdit = Boolean(
+      const preferInc = Boolean(
         p.isAuthoritativeMasterEdit ||
         (p.updatedAt && (!existing.updatedAt || p.updatedAt >= existing.updatedAt))
       );
-      if (isMasterEdit) {
-        planMap.set(p.id, { ...existing, ...p });
-        return;
-      }
 
       const isCompleted = p.status === 'Completed' || existing.status === 'Completed';
       planMap.set(p.id, {
         ...existing,
         ...p,
-        plannedLayers: p.plannedLayers || existing.plannedLayers,
-        plannedGsms: p.plannedGsms || existing.plannedGsms,
-        printedRollRequired: p.printedRollRequired ?? existing.printedRollRequired,
-        printedRollDesign: p.printedRollDesign || existing.printedRollDesign,
-        printedRollIcon: p.printedRollIcon || existing.printedRollIcon,
-        targetLayers: p.targetLayers || existing.targetLayers,
-        targetLengthMeters: p.targetLengthMeters || existing.targetLengthMeters,
-        paperBrand: p.paperBrand || existing.paperBrand,
-        adhesiveBrand: p.adhesiveBrand || existing.adhesiveBrand,
-        notes: p.notes || existing.notes,
-        status: isCompleted ? 'Completed' : (p.status || existing.status),
+        plannedLayers: preferInc ? (p.plannedLayers || existing.plannedLayers) : (existing.plannedLayers || p.plannedLayers),
+        plannedGsms: preferInc ? (p.plannedGsms || existing.plannedGsms) : (existing.plannedGsms || p.plannedGsms),
+        printedRollRequired: preferInc ? (p.printedRollRequired ?? existing.printedRollRequired) : (existing.printedRollRequired ?? p.printedRollRequired),
+        printedRollDesign: preferInc ? (p.printedRollDesign || existing.printedRollDesign) : (existing.printedRollDesign || p.printedRollDesign),
+        printedRollIcon: preferInc ? (p.printedRollIcon || existing.printedRollIcon) : (existing.printedRollIcon || p.printedRollIcon),
+        targetLayers: preferInc ? (p.targetLayers || existing.targetLayers) : (existing.targetLayers || p.targetLayers),
+        targetLengthMeters: preferInc ? (p.targetLengthMeters || existing.targetLengthMeters) : (existing.targetLengthMeters || p.targetLengthMeters),
+        paperBrand: preferInc ? (p.paperBrand || existing.paperBrand) : (existing.paperBrand || p.paperBrand),
+        adhesiveBrand: preferInc ? (p.adhesiveBrand || existing.adhesiveBrand) : (existing.adhesiveBrand || p.adhesiveBrand),
+        notes: preferInc ? (p.notes || existing.notes) : (existing.notes || p.notes),
+        status: isCompleted ? 'Completed' : (preferInc ? (p.status || existing.status) : (existing.status || p.status)),
         actualMetersSlit: Math.max(existing.actualMetersSlit || 0, p.actualMetersSlit || 0),
         actualLayersUsed: Math.max(existing.actualLayersUsed || 0, p.actualLayersUsed || 0),
         actualScrapKg: Math.max(existing.actualScrapKg || 0, p.actualScrapKg || 0)
@@ -256,14 +263,10 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     if (!existing) {
       packMap.set(pj.id, { ...pj });
     } else {
-      const isMasterEdit = Boolean(
+      const preferInc = Boolean(
         pj.isAuthoritativeMasterEdit ||
         (pj.updatedAt && (!existing.updatedAt || pj.updatedAt >= existing.updatedAt))
       );
-      if (isMasterEdit) {
-        packMap.set(pj.id, { ...existing, ...pj });
-        return;
-      }
 
       // Merge history runs
       const historyRuns = [...(existing.historyRuns || []), ...(pj.historyRuns || [])];
@@ -275,7 +278,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         packedBoxes: Math.max(existing.packedBoxes || 0, pj.packedBoxes || 0),
         dispatchedBoxes: Math.max(existing.dispatchedBoxes || 0, pj.dispatchedBoxes || 0),
         historyRuns: uniqueRuns,
-        status: pj.status === 'Completed' || existing.status === 'Completed' ? 'Completed' : (pj.status || existing.status)
+        status: pj.status === 'Completed' || existing.status === 'Completed' ? 'Completed' : (preferInc ? (pj.status || existing.status) : (existing.status || pj.status))
       });
     }
   });
@@ -504,10 +507,12 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       wipLotMap.set(lot.id, { ...lot });
     } else {
       const mergedConsumed = Math.max(existing.consumedQty || 0, lot.consumedQty || 0);
-      const mergedRemaining = Math.max(0, (lot.producedQty || existing.producedQty || 0) - mergedConsumed);
+      const mergedProduced = Math.max(existing.producedQty || 0, lot.producedQty || 0);
+      const mergedRemaining = Math.max(0, mergedProduced - mergedConsumed);
       wipLotMap.set(lot.id, {
         ...existing,
         ...lot,
+        producedQty: mergedProduced,
         consumedQty: mergedConsumed,
         remainingQty: mergedRemaining
       });
