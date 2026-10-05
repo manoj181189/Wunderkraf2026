@@ -1,14 +1,1966 @@
 {
-  "jobs": [],
-  "packJobs": [],
-  "logs": [],
-  "scrapSales": [],
-  "productionPlans": [],
-  "motherReelInventory": [],
-  "shiftHandovers": [],
-  "maintenanceIncidents": [],
-  "machineReadyAlerts": [],
+  "targetLayersMaster": [
+    8,
+    9
+  ],
   "customerComplaints": [],
+  "deletedWorkerIds": [
+    "FW-CUT-1",
+    "FW-CUT-3",
+    "FW-CUT-2",
+    "FW-CUT-S1",
+    "FW-FORM-3",
+    "FW-FORM-4",
+    "FW-FORM-H1",
+    "FW-FORM-H2",
+    "FW-FORM-S1",
+    "FW-QC-1",
+    "FW-QC-2",
+    "FW-QC-S1",
+    "FW-PACK-1",
+    "FW-PACK-2",
+    "FW-CUT-H3",
+    "FW-SLIT-2",
+    "FW-MNT-S1",
+    "FW-1789612779331",
+    "FW-SLIT-1",
+    "FW-SLIT-H1",
+    "FW-SLIT-S1",
+    "FW-FORM-1",
+    "FW-FORM-2",
+    "FW-PACK-H1",
+    "FW-PACK-H2",
+    "FW-PACK-S1",
+    "FW-MNT-1",
+    "FW-MNT-2",
+    "FW-MNT-3",
+    "EMP-1789698042379-148",
+    "EMP-1789698383225-109",
+    "EMP-1789810164154-859",
+    "EMP-1789817609655-380",
+    "EMP-1789895494753-272",
+    "EMP-1789903409517-42",
+    "FW-1790082099878",
+    "FW-1790082125070",
+    "FW-1790082156526",
+    "FW-001",
+    "FW-002",
+    "FW-003",
+    "FW-004",
+    "FW-005",
+    "FW-006",
+    "FW-007",
+    "FW-008",
+    "FW-009",
+    "FW-010",
+    "FW-011",
+    "FW-012",
+    "FW-013",
+    "FW-014",
+    "FW-015",
+    "FW-016",
+    "FW-017",
+    "FW-018",
+    "FW-019",
+    "FW-020",
+    "FW-021",
+    "FW-022",
+    "FW-023",
+    "FW-024",
+    "FW-025",
+    "FW-026",
+    "FW-027",
+    "FW-028",
+    "FW-029",
+    "FW-030",
+    "FW-031",
+    "FW-032",
+    "FW-033",
+    "FW-034",
+    "FW-035",
+    "FW-036",
+    "FW-037",
+    "FW-038",
+    "FW-039",
+    "FW-040",
+    "FW-041",
+    "FW-042",
+    "FW-043",
+    "FW-044",
+    "FW-045",
+    "FW-046",
+    "FW-047",
+    "FW-048",
+    "FW-049",
+    "FW-050",
+    "FW-051",
+    "FW-052",
+    "FW-053",
+    "FW-054",
+    "FW-055",
+    "FW-056",
+    "FW-057",
+    "FW-058",
+    "FW-059",
+    "FW-060",
+    "FW-061",
+    "FW-062",
+    "FW-063",
+    "FW-064",
+    "FW-065",
+    "FW-066",
+    "FW-067",
+    "FW-068",
+    "FW-069",
+    "FW-070",
+    "FW-071",
+    "FW-072",
+    "FW-073",
+    "FW-074",
+    "FW-075",
+    "FW-076",
+    "FW-077",
+    "FW-078",
+    "FW-079",
+    "FW-080",
+    "FW-081",
+    "FW-082",
+    "EMP-1790193260710-704",
+    "EMP-1790231957424-363",
+    "EMP-1790418342331-803",
+    "EMP-1790232071845-807",
+    "EMP-1790232890364-162",
+    "EMP-1790232890364-781"
+  ],
+  "maxPiecesPerSlitRoll": 12000,
+  "wipLots": [
+    {
+      "piecesPerCrate": 12800,
+      "consumedQty": 0,
+      "totalPieces": 217600,
+      "id": "LOT-CUT-1791113274265-596",
+      "machine": "Cutting-2",
+      "stage": "Cutting",
+      "producedQty": 17,
+      "product": "Fork",
+      "jobId": "FRK-066",
+      "timestamp": "2026-10-04T11:27:54.265Z",
+      "producedByOperator": "VISHAL",
+      "remainingQty": 17,
+      "shift": "DAY"
+    },
+    {
+      "shift": "DAY",
+      "product": "Fork",
+      "producedQty": 1,
+      "piecesPerCrate": 3520,
+      "machine": "Cutting-2",
+      "remainingQty": 1,
+      "consumedQty": 0,
+      "totalPieces": 3520,
+      "stage": "Cutting",
+      "id": "LOT-CUT-1791113176846-315",
+      "producedByOperator": "VISHAL",
+      "jobId": "FRK-066",
+      "timestamp": "2026-10-04T11:26:16.846Z"
+    },
+    {
+      "remainingQty": 5,
+      "product": "Dessert Spoon",
+      "shift": "DAY",
+      "id": "LOT-CUT-1789949243544-507",
+      "machine": "Cutting-1",
+      "producedQty": 5,
+      "jobId": "DSP-002",
+      "stage": "Cutting",
+      "timestamp": "2026-09-21T00:07:23.544Z",
+      "consumedQty": 0,
+      "producedByOperator": "TUSHAR",
+      "piecesPerCrate": 11000,
+      "totalPieces": 55000
+    },
+    {
+      "timestamp": "2026-09-21T00:07:13.513Z",
+      "machine": "Cutting-1",
+      "remainingQty": 1,
+      "producedByOperator": "TUSHAR",
+      "jobId": "DSP-002",
+      "product": "Dessert Spoon",
+      "stage": "Cutting",
+      "piecesPerCrate": 11000,
+      "consumedQty": 0,
+      "id": "LOT-CUT-1789949233513-484",
+      "totalPieces": 11000,
+      "producedQty": 1,
+      "shift": "DAY"
+    },
+    {
+      "totalPieces": 49995,
+      "consumedQty": 0,
+      "product": "Spoon",
+      "shift": "DAY",
+      "remainingQty": 5,
+      "producedQty": 5,
+      "machine": "Cutting-1",
+      "producedByOperator": "CUT_OP1",
+      "timestamp": "2026-09-20T13:06:59.502Z",
+      "piecesPerCrate": 10000,
+      "stage": "Cutting",
+      "jobId": "SPN-013",
+      "id": "LOT-CUT-1789909619502-436"
+    },
+    {
+      "producedQty": 5,
+      "shift": "NIGHT",
+      "timestamp": "2026-09-20T12:43:16.089Z",
+      "totalPieces": 49995,
+      "consumedQty": 0,
+      "jobId": "SPN-012",
+      "remainingQty": 5,
+      "product": "Spoon",
+      "id": "LOT-CUT-1789908196089-937",
+      "piecesPerCrate": 10000,
+      "stage": "Cutting",
+      "machine": "Cutting-1",
+      "producedByOperator": "AMISH"
+    },
+    {
+      "piecesPerCrate": 10000,
+      "timestamp": "2026-09-20T12:07:08.982Z",
+      "machine": "Cutting-1",
+      "id": "LOT-CUT-1789906028982-146",
+      "producedByOperator": "AMISH",
+      "remainingQty": 5,
+      "product": "Spoon",
+      "shift": "NIGHT",
+      "producedQty": 5,
+      "jobId": "SPN-011",
+      "consumedQty": 0,
+      "stage": "Cutting",
+      "totalPieces": 49995
+    },
+    {
+      "totalPieces": 79800,
+      "consumedQty": 0,
+      "machine": "Cutting-2",
+      "shift": "NIGHT",
+      "producedByOperator": "AMISH",
+      "producedQty": 8,
+      "id": "LOT-CUT-1789903202705-217",
+      "product": "Fork",
+      "jobId": "FRK-003",
+      "stage": "Cutting",
+      "remainingQty": 8,
+      "piecesPerCrate": 10000,
+      "timestamp": "2026-09-20T11:20:02.705Z"
+    },
+    {
+      "stage": "Cutting",
+      "producedQty": 2,
+      "machine": "Cutting-2",
+      "jobId": "FRK-003",
+      "piecesPerCrate": 10000,
+      "id": "LOT-CUT-1789903169340-302",
+      "consumedQty": 0,
+      "producedByOperator": "AMISH",
+      "totalPieces": 20000,
+      "remainingQty": 2,
+      "product": "Fork",
+      "shift": "NIGHT",
+      "timestamp": "2026-09-20T11:19:29.340Z"
+    },
+    {
+      "stage": "Cutting",
+      "product": "Spoon",
+      "jobId": "SPN-008",
+      "machine": "Cutting-1",
+      "id": "LOT-CUT-1789872955386-592",
+      "consumedQty": 1,
+      "shift": "DAY",
+      "timestamp": "2026-09-20T02:55:55.386Z",
+      "totalPieces": 10000,
+      "piecesPerCrate": 10000,
+      "remainingQty": 0,
+      "producedQty": 1,
+      "producedByOperator": "TUSHAR"
+    },
+    {
+      "machine": "Cutting-1",
+      "shift": "DAY",
+      "producedByOperator": "AMISH",
+      "product": "Fork",
+      "piecesPerCrate": 10000,
+      "timestamp": "2026-09-19T09:10:12.730Z",
+      "remainingQty": 1,
+      "producedQty": 1,
+      "jobId": "FRK-002",
+      "id": "LOT-CUT-1789809012730-535",
+      "stage": "Cutting",
+      "totalPieces": 10000,
+      "consumedQty": 0
+    },
+    {
+      "remainingQty": 0,
+      "jobId": "SPN-005",
+      "stage": "Cutting",
+      "piecesPerCrate": 10000,
+      "timestamp": "2026-09-18T02:23:59.424Z",
+      "producedByOperator": "AMISH",
+      "id": "LOT-CUT-1789698239424-805",
+      "product": "Spoon",
+      "totalPieces": 10000,
+      "consumedQty": 1,
+      "producedQty": 1,
+      "machine": "Cutting-1",
+      "shift": "NIGHT"
+    }
+  ],
+  "shiftConfig": {
+    "dayStart": "08:00",
+    "dayEnd": "20:00",
+    "nightStart": "20:00",
+    "nightEnd": "08:00"
+  },
+  "deletedOrderIds": [],
+  "deletedLogIds": [],
+  "seriesConfig": {
+    "orderSeq": 12,
+    "productSeqs": {
+      "Spoon": 15,
+      "Knife": 3,
+      "Dessert Spoon": 3,
+      "Fork": 4
+    },
+    "numberingMaster": {
+      "jobSeries": {
+        "prefix": "WK-LOT",
+        "paddingDigits": 3,
+        "nextSeq": 101
+      },
+      "slitSeries": {
+        "prefix": "SLIT",
+        "paddingDigits": 2,
+        "nextSeq": 1
+      },
+      "cutSeries": {
+        "prefix": "CUT",
+        "paddingDigits": 2,
+        "nextSeq": 1
+      },
+      "qcSeries": {
+        "prefix": "QC",
+        "paddingDigits": 2,
+        "nextSeq": 1
+      },
+      "useGlobalJobPrefix": false
+    }
+  },
+  "departmentHeads": [
+    {
+      "id": "DH-1",
+      "name": "Ramesh Slit-Head",
+      "dept": "Slitting",
+      "phone": "+91 98250 11001",
+      "role": "Slitting Department Head"
+    },
+    {
+      "name": "Suresh Cut-Master",
+      "id": "DH-2",
+      "role": "Cutting Department Head",
+      "phone": "+91 98250 22002",
+      "dept": "Cutting"
+    },
+    {
+      "dept": "Forming",
+      "role": "Forming Department Head",
+      "phone": "+91 98250 33003",
+      "name": "Rajesh Form-Lead",
+      "id": "DH-3"
+    },
+    {
+      "name": "Amit Verma (Lead QC)",
+      "id": "DH-4",
+      "phone": "+91 98250 44004",
+      "role": "Quality Control Head",
+      "dept": "QC"
+    },
+    {
+      "name": "Vikram Singh",
+      "id": "DH-5",
+      "phone": "+91 98250 55005",
+      "role": "Packing & Dispatch In-Charge",
+      "dept": "Packing"
+    },
+    {
+      "id": "DH-6",
+      "name": "Ramesh Sharma",
+      "role": "Chief Maintenance Engineer",
+      "dept": "Maintenance",
+      "phone": "+91 98250 12345"
+    },
+    {
+      "role": "Plant Production Manager",
+      "id": "DH-7",
+      "dept": "Plant Admin",
+      "phone": "+91 98250 99999",
+      "name": "Manoj Kumar (Plant Head)"
+    },
+    {
+      "phone": "+91 98250 77007",
+      "id": "DH-8",
+      "name": "Sanjay Patel",
+      "dept": "Purchase",
+      "role": "Purchase & Stores Officer"
+    }
+  ],
+  "coordinationMatrix": [
+    {
+      "contactName": "Ramesh Sharma",
+      "phone": "+91 98250 12345",
+      "alertCategories": {
+        "qcFailure": false,
+        "electricalAlert": false,
+        "materialIndent": false,
+        "productionHandover": true,
+        "machineBreakdown": true
+      },
+      "isActive": true,
+      "roleName": "Maintenance Head",
+      "id": "CM-1"
+    },
+    {
+      "phone": "+91 98251 67890",
+      "roleName": "Electrical Breakdown Head",
+      "id": "CM-2",
+      "contactName": "Kishan Patel",
+      "isActive": true,
+      "alertCategories": {
+        "electricalAlert": true,
+        "materialIndent": false,
+        "machineBreakdown": false,
+        "qcFailure": false,
+        "productionHandover": false
+      }
+    },
+    {
+      "contactName": "Suresh Patel",
+      "roleName": "Production Manager",
+      "id": "CM-3",
+      "isActive": true,
+      "phone": "+91 98250 11001",
+      "alertCategories": {
+        "materialIndent": true,
+        "qcFailure": true,
+        "machineBreakdown": true,
+        "productionHandover": true,
+        "electricalAlert": true
+      }
+    },
+    {
+      "alertCategories": {
+        "materialIndent": false,
+        "electricalAlert": false,
+        "qcFailure": true,
+        "productionHandover": false,
+        "machineBreakdown": false
+      },
+      "roleName": "QC Head",
+      "phone": "+91 98250 44004",
+      "contactName": "Amit Verma",
+      "isActive": true,
+      "id": "CM-4"
+    }
+  ],
+  "archivedJobs": [],
+  "glueBrands": [
+    "Pidilite FS35"
+  ],
+  "motherReelInventory": [],
+  "strictAuditRollYield": false,
+  "scrapToleranceKgMaster": [
+    15,
+    20,
+    25,
+    30,
+    40,
+    50
+  ],
+  "shiftHandovers": [],
+  "scrapLimitsMaster": [
+    5
+  ],
+  "machinesMaster": {
+    "Forming": [
+      "Forming-1",
+      "Forming-2",
+      "Forming-3",
+      "Forming-4",
+      "Forming-5",
+      "Forming-6",
+      "Forming-7",
+      "Forming-8"
+    ],
+    "Slitting": [
+      "Slitting-1"
+    ],
+    "Cutting": [
+      "Cutting-1",
+      "Cutting-2"
+    ],
+    "Packing": [
+      "Packing-1",
+      "Packing-2",
+      "Manual-1",
+      "Manual-2",
+      "Manual-3"
+    ],
+    "QC": [
+      "QC-Desk"
+    ],
+    "Printing": [
+      "Manual-4"
+    ]
+  },
+  "adminPassword": "1",
+  "deletedJobIds": [],
+  "crateCapacityMaster": {
+    "Fork": {
+      "formingPcs": 6500,
+      "cuttingPcs": 9000
+    },
+    "Knife": {
+      "cuttingPcs": 11000,
+      "formingPcs": 7500
+    },
+    "Spoon": {
+      "cuttingPcs": 10000,
+      "formingPcs": 7000
+    },
+    "Dessert Spoon": {
+      "cuttingPcs": 12000,
+      "formingPcs": 8500
+    }
+  },
+  "deptWorkers": {},
+  "productPrefixMap": {
+    "Knife": "KNF",
+    "Spoon": "SPN",
+    "Dessert Spoon": "DSP",
+    "Fork": "FRK"
+  },
+  "auditLogs": [
+    {
+      "timestamp": "2026-09-21T00:06:33.727Z",
+      "id": "AUDIT-1789949193727-545",
+      "action": "SUB_LOT_HANDOVER",
+      "complianceReference": "21-CFR-P11",
+      "stage": "Cutting",
+      "machine": "Cutting-1",
+      "userId": "cut_supervisor",
+      "payload": {
+        "sliceProducedQty": 5,
+        "incomingOperator": "TUSHAR",
+        "outgoingOperator": "AMISH",
+        "jobId": "DSP-002",
+        "sliceScrapQty": 50,
+        "meterReading": 0,
+        "batchId": "DSP-002-CUT-01",
+        "sliceRejectedPcs": 0
+      }
+    },
+    {
+      "action": "SUB_LOT_HANDOVER",
+      "timestamp": "2026-09-20T16:04:52.452Z",
+      "stage": "Cutting",
+      "id": "AUDIT-1789920292452-521",
+      "complianceReference": "21-CFR-P11",
+      "machine": "Cutting-1",
+      "payload": {
+        "outgoingOperator": "CUT_OP1",
+        "sliceRejectedPcs": 0,
+        "meterReading": 0,
+        "batchId": "SPN-014-CUT-01",
+        "sliceProducedQty": 5,
+        "sliceScrapQty": 50,
+        "jobId": "SPN-014",
+        "incomingOperator": "TUSHAR"
+      },
+      "userId": "cut_supervisor"
+    },
+    {
+      "complianceReference": "21-CFR-P11",
+      "action": "SUB_LOT_HANDOVER",
+      "payload": {
+        "incomingOperator": "AMISH",
+        "sliceScrapQty": 50,
+        "sliceProducedQty": 5,
+        "jobId": "SPN-012",
+        "sliceRejectedPcs": 0,
+        "meterReading": 0,
+        "batchId": "SPN-012-CUT-01",
+        "outgoingOperator": "TUSHAR"
+      },
+      "userId": "cut_supervisor",
+      "timestamp": "2026-09-20T12:42:53.147Z",
+      "id": "AUDIT-1789908173147-373",
+      "stage": "Cutting",
+      "machine": "Cutting-1"
+    },
+    {
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "jobId": "SPN-011",
+        "outgoingOperator": "TUSHAR",
+        "incomingOperator": "AMISH",
+        "meterReading": 0,
+        "batchId": "SPN-011-CUT-01",
+        "sliceProducedQty": 5,
+        "sliceScrapQty": 50
+      },
+      "id": "AUDIT-1789906004133-170",
+      "stage": "Cutting",
+      "userId": "cut_supervisor",
+      "machine": "Cutting-1",
+      "action": "SUB_LOT_HANDOVER",
+      "complianceReference": "21-CFR-P11",
+      "timestamp": "2026-09-20T12:06:44.133Z"
+    },
+    {
+      "id": "AUDIT-1789903118966-943",
+      "action": "SUB_LOT_HANDOVER",
+      "timestamp": "2026-09-20T11:18:38.966Z",
+      "complianceReference": "21-CFR-P11",
+      "stage": "Cutting",
+      "machine": "Cutting-2",
+      "userId": "cut_supervisor",
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "outgoingOperator": "TUSHAR",
+        "meterReading": 0,
+        "sliceScrapQty": 150,
+        "batchId": "FRK-003-CUT-01",
+        "jobId": "FRK-003",
+        "incomingOperator": "AMISH",
+        "sliceProducedQty": 10
+      }
+    },
+    {
+      "action": "SUB_LOT_HANDOVER",
+      "machine": "Cutting-1",
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "meterReading": 0,
+        "outgoingOperator": "AMISH",
+        "jobId": "SPN-009",
+        "incomingOperator": "TUSHAR",
+        "sliceProducedQty": 5,
+        "batchId": "SPN-009-CUT-01",
+        "sliceScrapQty": 0
+      },
+      "stage": "Cutting",
+      "timestamp": "2026-09-20T09:09:47.202Z",
+      "id": "AUDIT-1789895387202-493",
+      "userId": "cut_supervisor",
+      "complianceReference": "21-CFR-P11"
+    },
+    {
+      "timestamp": "2026-09-20T09:09:15.996Z",
+      "id": "AUDIT-1789895355996-776",
+      "action": "SUB_LOT_HANDOVER",
+      "userId": "cut_supervisor",
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "batchId": "SPN-009-CUT-01",
+        "meterReading": 0,
+        "outgoingOperator": "TUSHAR",
+        "incomingOperator": "AMISH",
+        "sliceScrapQty": 0,
+        "jobId": "SPN-009",
+        "sliceProducedQty": 5
+      },
+      "stage": "Cutting",
+      "machine": "Cutting-1",
+      "complianceReference": "21-CFR-P11"
+    },
+    {
+      "stage": "Cutting",
+      "action": "SUB_LOT_HANDOVER",
+      "machine": "Cutting-1",
+      "payload": {
+        "outgoingOperator": "TUSHAR",
+        "sliceScrapQty": 50,
+        "sliceRejectedPcs": 5,
+        "batchId": "SPN-008-CUT-01",
+        "sliceProducedQty": 5,
+        "meterReading": 0,
+        "jobId": "SPN-008",
+        "incomingOperator": "AMISH"
+      },
+      "timestamp": "2026-09-20T02:56:57.571Z",
+      "id": "AUDIT-1789873017571-800",
+      "complianceReference": "21-CFR-P11",
+      "userId": "cut_supervisor"
+    },
+    {
+      "userId": "cut_supervisor",
+      "id": "AUDIT-1789816115141-683",
+      "complianceReference": "21-CFR-P11",
+      "timestamp": "2026-09-19T11:08:35.141Z",
+      "payload": {
+        "incomingOperator": "AMISH",
+        "batchId": "KNF-002-CUT-01",
+        "sliceProducedQty": 5,
+        "jobId": "KNF-002",
+        "sliceRejectedPcs": 0,
+        "sliceScrapQty": 50,
+        "outgoingOperator": "TUSHAR",
+        "meterReading": 0
+      },
+      "stage": "Cutting",
+      "machine": "Cutting-1",
+      "action": "SUB_LOT_HANDOVER"
+    },
+    {
+      "stage": "Cutting",
+      "payload": {
+        "outgoingOperator": "AMISH",
+        "batchId": "KNF-002-CUT-01",
+        "sliceRejectedPcs": 5,
+        "sliceProducedQty": 5,
+        "sliceScrapQty": 50,
+        "jobId": "KNF-002",
+        "meterReading": 0,
+        "incomingOperator": "TUSHAR"
+      },
+      "id": "AUDIT-1789816027255-607",
+      "machine": "Cutting-1",
+      "userId": "cut_supervisor",
+      "timestamp": "2026-09-19T11:07:07.255Z",
+      "action": "SUB_LOT_HANDOVER",
+      "complianceReference": "21-CFR-P11"
+    },
+    {
+      "action": "SUB_LOT_HANDOVER",
+      "machine": "Cutting-1",
+      "id": "AUDIT-1789810001201-443",
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "meterReading": 0,
+        "jobId": "FRK-002",
+        "outgoingOperator": "TUSHAR",
+        "incomingOperator": "AMISH",
+        "sliceScrapQty": 50,
+        "sliceProducedQty": 4,
+        "batchId": "FRK-002-CUT-01"
+      },
+      "timestamp": "2026-09-19T09:26:41.201Z",
+      "complianceReference": "21-CFR-P11",
+      "stage": "Cutting",
+      "userId": "cut_supervisor"
+    },
+    {
+      "timestamp": "2026-09-19T09:10:50.243Z",
+      "userId": "cut_supervisor",
+      "payload": {
+        "sliceScrapQty": 50,
+        "sliceRejectedPcs": 10,
+        "jobId": "FRK-002",
+        "outgoingOperator": "AMISH",
+        "batchId": "FRK-002-CUT-01",
+        "incomingOperator": "TUSHAR",
+        "meterReading": 0,
+        "sliceProducedQty": 4
+      },
+      "machine": "Cutting-1",
+      "id": "AUDIT-1789809050243-2",
+      "stage": "Cutting",
+      "complianceReference": "21-CFR-P11",
+      "action": "SUB_LOT_HANDOVER"
+    },
+    {
+      "action": "SUB_LOT_HANDOVER",
+      "stage": "Cutting",
+      "machine": "Cutting-1",
+      "complianceReference": "21-CFR-P11",
+      "id": "AUDIT-1789807681793-275",
+      "payload": {
+        "outgoingOperator": "AMISH",
+        "jobId": "SPN-006",
+        "sliceRejectedPcs": 0,
+        "batchId": "SPN-006-CUT-01",
+        "meterReading": 0,
+        "sliceProducedQty": 5,
+        "sliceScrapQty": 50,
+        "incomingOperator": "TUSHAR"
+      },
+      "timestamp": "2026-09-19T08:48:01.793Z",
+      "userId": "cut_supervisor"
+    },
+    {
+      "action": "SUB_LOT_HANDOVER",
+      "id": "AUDIT-1789807570457-279",
+      "stage": "Cutting",
+      "machine": "Cutting-1",
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "meterReading": 0,
+        "sliceScrapQty": 50,
+        "batchId": "SPN-006-CUT-01",
+        "outgoingOperator": "TUSHAR",
+        "incomingOperator": "AMISH",
+        "sliceProducedQty": 5,
+        "jobId": "SPN-006"
+      },
+      "timestamp": "2026-09-19T08:46:10.457Z",
+      "complianceReference": "21-CFR-P11",
+      "userId": "cut_supervisor"
+    },
+    {
+      "complianceReference": "21-CFR-P11",
+      "id": "AUDIT-1789657207731-97",
+      "action": "SUB_LOT_HANDOVER",
+      "machine": "Cutting-1",
+      "timestamp": "2026-09-17T15:00:07.731Z",
+      "userId": "cut_supervisor",
+      "stage": "Cutting",
+      "payload": {
+        "outgoingOperator": "CUT_OP1",
+        "batchId": "SPN-004-CUT-01",
+        "sliceRejectedPcs": 0,
+        "meterReading": 0,
+        "sliceScrapQty": 50,
+        "jobId": "SPN-004",
+        "sliceProducedQty": 5,
+        "incomingOperator": "VIKRAM_CUT"
+      }
+    },
+    {
+      "payload": {
+        "outgoingOperator": "TUSHAR",
+        "batchId": "KNF-001-CUT-01",
+        "jobId": "KNF-001",
+        "sliceRejectedPcs": 100,
+        "sliceProducedQty": 10,
+        "sliceScrapQty": 155,
+        "meterReading": 0,
+        "incomingOperator": "BALU"
+      },
+      "stage": "Cutting",
+      "machine": "Cutting-2",
+      "userId": "cut_supervisor",
+      "action": "SUB_LOT_HANDOVER",
+      "complianceReference": "21-CFR-P11",
+      "timestamp": "2026-09-17T10:52:13.943Z",
+      "id": "AUDIT-1789642333943-213"
+    },
+    {
+      "payload": {
+        "incomingOperator": "AMISH",
+        "sliceProducedQty": 10,
+        "batchId": "SPN-003-CUT-01",
+        "jobId": "SPN-003",
+        "sliceRejectedPcs": 100,
+        "outgoingOperator": "TUSHAR",
+        "sliceScrapQty": 50,
+        "meterReading": 6000
+      },
+      "complianceReference": "21-CFR-P11",
+      "userId": "cut_supervisor",
+      "stage": "Cutting",
+      "machine": "Cutting-1",
+      "action": "SUB_LOT_HANDOVER",
+      "id": "AUDIT-1789616337807-743",
+      "timestamp": "2026-09-17T03:38:57.807Z"
+    },
+    {
+      "complianceReference": "21-CFR-P11",
+      "action": "SUB_LOT_HANDOVER",
+      "timestamp": "2026-09-17T03:19:10.783Z",
+      "stage": "Cutting",
+      "id": "AUDIT-1789615150783-128",
+      "machine": "Cutting-1",
+      "userId": "cut_supervisor",
+      "payload": {
+        "jobId": "SPN-003",
+        "sliceRejectedPcs": 100,
+        "meterReading": 3000,
+        "outgoingOperator": "AMISH",
+        "batchId": "SPN-003-CUT-01",
+        "sliceScrapQty": 50,
+        "incomingOperator": "TUSHAR",
+        "sliceProducedQty": 5
+      }
+    },
+    {
+      "userId": "cut_supervisor",
+      "payload": {
+        "meterReading": 3000,
+        "incomingOperator": "AMISH",
+        "sliceScrapQty": 50,
+        "jobId": "SPN-003",
+        "batchId": "SPN-003-CUT-01",
+        "sliceProducedQty": 5,
+        "sliceRejectedPcs": 100,
+        "outgoingOperator": "VIPUL"
+      },
+      "machine": "Cutting-1",
+      "id": "AUDIT-1789615095042-846",
+      "timestamp": "2026-09-17T03:18:15.042Z",
+      "complianceReference": "21-CFR-P11",
+      "stage": "Cutting",
+      "action": "SUB_LOT_HANDOVER"
+    },
+    {
+      "id": "AUDIT-1789615019907-755",
+      "complianceReference": "21-CFR-P11",
+      "action": "SUB_LOT_HANDOVER",
+      "machine": "Cutting-1",
+      "userId": "cut_supervisor",
+      "stage": "Cutting",
+      "timestamp": "2026-09-17T03:16:59.907Z",
+      "payload": {
+        "sliceProducedQty": 5,
+        "incomingOperator": "VIPUL",
+        "batchId": "SPN-003-CUT-01",
+        "outgoingOperator": "CUT_OP1",
+        "sliceScrapQty": 50,
+        "sliceRejectedPcs": 100,
+        "meterReading": 1500,
+        "jobId": "SPN-003"
+      }
+    },
+    {
+      "userId": "cut_supervisor",
+      "id": "AUDIT-1789613594693-954",
+      "complianceReference": "21-CFR-P11",
+      "payload": {
+        "outgoingOperator": "AMISH",
+        "sliceScrapQty": 50,
+        "jobId": "SPN-002",
+        "batchId": "SPN-002-CUT-01",
+        "sliceProducedQty": 5,
+        "incomingOperator": "TUSHAR",
+        "meterReading": 0
+      },
+      "stage": "Cutting",
+      "machine": "Cutting-2",
+      "timestamp": "2026-09-17T02:53:14.693Z",
+      "action": "SUB_LOT_HANDOVER"
+    },
+    {
+      "stage": "Cutting",
+      "action": "SUB_LOT_HANDOVER",
+      "machine": "Cutting-2",
+      "id": "AUDIT-1789613417025-411",
+      "payload": {
+        "incomingOperator": "AMISH",
+        "batchId": "SPN-002-CUT-01",
+        "jobId": "SPN-002",
+        "sliceProducedQty": 5,
+        "meterReading": 0,
+        "outgoingOperator": "TUSHAR",
+        "sliceScrapQty": 50
+      },
+      "complianceReference": "21-CFR-P11",
+      "timestamp": "2026-09-17T02:50:17.025Z",
+      "userId": "cut_supervisor"
+    }
+  ],
+  "users": {
+    "paras": {
+      "pass": "67",
+      "name": "paras",
+      "phone": "",
+      "role": "owner",
+      "perms": [
+        "Dashboard",
+        "Marketing",
+        "Dispatch",
+        "Slitting",
+        "Cutting",
+        "Forming",
+        "QC",
+        "Packing",
+        "Maintenance",
+        "Mnt_LogIncident",
+        "Mnt_AssignTech",
+        "Mnt_Repair",
+        "Mnt_SpareParts",
+        "Mnt_Preventative",
+        "Mnt_RCA",
+        "Purchase",
+        "Stock",
+        "Orders",
+        "Analytics",
+        "Search",
+        "Audit",
+        "Manpower",
+        "Planning",
+        "WA_ConfigEdit",
+        "WA_ManpowerReports",
+        "WA_QcAlerts",
+        "WA_ShiftReports",
+        "WA_BreakdownAlerts",
+        "WhatsApp",
+        "WA_DispatchNotes"
+      ]
+    },
+    "priti": {
+      "role": "SUPERVISOR",
+      "phone": "",
+      "pass": "43",
+      "perms": [
+        "Stock",
+        "Orders",
+        "Dispatch",
+        "Forming",
+        "QC",
+        "Manpower",
+        "Packing",
+        "Mnt_LogIncident",
+        "Mnt_Repair",
+        "Mnt_AssignTech",
+        "Mnt_SpareParts",
+        "WhatsApp",
+        "WA_ShiftReports",
+        "WA_BreakdownAlerts",
+        "WA_QcAlerts",
+        "WA_DispatchNotes",
+        "WA_ConfigEdit",
+        "WA_ManpowerReports",
+        "Purchase",
+        "Analytics",
+        "Audit",
+        "Search"
+      ],
+      "name": "PRITI"
+    },
+    "sandip": {
+      "role": "Manager",
+      "perms": [
+        "*"
+      ],
+      "name": "SANDIP KAMARIYA",
+      "phone": "",
+      "pass": "1632"
+    },
+    "amish": {
+      "name": "AMISH",
+      "perms": [
+        "Stock",
+        "Slitting",
+        "Cutting",
+        "Manpower",
+        "Mnt_LogIncident",
+        "Mnt_AssignTech",
+        "Mnt_Repair",
+        "Mnt_Preventative",
+        "Mnt_RCA",
+        "WA_BreakdownAlerts",
+        "WA_ShiftReports",
+        "WA_ManpowerReports",
+        "Purchase",
+        "Orders",
+        "Analytics",
+        "Audit",
+        "Search"
+      ],
+      "pass": "59",
+      "role": "SUPERVISOR",
+      "phone": ""
+    },
+    "sarang": {
+      "role": "SUPERVISOR",
+      "perms": [
+        "Dashboard",
+        "Forming",
+        "QC",
+        "Manpower",
+        "Packing",
+        "Purchase",
+        "Search",
+        "Audit",
+        "Mnt_RCA",
+        "Cutting",
+        "Slitting",
+        "Maintenance",
+        "Mnt_LogIncident",
+        "Mnt_AssignTech",
+        "Mnt_Repair",
+        "Mnt_SpareParts",
+        "Mnt_Preventative"
+      ],
+      "pass": "1122",
+      "name": "Sarang Rathod",
+      "phone": ""
+    },
+    "abhay": {
+      "name": "ABHAY",
+      "phone": "",
+      "pass": "28",
+      "role": "Operator",
+      "perms": [
+        "Stock",
+        "Slitting",
+        "Audit",
+        "Search",
+        "WA_ShiftReports"
+      ]
+    },
+    "kishan": {
+      "role": "marketing ",
+      "phone": "",
+      "name": "kishan ladani",
+      "perms": [
+        "Dashboard",
+        "Marketing",
+        "Dispatch",
+        "Slitting",
+        "Cutting",
+        "Forming",
+        "QC",
+        "Packing",
+        "Maintenance",
+        "Mnt_LogIncident",
+        "Mnt_AssignTech",
+        "Mnt_Repair",
+        "Mnt_SpareParts",
+        "Mnt_Preventative",
+        "Mnt_RCA",
+        "Purchase",
+        "Stock",
+        "Orders",
+        "Analytics",
+        "Search",
+        "Audit",
+        "Planning",
+        "Manpower"
+      ],
+      "pass": "912"
+    },
+    "balu": {
+      "perms": [
+        "Cutting",
+        "Mnt_LogIncident"
+      ],
+      "role": "Operator",
+      "phone": "",
+      "pass": "08",
+      "name": "BALU"
+    },
+    "admin": {
+      "perms": [
+        "*"
+      ],
+      "role": "Administrator",
+      "pass": "1118",
+      "phone": "",
+      "name": "Master Administrator"
+    }
+  },
+  "paperBrands": [
+    "AADHARA PAPER",
+    "BILT",
+    "ORIENT PAPER"
+  ],
+  "floorWorkers": [],
+  "deletedVaultItems": [],
+  "products": [
+    "Spoon",
+    "Fork",
+    "Knife",
+    "Dessert Spoon"
+  ],
+  "archivedLogs": [],
+  "deletedPlanIds": [],
+  "deletedHandoverIds": [
+    "HO-SLIT-1789614500414",
+    "HO-CUT-1789613594693",
+    "HO-CUT-1789615019906",
+    "HO-CUT-1789615095042",
+    "HO-CUT-1789615150783",
+    "HO-CUT-1789616337807",
+    "HO-FORM-1789617047977",
+    "HO-FORM-1789617586829",
+    "HO-CUT-1789642333942",
+    "HO-FORM-1789643864634",
+    "HO-CUT-1789657207731",
+    "HO-CUT-1789698164021",
+    "HO-CUT-1789748262589",
+    "HO-CUT-1789807570456",
+    "HO-CUT-1789807681793",
+    "HO-CUT-1789809050242",
+    "HO-CUT-1789810001200",
+    "HO-CUT-1789816027255",
+    "HO-CUT-1789816115141",
+    "HO-CUT-1789871807361",
+    "HO-CUT-1789873017570",
+    "HO-CUT-1789890080004",
+    "HO-CUT-1789893190100",
+    "HO-CUT-1789895355995",
+    "HO-CUT-1789895387202",
+    "HO-CUT-1789901692808",
+    "HO-CUT-1789903118965",
+    "HO-CUT-1789906004132",
+    "HO-CUT-1789908173145",
+    "HO-CUT-1789920292451",
+    "HO-CUT-1789949193726",
+    "HO-CUT-1790011045483",
+    "HO-CUT-1790038238458",
+    "HO-CUT-1790038264691",
+    "HO-CUT-1790038318264",
+    "HO-CUT-1790083600152",
+    "HO-CUT-1790083626840",
+    "HO-FORM-1790086413336",
+    "HO-FORM-1790086450084",
+    "HO-CUT-1790189658088",
+    "HO-CUT-1790189993260",
+    "HO-CUT-1790232239593",
+    "HO-FORM-1790233465150",
+    "HO-CUT-1790297631242",
+    "HO-FORM-1790297866013",
+    "HO-CUT-1790303077583",
+    "HO-FORM-1790303235965",
+    "HO-CUT-1790348006941",
+    "HO-FORM-1790350291899",
+    "HO-CUT-1790351885459",
+    "HO-CUT-1790360560748",
+    "HO-CUT-1790389589235",
+    "HO-CUT-1790389667243",
+    "HO-CUT-1790391828547",
+    "HO-CUT-1790418818069",
+    "HO-FORM-1790421005764",
+    "HO-CUT-1790473503003",
+    "HO-FORM-1790473820587",
+    "HO-CUT-1790476609892",
+    "HO-FORM-1790476923070",
+    "HO-CUT-1790488337758",
+    "HO-FORM-1790488738649",
+    "HO-CUT-1790515349424",
+    "HO-FORM-1790515998103",
+    "HO-CUT-1790554621436",
+    "HO-CUT-1790555689626",
+    "HO-FORM-1790555920007",
+    "HO-CUT-1789613417024",
+    "HO-FORM-1790555971311",
+    "HO-CUT-1790557959990",
+    "HO-CUT-1790558106606"
+  ],
+  "jobs": [],
+  "scrapSales": [],
+  "maintenanceIncidents": [],
+  "autoNotifyDeptHeadsOnCritical": true,
+  "maintenanceContacts": [
+    {
+      "role": "Mechanical & Tooling",
+      "dept": "Mechanical",
+      "name": "Ramesh Sharma (Head Mech)",
+      "id": "MC-1",
+      "phone": "+91 98250 12345"
+    },
+    {
+      "phone": "+91 98251 67890",
+      "id": "MC-2",
+      "dept": "Electrical",
+      "role": "Heater & PLC Sensors",
+      "name": "Kishan Patel (Sr. Electrical)"
+    },
+    {
+      "name": "Dinesh Varma (Pneumatics)",
+      "role": "Hydraulic & Air Pressure",
+      "id": "MC-3",
+      "dept": "Pneumatic",
+      "phone": "+91 98252 54321"
+    }
+  ],
+  "packJobs": [],
+  "whatsappConfig": {
+    "phone": "+91 9033912511",
+    "apiKey": "https://api.whatsapp.com/send/?phone=919033912511&text=%EF%BF%BD+%2AW%C3%9CNDERKRAF+PAPERWARE+ERP%2A%0A%EF%BF%BD+%2ATEST+SYSTEM+ALERT+DISPATCH%2A%0A%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%E2%94%81%0ADear+%2AMANOJ%2A+%28Maintenance+Head%29%2C%0A%0AThis+is+a+test+notification+to+verify+your+subscription+to+W%C3%BCnderkraf+Auto-Alert+system.%0A%0A%EF%BF%BD+%2AYour+Configured+Alert+Subscriptions%3A%2A%0A%E2%80%A2+Machine+Breakdown%0A%E2%80%A2+Electrical+Alert%0A%E2%80%A2+Production+Handover%0A%E2%80%A2+Material+Indent%0A%E2%80%A2+QC+Failure%0A%0A%EF%BF%BD+%2AStatus%3A%2A+Active+%26+Subscribed%0A%0A_If+you+received+this+message%2C+your+contact+number+and+routing+configuration+are+correctly+set+up._&type=phone_number&app_absent=0",
+    "autoSend": false,
+    "lastSentKey": "",
+    "webhookUrl": "https://script.google.com/macros/s/AKfycbxKFAms8M4eMCZG6jqunIR49btnEdzSHDXVHhjZzRShG5sq_0SLq1C-wFwlim4nNy8/exec",
+    "customMessage": "Wünderkraf Paperware Factory Live Shift Report",
+    "dayShiftReportTime": "20:00",
+    "nightShiftReportTime": "08:00",
+    "autoSendShiftReportDay": true,
+    "autoSendShiftReportNight": true,
+    "lastSentDayDate": "2026-09-13",
+    "lastSentNightDate": "2026-09-17",
+    "autoNotifyMaintenanceBreakdown": true,
+    "autoNotifyCriticalQcDefect": true,
+    "autoNotifyDispatchCompletion": true,
+    "autoNotifyDailyManpower": true,
+    "autoNotifyLowStockRequisition": true,
+    "autoNotifyScrapSpike": false,
+    "managementContacts": [],
+    "userRights": {},
+    "dispatchLogs": [
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1790908202654",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "category": "SHIFT_NIGHT"
+      },
+      {
+        "timestamp": "08:00 PM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "category": "SHIFT_DAY",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-DAY-1790865003605",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "id": "AUTO-DAY-1790433001094",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 PM",
+        "category": "SHIFT_DAY",
+        "sender": "SYSTEM (Auto-Trigger)"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_DAY",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "id": "AUTO-DAY-1790196725791",
+        "timestamp": "02:22 AM",
+        "status": "SENT",
+        "sender": "SYSTEM (Auto-Trigger)"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_DAY",
+        "id": "DEMO-1790196701069",
+        "sender": "admin (Live Demo Test)",
+        "timestamp": "02:21 AM",
+        "recipient": "Floor Coordination Matrix (DAY Shift Alert)",
+        "status": "SENT"
+      },
+      {
+        "id": "AUTO-NIGHT-1790196369441",
+        "timestamp": "02:16 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_NIGHT",
+        "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+      },
+      {
+        "status": "OPENED",
+        "sender": "admin",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "02:02 AM",
+        "category": "SHIFT_DAY",
+        "id": "WA-1790195536264",
+        "recipient": "Primary Plant Gateway (+91 9033912511)"
+      },
+      {
+        "id": "WA-1790194824391",
+        "recipient": "+91 9033912511",
+        "timestamp": "01:50 AM",
+        "status": "OPENED",
+        "preview": "📢 *WÜNDERKRAF FACTORY ANNOUNCEMENT*\n━━━━━━━━━━━━━━━━━━━━\n📅 *Date:* 9/24/2...",
+        "category": "CUSTOM_BROADCAST",
+        "sender": "admin"
+      },
+      {
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "id": "AUTO-NIGHT-1790389804853",
+        "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT"
+      },
+      {
+        "id": "AUTO-NIGHT-1790303400048",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM",
+        "category": "SHIFT_NIGHT"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-NIGHT-1790821809521",
+        "status": "SENT",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "status": "SENT",
+        "id": "AUTO-DAY-1790820061509",
+        "category": "SHIFT_DAY",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "07:31 AM"
+      },
+      {
+        "sender": "admin",
+        "timestamp": "09:37 AM",
+        "id": "WA-1790568428492",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "status": "SENT",
+        "category": "PURCHASE_INDENT",
+        "preview": "🛒 *URGENT PURCHASE REQUISITION ALERT*\n━━━━━━━━━━━━━━━━━━━━\n📋 *Indent ID:* *MR-2026-..."
+      },
+      {
+        "id": "WA-1790568366652",
+        "timestamp": "09:36 AM",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "category": "SHIFT_DAY",
+        "status": "OPENED",
+        "sender": "admin"
+      },
+      {
+        "id": "WA-1790568354183",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "timestamp": "09:35 AM",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_DAY",
+        "status": "SENT",
+        "sender": "admin"
+      },
+      {
+        "id": "WA-1790565407713",
+        "sender": "admin",
+        "status": "SENT",
+        "timestamp": "08:46 AM",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_DAY"
+      },
+      {
+        "id": "WA-1790565366781",
+        "category": "SHIFT_DAY",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "admin",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "timestamp": "08:46 AM",
+        "status": "SENT"
+      },
+      {
+        "timestamp": "08:33 AM",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "id": "WA-1790564604882",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "admin",
+        "category": "SHIFT_DAY",
+        "status": "OPENED"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "admin",
+        "category": "SHIFT_NIGHT",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "id": "WA-1790564418020",
+        "status": "OPENED",
+        "timestamp": "08:30 AM"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-NIGHT-1790562616363",
+        "category": "SHIFT_NIGHT",
+        "status": "SENT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "AUTO-DAY-1790560867723",
+        "category": "SHIFT_DAY",
+        "timestamp": "07:31 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT",
+        "sender": "SYSTEM (Auto-Trigger)"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1790476206637",
+        "category": "SHIFT_NIGHT"
+      },
+      {
+        "id": "DEMO-1790474676255",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "07:34 AM",
+        "recipient": "Floor Coordination Matrix (DAY Shift Alert)",
+        "status": "SENT",
+        "category": "SHIFT_DAY",
+        "sender": "admin (Live Demo Test)"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "status": "SENT",
+        "id": "AUTO-DAY-1790474469505",
+        "category": "SHIFT_DAY",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "07:31 AM",
+        "recipient": "Coordination Matrix (2 Contacts)"
+      },
+      {
+        "status": "OPENED",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "timestamp": "05:32 PM",
+        "sender": "admin",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "WA-1790596948333",
+        "category": "SHIFT_DAY"
+      },
+      {
+        "status": "FAILED",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "05:32 PM",
+        "recipient": "+91 9033912511",
+        "sender": "admin",
+        "id": "WA-1790596945388",
+        "category": "SHIFT_DAY"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "admin",
+        "status": "FAILED",
+        "id": "WA-1790595498302",
+        "category": "SHIFT_DAY",
+        "timestamp": "05:08 PM",
+        "recipient": "+91 9033912511"
+      },
+      {
+        "category": "JOB_STATUS",
+        "id": "WA-1790594089513",
+        "preview": "📋 *WÜNDERKRAF JOB STATUS REPORT*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ *Status:* No active product...",
+        "sender": "admin",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "status": "OPENED",
+        "timestamp": "04:44 PM"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "timestamp": "12:42 PM",
+        "sender": "admin",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "category": "SHIFT_DAY",
+        "id": "WA-1790579575576"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_DAY",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-DAY-1790865007334",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT",
+        "timestamp": "08:00 PM"
+      },
+      {
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-NIGHT-1790908200858"
+      },
+      {
+        "status": "SENT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "id": "AUTO-NIGHT-1790908200612"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-NIGHT-1790908259834",
+        "status": "SENT",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)"
+      },
+      {
+        "id": "AUTO-NIGHT-1790908254601",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT"
+      },
+      {
+        "id": "AUTO-NIGHT-1790908241391",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT",
+        "status": "SENT",
+        "sender": "SYSTEM (Auto-Trigger)"
+      },
+      {
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1790908240864"
+      },
+      {
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "AUTO-NIGHT-1790908230613",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "status": "SENT"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "id": "AUTO-NIGHT-1790908230300",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_NIGHT",
+        "status": "SENT"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT",
+        "status": "SENT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM",
+        "id": "AUTO-NIGHT-1790908225686"
+      },
+      {
+        "category": "SHIFT_NIGHT",
+        "id": "AUTO-NIGHT-1790908215275",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "status": "SENT"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "status": "SENT",
+        "category": "SHIFT_NIGHT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "id": "AUTO-NIGHT-1790908214925"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM",
+        "id": "AUTO-NIGHT-1790908208129",
+        "category": "SHIFT_NIGHT"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "AUTO-DAY-1791037801155",
+        "category": "SHIFT_DAY",
+        "status": "SENT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "20:00",
+        "sender": "SYSTEM (Auto-Trigger)"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1790994656159",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT",
+        "id": "AUTO-NIGHT-1790994656148",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "System Scheduler",
+        "category": "SHIFT_NIGHT",
+        "id": "SCHED-NIGHT-1790994626145",
+        "timestamp": "08:00 am",
+        "status": "SENT",
+        "recipient": "919033912511"
+      },
+      {
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 PM",
+        "id": "AUTO-DAY-1791037803660",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_DAY",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT"
+      },
+      {
+        "id": "AUTO-NIGHT-1791081004762",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_NIGHT"
+      },
+      {
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "20:00",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "AUTO-DAY-1791124214460",
+        "status": "SENT",
+        "category": "SHIFT_DAY",
+        "sender": "SYSTEM (Auto-Trigger)"
+      }
+    ]
+  },
+  "glueUsageLogs": [],
+  "maintenanceSparePartsMaster": [
+    "Upper Mould Heater Band (220V/1500W)",
+    "High-Speed Cutting Blade Punch Set",
+    "Thermocouple K-Type Sensor Cable",
+    "Festo 5/2 Directional Solenoid Valve",
+    "Hydraulic Piston Rod Oil Seal 45x60x10",
+    "NSK High-Precision Deep Groove Ball Bearing",
+    "PTFE Non-Stick Mould Liner Strip"
+  ],
+  "targetGsmMaster": [
+    "60 GSM",
+    "120 GSM",
+    "125 GSM"
+  ],
+  "maintenanceTechniciansMaster": [
+    "Ramesh Sharma (Head Mech)",
+    "Vijay Patel (Sr Electrical)",
+    "Dinesh Mistry (Mould Tooling)",
+    "Kiran Gohil (Hydraulic & Pneumatics)"
+  ],
   "materialRequisitions": [],
-  "glueUsageLogs": []
+  "machineReadyAlerts": [],
+  "productionPlans": [
+    {
+      "id": "PLAN-2026-001",
+      "jobId": "SPN-070",
+      "product": "Spoon",
+      "targetLayers": 8,
+      "targetLengthMeters": 3800,
+      "adhesiveBrand": "Pidilite FS35",
+      "targetScrapLimitPct": 2.5,
+      "targetScrapLimitKg": 15,
+      "assignedMachine": "Slitting-1",
+      "assignedShift": "DAY",
+      "plannedDate": "2026-10-04",
+      "targetQuantity": 300000,
+      "paperBrand": "AADHARA PAPER",
+      "targetGsm": "125 GSM",
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "status": "In-Progress",
+      "createdAt": "2026-10-04T18:17:40.211Z",
+      "plannedLayers": [
+        {
+          "gsm": 125,
+          "type": "Plain",
+          "requiredReels": 8
+        }
+      ]
+    },
+    {
+      "id": "PLAN-2026-002",
+      "jobId": "SPN-071",
+      "product": "Spoon",
+      "targetLayers": 8,
+      "targetLengthMeters": 3800,
+      "adhesiveBrand": "Pidilite FS35",
+      "targetScrapLimitPct": 2.5,
+      "targetScrapLimitKg": 15,
+      "assignedMachine": "Slitting-1",
+      "assignedShift": "DAY",
+      "plannedDate": "2026-10-04",
+      "targetQuantity": 300000,
+      "paperBrand": "AADHARA PAPER",
+      "targetGsm": "125 GSM",
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "status": "In-Progress",
+      "createdAt": "2026-10-04T18:20:10.000Z",
+      "plannedLayers": [
+        {
+          "gsm": 125,
+          "type": "Plain",
+          "requiredReels": 8
+        }
+      ]
+    },
+    {
+      "id": "PLAN-2026-003",
+      "jobId": "FRK-066",
+      "product": "Fork",
+      "targetLayers": 8,
+      "targetLengthMeters": 3800,
+      "adhesiveBrand": "Pidilite FS35",
+      "targetScrapLimitPct": 2.5,
+      "targetScrapLimitKg": 15,
+      "assignedMachine": "Slitting-1",
+      "assignedShift": "DAY",
+      "plannedDate": "2026-10-04",
+      "targetQuantity": 300000,
+      "paperBrand": "AADHARA PAPER",
+      "targetGsm": "125 GSM",
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "status": "In-Progress",
+      "createdAt": "2026-10-04T18:25:00.000Z",
+      "plannedLayers": [
+        {
+          "gsm": 125,
+          "type": "Plain",
+          "requiredReels": 8
+        }
+      ]
+    },
+    {
+      "id": "PLAN-2026-004",
+      "jobId": "FRK-067",
+      "product": "Fork",
+      "targetLayers": 8,
+      "targetLengthMeters": 3800,
+      "adhesiveBrand": "Pidilite FS35",
+      "targetScrapLimitPct": 2.5,
+      "targetScrapLimitKg": 15,
+      "assignedMachine": "Slitting-1",
+      "assignedShift": "DAY",
+      "plannedDate": "2026-10-04",
+      "targetQuantity": 300000,
+      "paperBrand": "AADHARA PAPER",
+      "targetGsm": "125 GSM",
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "status": "In-Progress",
+      "createdAt": "2026-10-04T18:30:00.000Z",
+      "plannedLayers": [
+        {
+          "gsm": 125,
+          "type": "Plain",
+          "requiredReels": 8
+        }
+      ]
+    },
+    {
+      "id": "PLAN-2026-005",
+      "jobId": "FRK-068",
+      "product": "Fork",
+      "targetLayers": 8,
+      "targetLengthMeters": 3800,
+      "adhesiveBrand": "Pidilite FS35",
+      "targetScrapLimitPct": 2.5,
+      "targetScrapLimitKg": 15,
+      "assignedMachine": "Slitting-1",
+      "assignedShift": "DAY",
+      "plannedDate": "2026-10-04",
+      "targetQuantity": 300000,
+      "paperBrand": "AADHARA PAPER",
+      "targetGsm": "125 GSM",
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "status": "In-Progress",
+      "createdAt": "2026-10-04T18:35:00.000Z",
+      "plannedLayers": [
+        {
+          "gsm": 125,
+          "type": "Plain",
+          "requiredReels": 8
+        }
+      ]
+    },
+    {
+      "id": "PLAN-2026-006",
+      "jobId": "FRK-069",
+      "product": "Fork",
+      "targetLayers": 8,
+      "targetLengthMeters": 3800,
+      "adhesiveBrand": "Pidilite FS35",
+      "targetScrapLimitPct": 2.5,
+      "targetScrapLimitKg": 15,
+      "assignedMachine": "Slitting-1",
+      "assignedShift": "DAY",
+      "plannedDate": "2026-10-04",
+      "targetQuantity": 300000,
+      "paperBrand": "AADHARA PAPER",
+      "targetGsm": "125 GSM",
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "status": "In-Progress",
+      "createdAt": "2026-10-04T18:40:00.000Z",
+      "plannedLayers": [
+        {
+          "gsm": 125,
+          "type": "Plain",
+          "requiredReels": 8
+        }
+      ]
+    }
+  ],
+  "pcsPerKgMaster": {
+    "Fork": 480,
+    "Spoon": 450,
+    "Dessert Spoon": 600,
+    "Knife": 550
+  },
+  "logs": [
+    {
+      "jobId": "MASTER-BRAND",
+      "stage": "Admin Master",
+      "machine": "ADMIN-SETTINGS",
+      "shift": "DAY",
+      "action": "🏷️ Added New Paper Mill Brand: ORIENT PAPER",
+      "worker": "ADMIN",
+      "user": "admin",
+      "rawDate": "2026-10-04",
+      "timestamp": "10/5/2026, 1:21:20 AM"
+    },
+    {
+      "jobId": "MASTER-BRAND",
+      "stage": "Admin Master",
+      "machine": "ADMIN-SETTINGS",
+      "shift": "DAY",
+      "action": "✏️ Renamed Paper Mill Brand from Orient Paper to AADHARA PAPER",
+      "worker": "ADMIN",
+      "user": "admin",
+      "rawDate": "2026-10-04",
+      "timestamp": "10/5/2026, 1:21:16 AM"
+    }
+  ],
+  "lastResetTimestamp": 1791141579161
 }

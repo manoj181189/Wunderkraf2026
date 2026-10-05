@@ -437,6 +437,7 @@ export interface NumberingSeriesMaster {
   slitSeries: NumberingEntityConfig;
   cutSeries: NumberingEntityConfig;
   qcSeries: NumberingEntityConfig;
+  planSeries?: NumberingEntityConfig;
   useGlobalJobPrefix?: boolean;
 }
 

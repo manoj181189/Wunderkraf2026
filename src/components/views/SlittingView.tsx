@@ -209,7 +209,7 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
       if (jobPlannedGsms.length > 0) {
         setAddReelGsm(jobPlannedGsms[0]);
       } else if (targetJob.gsm) {
-        setAddReelGsm(targetJob.gsm);
+        setAddReelGsm(String(targetJob.gsm));
       } else {
         setAddReelGsm('120 GSM');
       }
@@ -1197,7 +1197,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
       .filter((j) => {
         // If the job has no running batches, zero output rolls, and zero reels recorded, remove empty job
         const hasBatches = (j.runningBatches || []).length > 0;
-        const hasOutput = (j.availableRolls || 0) > 0 || (j.outputRolls || 0) > 0 || (j.outputWeightKg || 0) > 0;
+        const hasOutput = (j.availableRolls || 0) > 0 || ((j as any).outputRolls || 0) > 0 || (j.outputWeightKg || 0) > 0;
         const hasReels = (j.reelsList || []).length > 0;
         if (j.id === job.id && !hasBatches && !hasOutput && !hasReels) {
           return false;
@@ -1220,8 +1220,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     const allocatedReelIds = [
       ...(batch.motherReelsAllocated || []),
       ...(job.motherReelsAllocated || []),
-      batch.motherReelId,
-      job.motherReelId
+      (batch as any).motherReelId,
+      (job as any).motherReelId
     ].filter(Boolean) as string[];
 
     const updatedMotherReels = (motherReelInventory || []).map((mr) => {

@@ -534,8 +534,7 @@ _If you received this message, your contact number and routing configuration are
   
   const [targetLayersList, setTargetLayersList] = useState<number[]>(() => {
     if (state.targetLayersMaster && state.targetLayersMaster.length > 0) {
-      const isLegacy = state.targetLayersMaster.some((l) => l !== 8 && l !== 9) && state.targetLayersMaster.length > 2;
-      return isLegacy ? TARGET_LAYERS_DEFAULT : state.targetLayersMaster;
+      return state.targetLayersMaster;
     }
     return TARGET_LAYERS_DEFAULT;
   });
@@ -549,8 +548,7 @@ _If you received this message, your contact number and routing configuration are
 
   const [targetGsmList, setTargetGsmList] = useState<string[]>(() => {
     if (state.targetGsmMaster && state.targetGsmMaster.length > 0) {
-      const isLegacy = state.targetGsmMaster.some((g) => g !== '60 GSM' && g !== '120 GSM') && state.targetGsmMaster.length > 2;
-      return isLegacy ? TARGET_GSM_DEFAULT : state.targetGsmMaster;
+      return state.targetGsmMaster;
     }
     return TARGET_GSM_DEFAULT;
   });
@@ -4970,7 +4968,7 @@ ${formLines.join('\n')}
                         onChange={(e) => setJobEditForm({ ...jobEditForm, product: e.target.value as ProductType })}
                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
                       >
-                        {PRODUCTS.map((p) => (
+                        {productsList.map((p) => (
                           <option key={p} value={p}>
                             {p}
                           </option>
@@ -4982,11 +4980,11 @@ ${formLines.join('\n')}
                         Paper Brand / Mill:
                       </label>
                       <select
-                        value={jobEditForm.paperBrand || PAPER_BRANDS[0]}
+                        value={jobEditForm.paperBrand || paperBrandsList[0]}
                         onChange={(e) => setJobEditForm({ ...jobEditForm, paperBrand: e.target.value })}
                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
                       >
-                        {PAPER_BRANDS.map((b) => (
+                        {paperBrandsList.map((b) => (
                           <option key={b} value={b}>
                             {b}
                           </option>
@@ -6620,7 +6618,17 @@ ${formLines.join('\n')}
                 </div>
 
                 {/* Live Architecture Lineage Hierarchy Banner */}
-                <div className="mt-6 pt-5 border-t border-indigo-800/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="mt-6 pt-5 border-t border-indigo-800/60 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="bg-white/5 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-1">
+                      0. Scheduled Plan ID
+                    </div>
+                    <div className="font-mono font-black text-sm text-emerald-400 truncate">
+                      {numberingForm.planSeries?.prefix || 'PLAN'}-{new Date().getFullYear()}-{String(numberingForm.planSeries?.nextSeq || 1).padStart(numberingForm.planSeries?.paddingDigits || 3, '0')}
+                    </div>
+                    <div className="text-[10px] text-indigo-200/60 mt-0.5">Scheduling Prefix ID</div>
+                  </div>
+
                   <div className="bg-white/5 backdrop-blur-xs rounded-xl p-3 border border-white/10">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-300 mb-1">
                       1. Parent Job / Master Lot
@@ -6998,6 +7006,98 @@ ${formLines.join('\n')}
                             })
                           }
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:border-purple-500 focus:bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. PPC Planning Master Series */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4 hover:border-emerald-300 transition-colors">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                        <FileSpreadsheet className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-extrabold text-slate-800 uppercase m-0">
+                          PPC Planning Plan Series
+                        </h4>
+                        <span className="text-[11px] text-slate-500">Scheduled Production Plan ID sequence</span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      LIVE PREVIEW: {numberingForm.planSeries?.prefix || 'PLAN'}-{new Date().getFullYear()}-{String(numberingForm.planSeries?.nextSeq || 1).padStart(numberingForm.planSeries?.paddingDigits || 3, '0')}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                        Plan Prefix Code:
+                      </label>
+                      <input
+                        type="text"
+                        value={numberingForm.planSeries?.prefix || 'PLAN'}
+                        onChange={(e) =>
+                          setNumberingForm({
+                            ...numberingForm,
+                            planSeries: {
+                              prefix: e.target.value.toUpperCase().trim(),
+                              paddingDigits: numberingForm.planSeries?.paddingDigits || 3,
+                              nextSeq: numberingForm.planSeries?.nextSeq || 1
+                            }
+                          })
+                        }
+                        placeholder="e.g. PLAN"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Padding Digits:
+                        </label>
+                        <select
+                          value={numberingForm.planSeries?.paddingDigits || 3}
+                          onChange={(e) =>
+                            setNumberingForm({
+                              ...numberingForm,
+                              planSeries: {
+                                prefix: numberingForm.planSeries?.prefix || 'PLAN',
+                                paddingDigits: Number(e.target.value),
+                                nextSeq: numberingForm.planSeries?.nextSeq || 1
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+                        >
+                          <option value={2}>2 Digits (01 - 99)</option>
+                          <option value={3}>3 Digits (001 - 999)</option>
+                          <option value={4}>4 Digits (0001 - 9999)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Default Next Counter:
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={numberingForm.planSeries?.nextSeq || 1}
+                          onChange={(e) =>
+                            setNumberingForm({
+                              ...numberingForm,
+                              planSeries: {
+                                prefix: numberingForm.planSeries?.prefix || 'PLAN',
+                                paddingDigits: numberingForm.planSeries?.paddingDigits || 3,
+                                nextSeq: Math.max(1, Number(e.target.value) || 1)
+                              }
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
                         />
                       </div>
                     </div>

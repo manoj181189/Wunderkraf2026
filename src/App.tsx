@@ -389,6 +389,27 @@ export const App: React.FC = () => {
 
   // Persistence effect: Writes to high-capacity IndexedDB and mirrors safely with auto-pruning to localStorage
   const handleSaveState = async (nextState: FactoryState) => {
+    try {
+      const historyStr = localStorage.getItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY');
+      const history = historyStr ? JSON.parse(historyStr) : [];
+      const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const description = `Snapshot - ${dateStr} at ${timestamp} (Jobs: ${nextState.jobs?.length || 0}, Plans: ${nextState.productionPlans?.length || 0})`;
+      
+      // Only push if different from last snapshot
+      if (history.length === 0 || JSON.stringify(history[0].state.jobs) !== JSON.stringify(nextState.jobs) || JSON.stringify(history[0].state.productionPlans) !== JSON.stringify(nextState.productionPlans)) {
+        history.unshift({
+          id: Date.now().toString(),
+          timestamp: `${dateStr}, ${timestamp}`,
+          description,
+          state: nextState
+        });
+        localStorage.setItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY', JSON.stringify(history.slice(0, 10)));
+      }
+    } catch (e) {
+      console.warn('[History] Failed to push snapshot:', e);
+    }
+
     setState(nextState);
     const result = await persistFactoryState(nextState, state);
     if (result.mergedState) {

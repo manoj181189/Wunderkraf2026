@@ -345,7 +345,7 @@ export const PackingView: React.FC<PackingViewProps> = ({
       return pj;
     });
 
-    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, hName, 'Packing', selectedMachine, activeJob.shift || shift);
+    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, hName, 'Packing', selectedMachine, (activeJob.shift || shift) as "DAY" | "NIGHT");
 
     onSaveState({
       ...state,

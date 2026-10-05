@@ -38,7 +38,7 @@ interface MaintenanceAuditViewProps {
   initialSearchQuery?: string;
 }
 
-type AuditTab = 'traceability' | 'batch_report' | 'complaints';
+type AuditTab = 'traceability' | 'batch_report' | 'complaints' | 'logs' | 'handovers';
 
 export const MaintenanceAuditView: React.FC<MaintenanceAuditViewProps> = ({
   state,

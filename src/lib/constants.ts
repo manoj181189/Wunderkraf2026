@@ -5,6 +5,7 @@ export const DEFAULT_NUMBERING_MASTER: NumberingSeriesMaster = {
   slitSeries: { prefix: 'SLIT', paddingDigits: 2, nextSeq: 1 },
   cutSeries: { prefix: 'CUT', paddingDigits: 2, nextSeq: 1 },
   qcSeries: { prefix: 'QC', paddingDigits: 2, nextSeq: 1 },
+  planSeries: { prefix: 'PLAN', paddingDigits: 3, nextSeq: 1 },
   useGlobalJobPrefix: false
 };
 

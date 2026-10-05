@@ -218,12 +218,12 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     setFormPlannedLayers(layers);
   };
 
-  const syncLayersToTargetAndPrinting = (targetL: number, isPrinted: boolean) => {
+  const syncLayersToTargetAndPrinting = (targetL: number, isPrinted: boolean, customGsms?: string[]) => {
     const totalL = Math.max(1, targetL || 8);
-    const gsms = formSelectedGsms.length > 0 ? formSelectedGsms : ['120 GSM', '60 GSM'];
+    const activeGsms = customGsms && customGsms.length > 0 ? customGsms : (formSelectedGsms.length > 0 ? formSelectedGsms : ['120 GSM', '60 GSM']);
     
-    const pGsmStr = gsms[0] || '120 GSM';
-    const thinGsmStr = gsms.find(g => parseNumericGsm(g) < 100) || gsms[1] || '60 GSM';
+    const pGsmStr = activeGsms[0] || '120 GSM';
+    const thinGsmStr = activeGsms.find(g => parseNumericGsm(g) < 100) || activeGsms[1] || '60 GSM';
 
     let layers: PlannedLayer[] = [];
 
@@ -451,6 +451,11 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
       alert(`✅ Production Plan [${editingPlanId}] & Job Card specifications updated successfully!`);
     } else {
       // Robust sequence calculation across existing plans and deleted plan IDs
+      const master = getNumberingMaster(state.seriesConfig);
+      const planPfx = master.planSeries?.prefix?.trim() || 'PLAN';
+      const planPad = master.planSeries?.paddingDigits || 3;
+      const configNextSeq = master.planSeries?.nextSeq || 1;
+
       const allKnownPlanIds = [
         ...(productionPlans || []).map((p) => p.id),
         ...(state.deletedPlanIds || [])
@@ -458,22 +463,34 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
       let maxPlanSeq = 0;
       allKnownPlanIds.forEach((id) => {
         if (id) {
-          const match = id.match(/PLAN-\d+-(\d+)/i);
+          const regex = new RegExp(`^${planPfx}-(?:\\d+-)?(\\d+)`, 'i');
+          const match = id.match(regex);
           if (match) {
             const num = parseInt(match[1], 10);
             if (!isNaN(num) && num > maxPlanSeq) maxPlanSeq = num;
           }
         }
       });
-      const nextSeq = Math.max(maxPlanSeq + 1, (productionPlans || []).length + 1);
-      const planId = `PLAN-${new Date().getFullYear()}-${String(nextSeq).padStart(3, '0')}`;
+      const nextSeq = Math.max(maxPlanSeq + 1, configNextSeq, (productionPlans || []).length + 1);
+      const planId = `${planPfx}-${new Date().getFullYear()}-${String(nextSeq).padStart(planPad, '0')}`;
       
-      const { jobId, updatedSeriesConfig } = generateUnifiedJobId(
+      const { jobId, updatedSeriesConfig: baseUpdatedSeriesConfig } = generateUnifiedJobId(
         formProduct,
         state.seriesConfig,
         state.productPrefixMap,
         state.jobs || []
       );
+
+      const updatedSeriesConfig = {
+        ...baseUpdatedSeriesConfig,
+        numberingMaster: {
+          ...baseUpdatedSeriesConfig.numberingMaster,
+          planSeries: {
+            ...master.planSeries,
+            nextSeq: nextSeq + 1
+          }
+        }
+      };
 
       const newPlan: ProductionPlan = {
         id: planId,

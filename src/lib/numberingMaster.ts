@@ -24,6 +24,11 @@ export function getNumberingMaster(seriesConfig?: SeriesConfig): NumberingSeries
       paddingDigits: custom?.qcSeries?.paddingDigits || DEFAULT_NUMBERING_MASTER.qcSeries.paddingDigits,
       nextSeq: custom?.qcSeries?.nextSeq || DEFAULT_NUMBERING_MASTER.qcSeries.nextSeq
     },
+    planSeries: {
+      prefix: custom?.planSeries?.prefix?.trim() || DEFAULT_NUMBERING_MASTER.planSeries?.prefix || 'PLAN',
+      paddingDigits: custom?.planSeries?.paddingDigits || DEFAULT_NUMBERING_MASTER.planSeries?.paddingDigits || 3,
+      nextSeq: custom?.planSeries?.nextSeq || DEFAULT_NUMBERING_MASTER.planSeries?.nextSeq || 1
+    },
     useGlobalJobPrefix: custom?.useGlobalJobPrefix ?? false
   };
 }

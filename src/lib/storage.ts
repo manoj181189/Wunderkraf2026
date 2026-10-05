@@ -825,6 +825,7 @@ export function getCloudSyncStatus(): {
 }
 
 export { testFirestoreConnection, getCloudSyncMode, setCloudSyncMode, isStudioOrDevEnvironment };
+export type { CloudSyncMode };
 
 // Attach automatic background sync triggers in browser environment
 if (typeof window !== 'undefined') {

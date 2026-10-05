@@ -454,7 +454,7 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
                 ) : (
                   (state.materialRequisitions || []).map((req) => (
                     <option key={req.id} value={req.id}>
-                      {req.id} - {req.item || req.spareName} ({req.qty} Pcs) | Urgency: {req.urgency}
+                      {req.id} - {req.itemName || (req as any).item || (req as any).spareName} ({req.quantity || (req as any).qty || 1} {req.unit || 'Pcs'}) | Urgency: {req.urgency}
                     </option>
                   ))
                 )}
