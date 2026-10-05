@@ -450,10 +450,8 @@ export async function persistFactoryState(
     }
   }
 
-  // 3. Enqueue to offline write-queue for central sync (Auto mode only)
-  if (getCloudSyncMode() === 'auto') {
-    await enqueueOfflineSync(stateToSave);
-  }
+  // 3. Enqueue to offline write-queue for central sync
+  await enqueueOfflineSync(stateToSave);
 
   // 4. Notify all local tabs on same browser
   syncBus?.postMessage({ type: 'STATE_CHANGED', state: stateToSave });
@@ -466,10 +464,8 @@ export async function persistFactoryState(
     });
   }
 
-  // 6. Trigger non-blocking central sync flush (Auto mode only)
-  if (getCloudSyncMode() === 'auto') {
-    flushOfflineSyncQueue().catch(() => {});
-  }
+  // 6. Trigger non-blocking central sync flush
+  flushOfflineSyncQueue().catch(() => {});
 
   return {
     success: savedToIndexedDB || savedToLocalStorage,
@@ -924,22 +920,16 @@ export type { CloudSyncMode };
 // Attach automatic background sync triggers in browser environment
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
-    if (getCloudSyncMode() === 'auto') {
-      console.info('[Sync Bridge] Network connection restored. Flushing offline queue...');
-      flushOfflineSyncQueue();
-    }
+    console.info('[Sync Bridge] Network connection restored. Flushing offline queue...');
+    flushOfflineSyncQueue();
   });
 
   window.addEventListener('focus', () => {
-    if (getCloudSyncMode() === 'auto') {
-      flushOfflineSyncQueue();
-    }
+    flushOfflineSyncQueue();
   });
 
-  // Periodic queue flush & sync check every 15 seconds (Auto Mode only)
+  // Periodic queue flush & sync check every 15 seconds
   setInterval(() => {
-    if (getCloudSyncMode() === 'auto') {
-      flushOfflineSyncQueue();
-    }
+    flushOfflineSyncQueue();
   }, 15000);
 }
