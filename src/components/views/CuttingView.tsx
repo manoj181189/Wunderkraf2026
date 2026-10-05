@@ -285,17 +285,41 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
   const [selectedSurplusOption, setSelectedSurplusOption] = useState<'current_customer' | 'next_customer' | 'buffer'>('current_customer');
   const [targetNextJobId, setTargetNextJobId] = useState<string>('');
 
-  // Pending queue of slit rolls
+  // Pending queue of slit rolls ready for Cutting
   let pendingSlitJobs = jobs.filter((j) => {
-    // If it's a child job, its available rolls are from its parent!
+    // Exclude jobs that have already moved past Cutting (e.g., in Forming, QC, Packing, or Dispatched)
+    if (j.stage === 'Forming' || j.stage === 'QC' || j.stage === 'Packing' || j.stage === 'Dispatched') {
+      return false;
+    }
+    // If cutting is already completely finished for this job
+    if (j.status === 'CUTTING_COMPLETED') {
+      return false;
+    }
+
     const parentJob = j.parentJobId ? jobs.find(p => p.id === j.parentJobId) : null;
-    const rollsCount = parentJob ? (parentJob.availableRolls || 0) : (j.availableRolls || 0);
-    const hasRolls = rollsCount > 0;
+    const targetJobForSlit = parentJob || j;
+
+    const plannedLayers = targetJobForSlit.targetLayers || 8;
+    const completedReelsCount = targetJobForSlit.reelsList?.length || 0;
+    const hasAllLayersSlit = (completedReelsCount >= plannedLayers && plannedLayers > 0) || (targetJobForSlit.availableRolls !== undefined && targetJobForSlit.availableRolls >= plannedLayers);
+    const isSlitStageDone = targetJobForSlit.stage === 'Slitting Completed' || targetJobForSlit.status === 'READY_FOR_CUTTING';
+
+    // Available rolls calculation with fallback to completed layers
+    const rollsCount = (targetJobForSlit.availableRolls !== undefined && targetJobForSlit.availableRolls > 0)
+      ? targetJobForSlit.availableRolls
+      : (hasAllLayersSlit ? plannedLayers : (completedReelsCount > 0 && isSlitStageDone ? completedReelsCount : 0));
+
+    const hasRolls = rollsCount > 0 || (targetJobForSlit.outputWeightKg || 0) > 0 || hasAllLayersSlit;
     
     // If it's a child job, it is ready for cutting if the parent is ready or in progress
     if (j.parentJobId) {
-      const parentIsReady = parentJob && (parentJob.status === 'READY_FOR_CUTTING' || parentJob.status === 'CUTTING_IN_PROGRESS');
-      return hasRolls && parentIsReady;
+      const parentIsReady = parentJob && (
+        parentJob.status === 'READY_FOR_CUTTING' || 
+        parentJob.status === 'CUTTING_IN_PROGRESS' || 
+        parentJob.stage === 'Slitting Completed' ||
+        hasAllLayersSlit
+      );
+      return hasRolls && Boolean(parentIsReady);
     }
     
     // If it is a parent job, we only show it in cutting if it has no child jobs.
@@ -305,7 +329,13 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       return false; // Hide the parent job, show its child jobs instead!
     }
 
-    const isReadyOrInProgress = j.status === 'READY_FOR_CUTTING' || j.status === 'CUTTING_IN_PROGRESS';
+    const isReadyOrInProgress = 
+      j.status === 'READY_FOR_CUTTING' || 
+      j.status === 'CUTTING_IN_PROGRESS' || 
+      j.stage === 'Slitting Completed' ||
+      j.stage === 'Cutting' ||
+      hasAllLayersSlit;
+
     return hasRolls && isReadyOrInProgress;
   });
   if (filterProduct) {
@@ -610,8 +640,13 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
 
     // Resolve where available rolls come from (Parent job handles Slitting and holds rolls)
     const rollSourceJob = job.parentJobId ? jobs.find(p => p.id === job.parentJobId) : job;
-    if (!rollSourceJob || (rollSourceJob.availableRolls || 0) < rollsCount) {
-      alert(`Insufficient slit rolls! Available: ${rollSourceJob?.availableRolls || 0}`);
+    const targetPlannedLayers = rollSourceJob?.targetLayers || job.targetLayers || 8;
+    const effectiveAvailRolls = (rollSourceJob?.availableRolls !== undefined && rollSourceJob.availableRolls > 0)
+      ? rollSourceJob.availableRolls
+      : Math.max(rollSourceJob?.reelsList?.length || 0, targetPlannedLayers);
+
+    if (!rollSourceJob || effectiveAvailRolls < rollsCount) {
+      alert(`Insufficient slit rolls! Available: ${effectiveAvailRolls}`);
       return;
     }
 
@@ -3017,7 +3052,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 Enter Slit Rolls to Issue (Roll Count) *:
               </label>
               <div className="flex items-center gap-1">
-                {(selectedPendingJob ? [selectedPendingJob.targetLayers || 8] : [8, 9]).map((num) => (
+                {[1, 2, 4, 6].map((num) => (
                   <button
                     key={num}
                     type="button"

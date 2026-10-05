@@ -180,6 +180,8 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     status: '',
   });
 
+  const [tableTab, setTableTab] = useState<'ALL' | 'ACTIVE' | 'CUTTING'>('ALL');
+
   // Genealogy Modal Job State
   const [genealogyModalJob, setGenealogyModalJob] = useState<Job | null>(null);
 
@@ -1035,7 +1037,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     const stopTime = effectiveStopTime;
     const finalScrapPercent = inputWeight > 0 ? Number(((finalScrapKg / inputWeight) * 100).toFixed(2)) : 0;
 
-    const updatedJobs = jobs.map((j) => {
+    let updatedJobs = jobs.map((j) => {
       if (j.id !== job.id) return j;
       const prevScrap = j.scrapKg || 0;
       const prevOutKg = j.outputWeightKg || 0;
@@ -1123,10 +1125,24 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     let updatedPlans = [...productionPlans];
     let updatedMotherReels = [...motherReelInventory];
 
+    const finalJobObj = updatedJobs.find((j) => j.id === job.id);
+    const effectiveAvailRolls = finalJobObj?.availableRolls || rollsCount;
+    // Propagate completed slit rolls & status to child jobs if this was a parent job
+    updatedJobs = updatedJobs.map((cj) => {
+      if (cj.parentJobId === job.id) {
+        return {
+          ...cj,
+          status: 'READY_FOR_CUTTING',
+          stage: 'Slitting Completed',
+          availableRolls: effectiveAvailRolls
+        };
+      }
+      return cj;
+    });
+
     const targetPlanId = job.planId || selectedPlanId;
     updatedPlans = productionPlans.map((p) => {
-      if ((targetPlanId && p.id === targetPlanId) || (job.id && p.jobId === job.id)) {
-        const finalJobObj = updatedJobs.find((j) => j.id === job.id);
+      if ((targetPlanId && p.id === targetPlanId) || (job.id && p.jobId === job.id) || (job.planId && p.id === job.planId)) {
         const finalScrapPct = finalJobObj?.scrapPercent || 0;
         const finalScrapKg = finalJobObj?.scrapKg || 0;
         const finalLayers = finalJobObj?.reelsList?.filter((r) => !r.isHotFoilLayer).length || 0;
@@ -1894,14 +1910,82 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
               >
                 <option value="" disabled>-- Select Today\'s Assignment / आज का असाइनमेंट --</option>
                 {[...productionPlans]
-                  .filter((p) => p.status === 'Scheduled' || p.status === 'In-Progress')
+                  .filter((p) => {
+                    if (p.status === 'Completed' || p.status === 'Cancelled') return false;
+                    const linkedJob = jobs.find((j) => j.planId === p.id || j.id === p.jobId);
+                    if (linkedJob) {
+                      const targetLayers = p.targetLayers || linkedJob.targetLayers || 8;
+                      const completedReelsCount = linkedJob.reelsList?.length || 0;
+                      const hasAllLayers = (completedReelsCount >= targetLayers && targetLayers > 0) || (linkedJob.availableRolls !== undefined && linkedJob.availableRolls >= targetLayers);
+                      const isStageDone = 
+                        linkedJob.stage === 'Slitting Completed' || 
+                        linkedJob.stage === 'Cutting' || 
+                        linkedJob.stage === 'Forming' || 
+                        linkedJob.stage === 'QC' || 
+                        linkedJob.stage === 'Packing' || 
+                        linkedJob.stage === 'Dispatched' ||
+                        linkedJob.status === 'READY_FOR_CUTTING' || 
+                        linkedJob.status === 'CUTTING_IN_PROGRESS' || 
+                        linkedJob.status === 'CUTTING_COMPLETED' || 
+                        linkedJob.status === 'Completed';
+                      if (hasAllLayers || isStageDone) return false;
+                    }
+                    return true;
+                  })
                   .sort((a, b) => b.id.localeCompare(a.id))
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      [{p.id}] {p.product} • {p.targetLayers}L • {p.targetLengthMeters}M • {p.paperBrand || 'ITC'} ({p.status})
-                    </option>
-                  ))}
+                  .map((p) => {
+                    const linkedJob = jobs.find((j) => j.planId === p.id || j.id === p.jobId);
+                    const seriesJobId = p.jobId || linkedJob?.id;
+                    const pfx = state.productPrefixMap?.[p.product] || p.product.slice(0, 3).toUpperCase();
+                    const nextSeq = state.seriesConfig?.productSeqs?.[p.product] || 1;
+                    const seriesBadge = seriesJobId ? `[Job Series: ${seriesJobId}]` : `[${pfx} #${nextSeq}]`;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        [{p.id}] {seriesBadge} {p.product} • {p.targetLayers}L • {p.targetLengthMeters}M • {p.paperBrand || 'ITC'} ({p.status})
+                      </option>
+                    );
+                  })}
               </select>
+              {selectedPlanId && (() => {
+                const selPlan = productionPlans.find(p => p.id === selectedPlanId);
+                if (!selPlan) return null;
+                const linkedJob = jobs.find(j => j.planId === selPlan.id || j.id === selPlan.jobId);
+                const seriesJobId = selPlan.jobId || linkedJob?.id || 'Auto-Allocating';
+                const pfx = state.productPrefixMap?.[selPlan.product] || selPlan.product.slice(0, 3).toUpperCase();
+                const currentSeq = state.seriesConfig?.productSeqs?.[selPlan.product] || 1;
+                const plannedLayers = selPlan.targetLayers || 8;
+                const completedLayers = linkedJob?.reelsList?.length || 0;
+
+                return (
+                  <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg text-xs space-y-1 shadow-2xs">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <span className="text-[10px] font-black uppercase text-blue-900 tracking-wider flex items-center gap-1">
+                        <span>🎯</span>
+                        <span>Assignment Series Tracker ({selPlan.product}):</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-indigo-200 font-mono">
+                        {pfx} Counter: #{currentSeq}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-extrabold text-blue-950 font-mono text-[11px] bg-white px-2 py-0.5 rounded border border-blue-200">
+                        📋 {selPlan.id}
+                      </span>
+                      <span className="font-black text-indigo-950 font-mono text-[11px] bg-indigo-100 px-2 py-0.5 rounded border border-indigo-300">
+                        🏷️ Job Series: {seriesJobId}
+                      </span>
+                      <span className="font-bold text-emerald-900 text-[11px] bg-emerald-100/80 px-2 py-0.5 rounded border border-emerald-300">
+                        {selPlan.product} ({plannedLayers} Layers)
+                      </span>
+                      {completedLayers > 0 && (
+                        <span className="font-bold text-amber-900 text-[11px] bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                          {completedLayers} / {plannedLayers} Layers Slit
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div>
@@ -2466,6 +2550,24 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
           const remark = j.customRemark || 'Standard';
           const stock = j.availableRolls || 0;
 
+          const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
+          const plannedLayers = targetPlan?.targetLayers || j.targetLayers || 8;
+          const completedReelsCount = j.reelsList?.length || 0;
+          const isCompletedSentToCutting = 
+            j.stage === 'Slitting Completed' || 
+            j.stage === 'Cutting' || 
+            j.stage === 'Forming' || 
+            j.stage === 'QC' || 
+            j.stage === 'Packing' || 
+            j.stage === 'Dispatched' ||
+            j.status === 'READY_FOR_CUTTING' || 
+            j.status === 'CUTTING_IN_PROGRESS' || 
+            j.status === 'CUTTING_COMPLETED' || 
+            j.status === 'Completed' ||
+            (completedReelsCount >= plannedLayers && plannedLayers > 0);
+
+          const isSlittingActive = !isCompletedSentToCutting;
+
           return {
             job: j,
             id: j.id,
@@ -2485,11 +2587,22 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
             scrapPct,
             stage: j.stage || '',
             slitStageLedger,
+            plannedLayers,
+            isCompletedSentToCutting,
+            isSlittingActive,
           };
         });
 
         // 1. Global Filter
         let filtered = processedJobs;
+
+        // Filter by Tab (Active vs Sent to Cutting)
+        if (tableTab === 'ACTIVE') {
+          filtered = filtered.filter(item => item.isSlittingActive);
+        } else if (tableTab === 'CUTTING') {
+          filtered = filtered.filter(item => item.isCompletedSentToCutting);
+        }
+
         if (tableSearch.trim()) {
           const q = tableSearch.toLowerCase();
           filtered = filtered.filter((item) => {
@@ -2588,6 +2701,31 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                {/* Table Tab Selector */}
+                <div className="flex items-center gap-1 p-0.5 bg-slate-100 border border-slate-200 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setTableTab('ALL')}
+                    className={`px-2 py-1 text-[11px] rounded transition cursor-pointer ${tableTab === 'ALL' ? 'bg-white text-blue-900 font-extrabold shadow-2xs' : 'text-slate-600 hover:text-slate-900 font-semibold'}`}
+                  >
+                    All Register ({processedJobs.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTableTab('ACTIVE')}
+                    className={`px-2 py-1 text-[11px] rounded transition cursor-pointer flex items-center gap-1 ${tableTab === 'ACTIVE' ? 'bg-white text-blue-900 font-extrabold shadow-2xs' : 'text-slate-600 hover:text-slate-900 font-semibold'}`}
+                  >
+                    <span>⚡ In Slitting ({processedJobs.filter(i => i.isSlittingActive).length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTableTab('CUTTING')}
+                    className={`px-2 py-1 text-[11px] rounded transition cursor-pointer flex items-center gap-1 ${tableTab === 'CUTTING' ? 'bg-white text-emerald-900 font-extrabold shadow-2xs' : 'text-slate-600 hover:text-slate-900 font-semibold'}`}
+                  >
+                    <span>✅ In Cutting ({processedJobs.filter(i => i.isCompletedSentToCutting).length})</span>
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setShowFilters(!showFilters)}
@@ -2849,9 +2987,15 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                           </div>
                         </td>
                         <td className="p-2.5 text-center">
-                          <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                            {item.stage}
-                          </span>
+                          {item.isCompletedSentToCutting ? (
+                            <span className="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded shadow-2xs whitespace-nowrap">
+                              ✅ 100% Slit ➔ Cutting
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded whitespace-nowrap">
+                              ⚡ Slitting ({item.reels.length}/{item.plannedLayers}L)
+                            </span>
+                          )}
                         </td>
                         <td className="p-2.5 text-center">
                           <button
@@ -2905,20 +3049,39 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 <option value="">-- SELECT JOB ID --</option>
                 {jobs
                   .filter((j) => {
-                    const currReels = getJobAllReels(j);
-                    const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
-                    const plannedLimit = targetPlan?.targetLayers || j.targetLayers || 8;
                     const isRunningNow = currentRunningBatch?.job.id === j.id;
                     if (isRunningNow) return true;
-                    return currReels.length < plannedLimit;
+
+                    // Exclude jobs that have already finished slitting or moved to cutting/onward stages
+                    if (
+                      j.stage === 'Slitting Completed' ||
+                      j.stage === 'Cutting' ||
+                      j.stage === 'Forming' ||
+                      j.stage === 'QC' ||
+                      j.stage === 'Packing' ||
+                      j.stage === 'Dispatched' ||
+                      j.status === 'READY_FOR_CUTTING' ||
+                      j.status === 'CUTTING_IN_PROGRESS' ||
+                      j.status === 'CUTTING_COMPLETED' ||
+                      j.status === 'Completed'
+                    ) {
+                      return false;
+                    }
+
+                    const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
+                    const plannedLimit = targetPlan?.targetLayers || j.targetLayers || 8;
+                    const completedLayers = Math.max(j.reelsList?.length || 0, getJobAllReels(j).length, j.availableRolls || 0);
+                    return completedLayers < plannedLimit;
                   })
                   .map((j) => {
                     const isRunningNow = currentRunningBatch?.job.id === j.id;
+                    const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
+                    const plannedLimit = targetPlan?.targetLayers || j.targetLayers || 8;
+                    const completedLayers = j.reelsList?.length || getJobAllReels(j).length || 0;
                     return (
                       <option key={j.id} value={j.id}>
                         {isRunningNow ? '⭐ [ACTIVE RUNNING] ' : ''}
-                        {j.id} - {j.product} [{j.paperBrand || 'ITC'}]{' '}
-                        {getJobAllReels(j).length > 0 ? `(Reels: ${getJobAllReels(j).join(', ')})` : ''}
+                        [Series: {j.id}] - {j.product} ({completedLayers}/{plannedLimit} Layers) [{j.paperBrand || 'ITC'}]
                       </option>
                     );
                   })}

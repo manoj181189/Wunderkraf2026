@@ -83,15 +83,43 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
           // Prefer completed or higher produced counts
           const isIncCompleted = b.status === 'Completed' || !!b.endTime;
           const isPrevCompleted = prevBatch.status === 'Completed' || !!prevBatch.endTime;
+
+          // Merge slices by sliceId to prevent loss of operator run custody details and slice-level consumed quantities
+          const sliceMap = new Map<string, any>();
+          (prevBatch.slices || []).forEach((s: any) => {
+            if (s && s.sliceId) sliceMap.set(s.sliceId, { ...s });
+          });
+          (b.slices || []).forEach((s: any) => {
+            if (!s || !s.sliceId) return;
+            const existingSlice = sliceMap.get(s.sliceId);
+            if (!existingSlice) {
+              sliceMap.set(s.sliceId, { ...s });
+            } else {
+              sliceMap.set(s.sliceId, {
+                ...existingSlice,
+                ...s,
+                consumedQty: Math.max(existingSlice.consumedQty || 0, s.consumedQty || 0)
+              });
+            }
+          });
+          const mergedSlices = Array.from(sliceMap.values());
+
           if (isIncCompleted && !isPrevCompleted) {
-            batchMap.set(key, { ...prevBatch, ...b });
+            batchMap.set(key, {
+              ...prevBatch,
+              ...b,
+              consumedQty: Math.max(prevBatch.consumedQty || 0, b.consumedQty || 0),
+              slices: mergedSlices.length > 0 ? mergedSlices : undefined
+            });
           } else {
             batchMap.set(key, {
               ...prevBatch,
               ...b,
               producedQty: Math.max(prevBatch.producedQty || 0, b.producedQty || 0),
               producedPieces: Math.max(prevBatch.producedPieces || 0, b.producedPieces || 0),
-              loosePieces: Math.max(prevBatch.loosePieces || 0, b.loosePieces || 0)
+              loosePieces: Math.max(prevBatch.loosePieces || 0, b.loosePieces || 0),
+              consumedQty: Math.max(prevBatch.consumedQty || 0, b.consumedQty || 0),
+              slices: mergedSlices.length > 0 ? mergedSlices : undefined
             });
           }
         }
@@ -464,6 +492,28 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     nightEnd: incoming.shiftConfig?.nightEnd || base.shiftConfig?.nightEnd || '08:00'
   };
 
+  // Deep merge wipLots by ID to prevent sync overwrite/loss of decrements
+  const wipLotMap = new Map<string, any>();
+  (base.wipLots || []).forEach((lot) => {
+    if (lot && lot.id) wipLotMap.set(lot.id, { ...lot });
+  });
+  (incoming.wipLots || []).forEach((lot) => {
+    if (!lot || !lot.id) return;
+    const existing = wipLotMap.get(lot.id);
+    if (!existing) {
+      wipLotMap.set(lot.id, { ...lot });
+    } else {
+      const mergedConsumed = Math.max(existing.consumedQty || 0, lot.consumedQty || 0);
+      const mergedRemaining = Math.max(0, (lot.producedQty || existing.producedQty || 0) - mergedConsumed);
+      wipLotMap.set(lot.id, {
+        ...existing,
+        ...lot,
+        consumedQty: mergedConsumed,
+        remainingQty: mergedRemaining
+      });
+    }
+  });
+
   // Assemble final consolidated state
   const merged: FactoryState = {
     ...base,
@@ -477,6 +527,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     shiftHandovers: Array.from(handoverMap.values()),
     maintenanceIncidents: Array.from(incidentMap.values()),
     motherReelInventory: Array.from(reelMap.values()),
+    wipLots: Array.from(wipLotMap.values()),
     seriesConfig: mergedSeriesConfig,
     whatsappConfig: mergedWhatsappConfig,
     shiftConfig: mergedShiftConfig,

@@ -136,7 +136,7 @@
   "wipLots": [
     {
       "piecesPerCrate": 12800,
-      "consumedQty": 0,
+      "consumedQty": 12,
       "totalPieces": 217600,
       "id": "LOT-CUT-1791113274265-596",
       "machine": "Cutting-2",
@@ -146,7 +146,7 @@
       "jobId": "FRK-066",
       "timestamp": "2026-10-04T11:27:54.265Z",
       "producedByOperator": "VISHAL",
-      "remainingQty": 17,
+      "remainingQty": 5,
       "shift": "DAY"
     },
     {
@@ -1280,7 +1280,7 @@
     "autoSend": false,
     "lastSentKey": "",
     "webhookUrl": "https://script.google.com/macros/s/AKfycbxKFAms8M4eMCZG6jqunIR49btnEdzSHDXVHhjZzRShG5sq_0SLq1C-wFwlim4nNy8/exec",
-    "customMessage": "Wünderkraf Paperware Factory Live Shift Report",
+    "customMessage": "W\u00fcnderkraf Paperware Factory Live Shift Report",
     "dayShiftReportTime": "20:00",
     "nightShiftReportTime": "08:00",
     "autoSendShiftReportDay": true,
@@ -1298,7 +1298,7 @@
     "dispatchLogs": [
       {
         "sender": "SYSTEM (Auto-Trigger)",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT",
         "id": "AUTO-NIGHT-1790908202654",
         "timestamp": "08:00 AM",
@@ -1311,11 +1311,11 @@
         "category": "SHIFT_DAY",
         "sender": "SYSTEM (Auto-Trigger)",
         "id": "AUTO-DAY-1790865003605",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT",
         "id": "AUTO-DAY-1790433001094",
         "recipient": "Coordination Matrix (2 Contacts)",
@@ -1324,7 +1324,7 @@
         "sender": "SYSTEM (Auto-Trigger)"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_DAY",
         "recipient": "Coordination Matrix (2 Contacts)",
         "id": "AUTO-DAY-1790196725791",
@@ -1333,7 +1333,7 @@
         "sender": "SYSTEM (Auto-Trigger)"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_DAY",
         "id": "DEMO-1790196701069",
         "sender": "admin (Live Demo Test)",
@@ -1348,12 +1348,12 @@
         "sender": "SYSTEM (Auto-Trigger)",
         "category": "SHIFT_NIGHT",
         "status": "SENT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501..."
       },
       {
         "status": "OPENED",
         "sender": "admin",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "02:02 AM",
         "category": "SHIFT_DAY",
         "id": "WA-1790195536264",
@@ -1364,7 +1364,7 @@
         "recipient": "+91 9033912511",
         "timestamp": "01:50 AM",
         "status": "OPENED",
-        "preview": "📢 *WÜNDERKRAF FACTORY ANNOUNCEMENT*\n━━━━━━━━━━━━━━━━━━━━\n📅 *Date:* 9/24/2...",
+        "preview": "\ud83d\udce2 *W\u00dcNDERKRAF FACTORY ANNOUNCEMENT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\ud83d\udcc5 *Date:* 9/24/2...",
         "category": "CUSTOM_BROADCAST",
         "sender": "admin"
       },
@@ -1374,13 +1374,13 @@
         "timestamp": "08:00 AM",
         "id": "AUTO-NIGHT-1790389804853",
         "status": "SENT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_NIGHT"
       },
       {
         "id": "AUTO-NIGHT-1790303400048",
         "sender": "SYSTEM (Auto-Trigger)",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT",
         "recipient": "Coordination Matrix (2 Contacts)",
         "timestamp": "08:00 AM",
@@ -1391,7 +1391,7 @@
         "id": "AUTO-NIGHT-1790821809521",
         "status": "SENT",
         "category": "SHIFT_NIGHT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "08:00 AM",
         "recipient": "Coordination Matrix (2 Contacts)"
       },
@@ -1400,7 +1400,7 @@
         "status": "SENT",
         "id": "AUTO-DAY-1790820061509",
         "category": "SHIFT_DAY",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "recipient": "Coordination Matrix (2 Contacts)",
         "timestamp": "07:31 AM"
       },
@@ -1411,12 +1411,12 @@
         "recipient": "Primary Plant Gateway (+91 9033912511)",
         "status": "SENT",
         "category": "PURCHASE_INDENT",
-        "preview": "🛒 *URGENT PURCHASE REQUISITION ALERT*\n━━━━━━━━━━━━━━━━━━━━\n📋 *Indent ID:* *MR-2026-..."
+        "preview": "\ud83d\uded2 *URGENT PURCHASE REQUISITION ALERT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\ud83d\udccb *Indent ID:* *MR-2026-..."
       },
       {
         "id": "WA-1790568366652",
         "timestamp": "09:36 AM",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
         "category": "SHIFT_DAY",
         "status": "OPENED",
@@ -1426,7 +1426,7 @@
         "id": "WA-1790568354183",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
         "timestamp": "09:35 AM",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_DAY",
         "status": "SENT",
         "sender": "admin"
@@ -1437,13 +1437,13 @@
         "status": "SENT",
         "timestamp": "08:46 AM",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_DAY"
       },
       {
         "id": "WA-1790565366781",
         "category": "SHIFT_DAY",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "sender": "admin",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
         "timestamp": "08:46 AM",
@@ -1453,13 +1453,13 @@
         "timestamp": "08:33 AM",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
         "id": "WA-1790564604882",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "sender": "admin",
         "category": "SHIFT_DAY",
         "status": "OPENED"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "sender": "admin",
         "category": "SHIFT_NIGHT",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
@@ -1474,10 +1474,10 @@
         "status": "SENT",
         "recipient": "Coordination Matrix (2 Contacts)",
         "timestamp": "08:00 AM",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501..."
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "id": "AUTO-DAY-1790560867723",
         "category": "SHIFT_DAY",
         "timestamp": "07:31 AM",
@@ -1486,7 +1486,7 @@
         "sender": "SYSTEM (Auto-Trigger)"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "sender": "SYSTEM (Auto-Trigger)",
         "recipient": "Coordination Matrix (2 Contacts)",
         "timestamp": "08:00 AM",
@@ -1496,7 +1496,7 @@
       },
       {
         "id": "DEMO-1790474676255",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "07:34 AM",
         "recipient": "Floor Coordination Matrix (DAY Shift Alert)",
         "status": "SENT",
@@ -1508,7 +1508,7 @@
         "status": "SENT",
         "id": "AUTO-DAY-1790474469505",
         "category": "SHIFT_DAY",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "07:31 AM",
         "recipient": "Coordination Matrix (2 Contacts)"
       },
@@ -1517,13 +1517,13 @@
         "recipient": "Primary Plant Gateway (+91 9033912511)",
         "timestamp": "05:32 PM",
         "sender": "admin",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "id": "WA-1790596948333",
         "category": "SHIFT_DAY"
       },
       {
         "status": "FAILED",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "05:32 PM",
         "recipient": "+91 9033912511",
         "sender": "admin",
@@ -1531,7 +1531,7 @@
         "category": "SHIFT_DAY"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "sender": "admin",
         "status": "FAILED",
         "id": "WA-1790595498302",
@@ -1542,14 +1542,14 @@
       {
         "category": "JOB_STATUS",
         "id": "WA-1790594089513",
-        "preview": "📋 *WÜNDERKRAF JOB STATUS REPORT*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ *Status:* No active product...",
+        "preview": "\ud83d\udccb *W\u00dcNDERKRAF JOB STATUS REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u26a0\ufe0f *Status:* No active product...",
         "sender": "admin",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
         "status": "OPENED",
         "timestamp": "04:44 PM"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT",
         "timestamp": "12:42 PM",
         "sender": "admin",
@@ -1558,7 +1558,7 @@
         "id": "WA-1790579575576"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_DAY",
         "sender": "SYSTEM (Auto-Trigger)",
         "id": "AUTO-DAY-1790865007334",
@@ -1568,7 +1568,7 @@
       },
       {
         "category": "SHIFT_NIGHT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "08:00 AM",
         "recipient": "Coordination Matrix (2 Contacts)",
         "status": "SENT",
@@ -1579,7 +1579,7 @@
         "status": "SENT",
         "sender": "SYSTEM (Auto-Trigger)",
         "category": "SHIFT_NIGHT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "08:00 AM",
         "recipient": "Coordination Matrix (2 Contacts)",
         "id": "AUTO-NIGHT-1790908200612"
@@ -1589,13 +1589,13 @@
         "id": "AUTO-NIGHT-1790908259834",
         "status": "SENT",
         "category": "SHIFT_NIGHT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "08:00 AM",
         "recipient": "Coordination Matrix (2 Contacts)"
       },
       {
         "id": "AUTO-NIGHT-1790908254601",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_NIGHT",
         "sender": "SYSTEM (Auto-Trigger)",
         "timestamp": "08:00 AM",
@@ -1606,7 +1606,7 @@
         "id": "AUTO-NIGHT-1790908241391",
         "timestamp": "08:00 AM",
         "recipient": "Coordination Matrix (2 Contacts)",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_NIGHT",
         "status": "SENT",
         "sender": "SYSTEM (Auto-Trigger)"
@@ -1616,13 +1616,13 @@
         "timestamp": "08:00 AM",
         "sender": "SYSTEM (Auto-Trigger)",
         "category": "SHIFT_NIGHT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT",
         "id": "AUTO-NIGHT-1790908240864"
       },
       {
         "category": "SHIFT_NIGHT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "id": "AUTO-NIGHT-1790908230613",
         "recipient": "Coordination Matrix (2 Contacts)",
         "sender": "SYSTEM (Auto-Trigger)",
@@ -1630,7 +1630,7 @@
         "status": "SENT"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "08:00 AM",
         "recipient": "Coordination Matrix (2 Contacts)",
         "id": "AUTO-NIGHT-1790908230300",
@@ -1639,7 +1639,7 @@
         "status": "SENT"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_NIGHT",
         "status": "SENT",
         "sender": "SYSTEM (Auto-Trigger)",
@@ -1650,7 +1650,7 @@
       {
         "category": "SHIFT_NIGHT",
         "id": "AUTO-NIGHT-1790908215275",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "recipient": "Coordination Matrix (2 Contacts)",
         "sender": "SYSTEM (Auto-Trigger)",
         "timestamp": "08:00 AM",
@@ -1661,13 +1661,13 @@
         "status": "SENT",
         "category": "SHIFT_NIGHT",
         "recipient": "Coordination Matrix (2 Contacts)",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "08:00 AM",
         "id": "AUTO-NIGHT-1790908214925"
       },
       {
         "sender": "SYSTEM (Auto-Trigger)",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT",
         "recipient": "Coordination Matrix (2 Contacts)",
         "timestamp": "08:00 AM",
@@ -1675,7 +1675,7 @@
         "category": "SHIFT_NIGHT"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "id": "AUTO-DAY-1791037801155",
         "category": "SHIFT_DAY",
         "status": "SENT",
@@ -1690,10 +1690,10 @@
         "status": "SENT",
         "id": "AUTO-NIGHT-1790994656159",
         "category": "SHIFT_NIGHT",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501..."
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_NIGHT",
         "id": "AUTO-NIGHT-1790994656148",
         "sender": "SYSTEM (Auto-Trigger)",
@@ -1702,7 +1702,7 @@
         "status": "SENT"
       },
       {
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "sender": "System Scheduler",
         "category": "SHIFT_NIGHT",
         "id": "SCHED-NIGHT-1790994626145",
@@ -1716,12 +1716,12 @@
         "id": "AUTO-DAY-1791037803660",
         "sender": "SYSTEM (Auto-Trigger)",
         "category": "SHIFT_DAY",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT"
       },
       {
         "id": "AUTO-NIGHT-1791081004762",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "08:00 AM",
         "recipient": "Coordination Matrix (2 Contacts)",
         "status": "SENT",
@@ -1731,7 +1731,7 @@
       {
         "recipient": "Coordination Matrix (2 Contacts)",
         "timestamp": "20:00",
-        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "id": "AUTO-DAY-1791124214460",
         "status": "SENT",
         "category": "SHIFT_DAY",
@@ -1944,7 +1944,7 @@
       "stage": "Admin Master",
       "machine": "ADMIN-SETTINGS",
       "shift": "DAY",
-      "action": "🏷️ Added New Paper Mill Brand: ORIENT PAPER",
+      "action": "\ud83c\udff7\ufe0f Added New Paper Mill Brand: ORIENT PAPER",
       "worker": "ADMIN",
       "user": "admin",
       "rawDate": "2026-10-04",
@@ -1955,7 +1955,7 @@
       "stage": "Admin Master",
       "machine": "ADMIN-SETTINGS",
       "shift": "DAY",
-      "action": "✏️ Renamed Paper Mill Brand from Orient Paper to AADHARA PAPER",
+      "action": "\u270f\ufe0f Renamed Paper Mill Brand from Orient Paper to AADHARA PAPER",
       "worker": "ADMIN",
       "user": "admin",
       "rawDate": "2026-10-04",

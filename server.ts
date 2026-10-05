@@ -100,15 +100,17 @@ app.post('/api/sync/state', (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid state payload: jobs array required' });
     }
 
-    // Save authoritative client state directly without resurrecting old deleted jobs
-    const saved = saveCentralStateToDisk(incomingState);
+    // Merge incoming client state with current central state on the server to prevent multi-device data overwrites
+    const currentCentral = loadCentralStateFromDisk();
+    const mergedState = currentCentral ? mergeFactoryStates(currentCentral, incomingState) : incomingState;
+    const saved = saveCentralStateToDisk(mergedState);
 
     res.json({
       success: saved,
       timestamp: Date.now(),
-      state: incomingState,
-      jobCount: incomingState.jobs?.length || 0,
-      logCount: incomingState.logs?.length || 0
+      state: mergedState,
+      jobCount: mergedState.jobs?.length || 0,
+      logCount: mergedState.logs?.length || 0
     });
   } catch (err: any) {
     console.error('Central sync POST error:', err);

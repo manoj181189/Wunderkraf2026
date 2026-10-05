@@ -316,6 +316,94 @@ export async function fetchCentralState(): Promise<FactoryState | null> {
  * 4. Broadcasts to same-device tabs.
  * 5. Asynchronously flushes to central shared endpoint.
  */
+/**
+ * Self-healing stage reconciliation:
+ * Detects jobs where slitting of 8 or 9 layers is 100% completed.
+ * Automatically marks them 'Slitting Completed' / 'READY_FOR_CUTTING' with available rolls,
+ * and marks their production plans 'Completed' so they cleanly move from Slitting to Cutting.
+ */
+export function reconcileJobStageTransitions(state: FactoryState): FactoryState {
+  if (!state || !state.jobs || !Array.isArray(state.jobs)) return state;
+
+  let hasChanges = false;
+  const plans = state.productionPlans || [];
+
+  const updatedJobs = state.jobs.map((job) => {
+    const linkedPlan = job.planId ? plans.find(p => p.id === job.planId) : null;
+    const targetLayers = linkedPlan?.targetLayers || job.targetLayers || 8;
+    const completedReelsCount = job.reelsList?.length || 0;
+    const hasBatches = (job.runningBatches || []).length > 0;
+    const allBatchesCompleted = hasBatches && (job.runningBatches || []).every(b => b.status === 'Completed');
+    
+    // Check if 8 or 9 layers slitting is 100% completed
+    const isSlitting100PercentDone = 
+      (completedReelsCount >= targetLayers && targetLayers > 0) ||
+      (job.stage === 'Slitting Completed') ||
+      (allBatchesCompleted && (job.outputWeightKg || 0) > 0);
+
+    if (isSlitting100PercentDone) {
+      const isPastSlitting = job.stage === 'Cutting' || job.stage === 'Forming' || job.stage === 'QC' || job.stage === 'Packing' || job.stage === 'Dispatched';
+      const isCuttingOrDone = job.status === 'READY_FOR_CUTTING' || job.status === 'CUTTING_IN_PROGRESS' || job.status === 'CUTTING_COMPLETED' || job.status === 'Completed';
+      
+      const effectiveRolls = (job.availableRolls !== undefined && job.availableRolls > 0) 
+        ? job.availableRolls 
+        : Math.max(completedReelsCount, targetLayers);
+
+      if (!isPastSlitting && !isCuttingOrDone) {
+        hasChanges = true;
+        return {
+          ...job,
+          stage: 'Slitting Completed',
+          status: 'READY_FOR_CUTTING',
+          availableRolls: effectiveRolls
+        };
+      } else if (!isPastSlitting && job.availableRolls === undefined) {
+        hasChanges = true;
+        return {
+          ...job,
+          availableRolls: effectiveRolls
+        };
+      }
+    }
+
+    return job;
+  });
+
+  const updatedPlans = plans.map((plan) => {
+    if (plan.status === 'Completed' || plan.status === 'Cancelled') return plan;
+    const linkedJob = updatedJobs.find(j => j.planId === plan.id || j.id === plan.jobId);
+    if (!linkedJob) return plan;
+
+    const targetLayers = plan.targetLayers || linkedJob.targetLayers || 8;
+    const completedReelsCount = linkedJob.reelsList?.length || 0;
+    const isDone = 
+      (completedReelsCount >= targetLayers && targetLayers > 0) ||
+      linkedJob.stage === 'Slitting Completed' ||
+      linkedJob.stage === 'Cutting' ||
+      linkedJob.status === 'READY_FOR_CUTTING' ||
+      linkedJob.status === 'CUTTING_IN_PROGRESS' ||
+      linkedJob.status === 'Completed';
+
+    if (isDone) {
+      hasChanges = true;
+      return {
+        ...plan,
+        status: 'Completed' as const,
+        actualLayersUsed: completedReelsCount || targetLayers
+      };
+    }
+    return plan;
+  });
+
+  if (!hasChanges) return state;
+
+  return {
+    ...state,
+    jobs: updatedJobs,
+    productionPlans: updatedPlans
+  };
+}
+
 export async function persistFactoryState(
   nextState: FactoryState,
   _currentState?: FactoryState
@@ -328,10 +416,13 @@ export async function persistFactoryState(
   let savedToIndexedDB = false;
   let savedToLocalStorage = false;
 
+  // Run reconciliation to ensure completed slitting jobs transition smoothly to cutting
+  const reconciled = reconcileJobStageTransitions(nextState);
+
   // Use nextState directly as the authoritative state to persist (do not merge old deleted items back)
   const stateToSave: FactoryState = {
-    ...nextState,
-    lastUpdated: nextState.lastUpdated || new Date().toISOString()
+    ...reconciled,
+    lastUpdated: reconciled.lastUpdated || new Date().toISOString()
   };
 
   // 1. Primary IndexedDB write
@@ -423,7 +514,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
   if (syncMode === 'manual' && localState && localState.jobs && Array.isArray(localState.jobs)) {
     console.info('[Storage] Safe/Manual Mode: Initialized using pristine local state.');
     localState.glueBrands = ['Pidilite FS35'];
-    return localState;
+    return reconcileJobStageTransitions(localState);
   }
 
   // Step 2: Attempt to pull latest shared state from Firestore Cloud (Primary for GitHub Pages / Multi-Device Fleet in Auto Mode)
@@ -432,7 +523,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
       const cloudState = await fetchStateFromCloud();
       if (cloudState && Array.isArray(cloudState.jobs)) {
         console.info('[FirebaseSync] Authoritative cloud state received. Converging with local state...');
-        const merged = mergeFactoryStates(cloudState, localState || INITIAL_STATE);
+        const merged = reconcileJobStageTransitions(mergeFactoryStates(cloudState, localState || INITIAL_STATE));
         merged.glueBrands = ['Pidilite FS35'];
         await saveToIndexedDB(merged);
         try {
@@ -453,7 +544,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
       const centralState = await fetchCentralState();
       if (centralState) {
         console.info('[Sync Bridge] Central state fetched successfully. Merging with local data...');
-        const merged = mergeFactoryStates(centralState, localState || INITIAL_STATE);
+        const merged = reconcileJobStageTransitions(mergeFactoryStates(centralState, localState || INITIAL_STATE));
         merged.glueBrands = ['Pidilite FS35'];
 
         // Save converged authoritative state to local storage
@@ -476,11 +567,11 @@ export async function initializeFactoryState(): Promise<FactoryState> {
   if (localState && localState.jobs && Array.isArray(localState.jobs)) {
     console.info('[Storage] Initialized with local offline state.');
     localState.glueBrands = ['Pidilite FS35'];
-    return localState;
+    return reconcileJobStageTransitions(localState);
   }
 
   console.info('[Storage] Initializing fresh default state.');
-  const defaultSt = { ...INITIAL_STATE, glueBrands: ['Pidilite FS35'] };
+  const defaultSt = reconcileJobStageTransitions({ ...INITIAL_STATE, glueBrands: ['Pidilite FS35'] });
   saveToIndexedDB(defaultSt).catch(() => {});
   return defaultSt;
 }
