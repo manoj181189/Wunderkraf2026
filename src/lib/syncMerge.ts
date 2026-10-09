@@ -72,9 +72,13 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         if (!prevBatch) {
           batchMap.set(key, { ...b });
         } else {
-          // Prefer completed or higher produced counts
+          // Prefer completed status and preserve endTime
           const isIncCompleted = b.status === 'Completed' || !!b.endTime;
           const isPrevCompleted = prevBatch.status === 'Completed' || !!prevBatch.endTime;
+          const isBatchCompleted = isIncCompleted || isPrevCompleted;
+
+          const finalStatus = isBatchCompleted ? 'Completed' : (preferInc ? (b.status || prevBatch.status) : (prevBatch.status || b.status));
+          const finalEndTime = isBatchCompleted ? (b.endTime || prevBatch.endTime) : undefined;
 
           // Merge slices by sliceId to prevent loss of operator run custody details and slice-level consumed quantities
           const sliceMap = new Map<string, any>();
@@ -96,24 +100,17 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
           });
           const mergedSlices = Array.from(sliceMap.values());
 
-          if (isIncCompleted && !isPrevCompleted) {
-            batchMap.set(key, {
-              ...prevBatch,
-              ...b,
-              consumedQty: Math.max(prevBatch.consumedQty || 0, b.consumedQty || 0),
-              slices: mergedSlices.length > 0 ? mergedSlices : undefined
-            });
-          } else {
-            batchMap.set(key, {
-              ...prevBatch,
-              ...b,
-              producedQty: Math.max(prevBatch.producedQty || 0, b.producedQty || 0),
-              producedPieces: Math.max(prevBatch.producedPieces || 0, b.producedPieces || 0),
-              loosePieces: Math.max(prevBatch.loosePieces || 0, b.loosePieces || 0),
-              consumedQty: Math.max(prevBatch.consumedQty || 0, b.consumedQty || 0),
-              slices: mergedSlices.length > 0 ? mergedSlices : undefined
-            });
-          }
+          batchMap.set(key, {
+            ...prevBatch,
+            ...b,
+            status: finalStatus,
+            endTime: finalEndTime,
+            producedQty: Math.max(prevBatch.producedQty || 0, b.producedQty || 0),
+            producedPieces: Math.max(prevBatch.producedPieces || 0, b.producedPieces || 0),
+            loosePieces: Math.max(prevBatch.loosePieces || 0, b.loosePieces || 0),
+            consumedQty: Math.max(prevBatch.consumedQty || 0, b.consumedQty || 0),
+            slices: mergedSlices.length > 0 ? mergedSlices : undefined
+          });
         }
       });
 

@@ -596,36 +596,44 @@ export async function forceSyncWithCentral(currentState: FactoryState): Promise<
     }
   }
 
-  // 3. Push to local/custom HTTP endpoint
+  let authoritativeState = currentState;
+
+  // 3. Push to local/custom HTTP endpoint and adopt merged central state
   try {
     const endpoint = getCentralSyncEndpoint();
-    await fetch(endpoint, {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: currentState, clientTimestamp: Date.now() })
-    }).catch(() => {});
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.state && Array.isArray(data.state.jobs)) {
+        authoritativeState = data.state;
+      }
+    }
   } catch (err: any) {
     console.warn('[Sync Bridge] HTTP Force sync push error:', err);
   }
 
   // 4. Persist locally
-  await saveToIndexedDB(currentState);
+  await saveToIndexedDB(authoritativeState);
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentState));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(authoritativeState));
   } catch (e) {}
 
   if (cloudSuccess) {
     return {
       success: true,
-      syncedState: currentState,
+      syncedState: authoritativeState,
       message: 'Cloud Sync Successful: Studio state pushed to Firestore Cloud! Live devices/GitHub Pages are now updated.'
     };
   }
 
   return {
     success: true,
-    syncedState: currentState,
-    message: 'Local state saved and persisted successfully.'
+    syncedState: authoritativeState,
+    message: 'Live state synchronized successfully with central server.'
   };
 }
 

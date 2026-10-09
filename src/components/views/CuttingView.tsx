@@ -3172,6 +3172,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
           const paperBrand = j.paperBrand || 'ITC';
           const remark = j.customRemark || 'Standard';
           const stock = j.availableCuttingCrates || 0;
+          const stockPieces = stock > 0 ? Math.round(stock * cutPcsStd) : 0;
 
           // Status representation
           let statusText = j.stage || '';
@@ -3192,6 +3193,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
             product: j.product,
             remark: remark,
             stock: stock,
+            stockPieces: stockPieces,
             totalCutPieces,
             totalScrapKg,
             totalInRolls,
@@ -3550,8 +3552,13 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                         <td className="p-2.5 text-right font-extrabold text-emerald-700">
                           {item.stock} Crates
                           <div className="text-[10px] text-emerald-600 font-semibold">
-                            ({(item.totalCutPieces ?? 0).toLocaleString()} Blanks)
+                            ({(item.stockPieces ?? 0).toLocaleString()} Blanks)
                           </div>
+                          {item.totalCutPieces > item.stockPieces && (
+                            <div className="text-[9px] text-slate-400 font-medium">
+                              (Cum: {item.totalCutPieces.toLocaleString()})
+                            </div>
+                          )}
                         </td>
                         <td className="p-2.5 text-right font-mono text-xs">
                           <div className="flex flex-col items-end">

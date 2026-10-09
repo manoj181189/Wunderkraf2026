@@ -136,7 +136,7 @@
   "wipLots": [
     {
       "piecesPerCrate": 12800,
-      "consumedQty": 12,
+      "consumedQty": 14,
       "totalPieces": 217600,
       "id": "LOT-CUT-1791113274265-596",
       "machine": "Cutting-2",
@@ -146,7 +146,7 @@
       "jobId": "FRK-066",
       "timestamp": "2026-10-04T11:27:54.265Z",
       "producedByOperator": "VISHAL",
-      "remainingQty": 5,
+      "remainingQty": 3,
       "shift": "DAY"
     },
     {
@@ -196,10 +196,10 @@
     },
     {
       "totalPieces": 49995,
-      "consumedQty": 0,
+      "consumedQty": 1,
       "product": "Spoon",
       "shift": "DAY",
-      "remainingQty": 5,
+      "remainingQty": 4,
       "producedQty": 5,
       "machine": "Cutting-1",
       "producedByOperator": "CUT_OP1",
@@ -313,6 +313,126 @@
       "producedQty": 1,
       "machine": "Cutting-1",
       "shift": "NIGHT"
+    },
+    {
+      "jobId": "F-066",
+      "totalPieces": 173204,
+      "stage": "Cutting",
+      "product": "Fork",
+      "producedByOperator": "VISHAL",
+      "remainingQty": 1,
+      "timestamp": "2026-10-05T02:10:26.007Z",
+      "shift": "DAY",
+      "piecesPerCrate": 12366,
+      "producedQty": 14,
+      "machine": "Cutting-2",
+      "id": "LOT-CUT-1791166226007-25",
+      "consumedQty": 13
+    },
+    {
+      "totalPieces": 136560,
+      "product": "Spoon",
+      "timestamp": "2026-10-05T02:05:09.699Z",
+      "shift": "NIGHT",
+      "producedByOperator": "BALU",
+      "producedQty": 12,
+      "remainingQty": 12,
+      "machine": "Cutting-2",
+      "piecesPerCrate": 11380,
+      "stage": "Cutting",
+      "jobId": "S-070",
+      "id": "LOT-CUT-1791165909699-571",
+      "consumedQty": 0
+    },
+    {
+      "timestamp": "2026-10-05T02:51:52.459Z",
+      "stage": "Cutting",
+      "jobId": "F-067",
+      "producedByOperator": "BALU",
+      "totalPieces": 204800,
+      "machine": "Cutting-2",
+      "piecesPerCrate": 12800,
+      "consumedQty": 0,
+      "shift": "NIGHT",
+      "producedQty": 16,
+      "remainingQty": 16,
+      "product": "Fork",
+      "id": "LOT-CUT-1791168712459-442"
+    },
+    {
+      "shift": "DAY",
+      "consumedQty": 0,
+      "remainingQty": 1,
+      "producedQty": 1,
+      "producedByOperator": "VISHAL",
+      "product": "Fork",
+      "jobId": "F-068",
+      "stage": "Cutting",
+      "timestamp": "2026-10-05T13:13:13.798Z",
+      "totalPieces": 13440,
+      "machine": "Cutting-2",
+      "piecesPerCrate": 13440,
+      "id": "LOT-CUT-1791205993798-403"
+    },
+    {
+      "remainingQty": 15,
+      "product": "Fork",
+      "producedByOperator": "VISHAL",
+      "producedQty": 15,
+      "consumedQty": 0,
+      "shift": "DAY",
+      "id": "LOT-CUT-1791206053907-213",
+      "machine": "Cutting-2",
+      "totalPieces": 192000,
+      "timestamp": "2026-10-05T13:14:13.907Z",
+      "stage": "Cutting",
+      "piecesPerCrate": 12800,
+      "jobId": "F-068"
+    },
+    {
+      "id": "LOT-CUT-1791165881191-101",
+      "jobId": "S-070",
+      "stage": "Cutting",
+      "producedByOperator": "VISHAL SOLANKI",
+      "producedQty": 8,
+      "consumedQty": 3,
+      "remainingQty": 5,
+      "totalPieces": 91040,
+      "piecesPerCrate": 11380,
+      "shift": "DAY",
+      "machine": "Cutting-2",
+      "product": "Spoon",
+      "timestamp": "2026-10-05T02:00:00.000Z"
+    },
+    {
+      "id": "LOT-CUT-1791166163596-202",
+      "jobId": "F-066",
+      "stage": "Cutting",
+      "producedByOperator": "BALU",
+      "producedQty": 4,
+      "consumedQty": 4,
+      "remainingQty": 0,
+      "totalPieces": 49464,
+      "piecesPerCrate": 12366,
+      "shift": "NIGHT",
+      "machine": "Cutting-2",
+      "product": "Fork",
+      "timestamp": "2026-10-05T02:05:00.000Z"
+    },
+    {
+      "id": "LOT-CUT-1791166376076-303",
+      "jobId": "F-067",
+      "stage": "Cutting",
+      "producedByOperator": "VISHAL",
+      "producedQty": 1,
+      "consumedQty": 0,
+      "remainingQty": 1,
+      "totalPieces": 11500,
+      "piecesPerCrate": 11500,
+      "shift": "DAY",
+      "machine": "Cutting-2",
+      "product": "Fork",
+      "timestamp": "2026-10-05T02:15:00.000Z"
     }
   ],
   "shiftConfig": {
@@ -326,10 +446,10 @@
   "seriesConfig": {
     "orderSeq": 12,
     "productSeqs": {
-      "Spoon": 15,
-      "Knife": 3,
+      "Spoon": 72,
+      "Knife": 19,
       "Dessert Spoon": 3,
-      "Fork": 4
+      "Fork": 70
     },
     "numberingMaster": {
       "jobSeries": {
@@ -352,123 +472,128 @@
         "paddingDigits": 2,
         "nextSeq": 1
       },
+      "planSeries": {
+        "prefix": "PLAN",
+        "paddingDigits": 3,
+        "nextSeq": 8
+      },
       "useGlobalJobPrefix": false
     }
   },
   "departmentHeads": [
     {
-      "id": "DH-1",
       "name": "Ramesh Slit-Head",
+      "role": "Slitting Department Head",
+      "id": "DH-1",
       "dept": "Slitting",
-      "phone": "+91 98250 11001",
-      "role": "Slitting Department Head"
+      "phone": "+91 98250 11001"
     },
     {
-      "name": "Suresh Cut-Master",
       "id": "DH-2",
       "role": "Cutting Department Head",
-      "phone": "+91 98250 22002",
-      "dept": "Cutting"
+      "name": "Suresh Cut-Master",
+      "dept": "Cutting",
+      "phone": "+91 98250 22002"
     },
     {
-      "dept": "Forming",
+      "id": "DH-3",
       "role": "Forming Department Head",
-      "phone": "+91 98250 33003",
       "name": "Rajesh Form-Lead",
-      "id": "DH-3"
+      "dept": "Forming",
+      "phone": "+91 98250 33003"
     },
     {
-      "name": "Amit Verma (Lead QC)",
       "id": "DH-4",
       "phone": "+91 98250 44004",
+      "name": "Amit Verma (Lead QC)",
       "role": "Quality Control Head",
       "dept": "QC"
     },
     {
       "name": "Vikram Singh",
-      "id": "DH-5",
-      "phone": "+91 98250 55005",
       "role": "Packing & Dispatch In-Charge",
-      "dept": "Packing"
+      "id": "DH-5",
+      "dept": "Packing",
+      "phone": "+91 98250 55005"
     },
     {
-      "id": "DH-6",
-      "name": "Ramesh Sharma",
-      "role": "Chief Maintenance Engineer",
+      "phone": "+91 98250 12345",
       "dept": "Maintenance",
-      "phone": "+91 98250 12345"
+      "role": "Chief Maintenance Engineer",
+      "name": "Ramesh Sharma",
+      "id": "DH-6"
     },
     {
-      "role": "Plant Production Manager",
-      "id": "DH-7",
       "dept": "Plant Admin",
       "phone": "+91 98250 99999",
+      "role": "Plant Production Manager",
+      "id": "DH-7",
       "name": "Manoj Kumar (Plant Head)"
     },
     {
-      "phone": "+91 98250 77007",
-      "id": "DH-8",
-      "name": "Sanjay Patel",
       "dept": "Purchase",
-      "role": "Purchase & Stores Officer"
+      "name": "Sanjay Patel",
+      "role": "Purchase & Stores Officer",
+      "phone": "+91 98250 77007",
+      "id": "DH-8"
     }
   ],
   "coordinationMatrix": [
     {
-      "contactName": "Ramesh Sharma",
-      "phone": "+91 98250 12345",
       "alertCategories": {
-        "qcFailure": false,
-        "electricalAlert": false,
-        "materialIndent": false,
+        "machineBreakdown": true,
         "productionHandover": true,
-        "machineBreakdown": true
+        "materialIndent": false,
+        "electricalAlert": false,
+        "qcFailure": false
       },
-      "isActive": true,
+      "id": "CM-1",
       "roleName": "Maintenance Head",
-      "id": "CM-1"
+      "isActive": true,
+      "phone": "+91 98250 12345",
+      "contactName": "Ramesh Sharma"
     },
     {
-      "phone": "+91 98251 67890",
+      "alertCategories": {
+        "qcFailure": false,
+        "machineBreakdown": false,
+        "materialIndent": false,
+        "electricalAlert": true,
+        "productionHandover": false
+      },
+      "contactName": "Kishan Patel",
       "roleName": "Electrical Breakdown Head",
       "id": "CM-2",
-      "contactName": "Kishan Patel",
-      "isActive": true,
-      "alertCategories": {
-        "electricalAlert": true,
-        "materialIndent": false,
-        "machineBreakdown": false,
-        "qcFailure": false,
-        "productionHandover": false
-      }
+      "phone": "+91 98251 67890",
+      "isActive": true
     },
     {
       "contactName": "Suresh Patel",
+      "phone": "+91 98250 11001",
       "roleName": "Production Manager",
       "id": "CM-3",
       "isActive": true,
-      "phone": "+91 98250 11001",
       "alertCategories": {
-        "materialIndent": true,
-        "qcFailure": true,
-        "machineBreakdown": true,
         "productionHandover": true,
+        "materialIndent": true,
+        "machineBreakdown": true,
+        "qcFailure": true,
         "electricalAlert": true
       }
     },
     {
+      "isActive": true,
       "alertCategories": {
-        "materialIndent": false,
         "electricalAlert": false,
+        "materialIndent": false,
         "qcFailure": true,
         "productionHandover": false,
         "machineBreakdown": false
       },
-      "roleName": "QC Head",
-      "phone": "+91 98250 44004",
       "contactName": "Amit Verma",
-      "isActive": true,
-      "id": "CM-4"
+      "roleName": "QC Head",
+      "id": "CM-4",
+      "phone": "+91 98250 44004"
     }
   ],
   "archivedJobs": [],
@@ -485,10 +610,135 @@
     40,
     50
   ],
-  "shiftHandovers": [],
-  "scrapLimitsMaster": [
-    5
+  "shiftHandovers": [
+    {
+      "timestamp": "07:42 am",
+      "producedPieces": 11500,
+      "notes": "",
+      "outgoingOperator": "VISHAL",
+      "batchId": "F-067-CUT-01",
+      "jobId": "F-067",
+      "producedQty": 1,
+      "currentShift": "DAY",
+      "scrapQty": 51,
+      "date": "2026-10-05",
+      "meterReading": 1000,
+      "nextShift": "NIGHT",
+      "department": "Cutting",
+      "relievedByOperator": "BALU",
+      "id": "HO-CUT-1791166376076",
+      "machine": "Cutting-2",
+      "helpers": [
+        "SHILPA"
+      ]
+    },
+    {
+      "timestamp": "07:39 am",
+      "scrapQty": 0,
+      "producedQty": 4,
+      "jobId": "F-066",
+      "outgoingOperator": "BALU",
+      "date": "2026-10-05",
+      "batchId": "F-066-CUT-01",
+      "relievedByOperator": "VISHAL",
+      "id": "HO-CUT-1791166163596",
+      "notes": "",
+      "meterReading": 4500,
+      "helpers": [
+        "AJAY"
+      ],
+      "nextShift": "DAY",
+      "machine": "Cutting-2",
+      "currentShift": "NIGHT",
+      "department": "Cutting",
+      "producedPieces": 49464
+    },
+    {
+      "timestamp": "07:34 am",
+      "id": "HO-CUT-1791165881191",
+      "scrapQty": 0,
+      "meterReading": 8000,
+      "currentShift": "DAY",
+      "batchId": "S-070-CUT-01",
+      "producedPieces": 91040,
+      "jobId": "S-070",
+      "date": "2026-10-05",
+      "helpers": [
+        "SHILPA"
+      ],
+      "relievedByOperator": "BALU",
+      "nextShift": "NIGHT",
+      "machine": "Cutting-2",
+      "department": "Cutting",
+      "producedQty": 8,
+      "notes": "",
+      "outgoingOperator": "VISHAL SOLANKI"
+    },
+    {
+      "nextShift": "DAY",
+      "id": "HO-FORM-1791191492567",
+      "producedQty": 6,
+      "date": "2026-10-05",
+      "notes": "",
+      "batchId": "F-066-FORM-01",
+      "producedPieces": 62116,
+      "jobId": "F-066",
+      "currentShift": "NIGHT",
+      "outgoingOperator": "RAHUL",
+      "meterReading": 7486,
+      "relievedByOperator": "SARITA",
+      "department": "Forming",
+      "scrapQty": 14,
+      "timestamp": "02:41 pm",
+      "machine": "Forming-5",
+      "helpers": [
+        "RAJMUNI"
+      ]
+    },
+    {
+      "nextShift": "NIGHT",
+      "jobId": "F-066",
+      "department": "Forming",
+      "producedQty": 4,
+      "batchId": "F-066-FORM-01",
+      "notes": "",
+      "id": "HO-FORM-1791190654014",
+      "scrapQty": 15,
+      "producedPieces": 49185,
+      "relievedByOperator": "RAHUL",
+      "outgoingOperator": "SARITA",
+      "helpers": [
+        "KANTABEN"
+      ],
+      "meterReading": 3464,
+      "timestamp": "02:27 pm",
+      "machine": "Forming-5",
+      "currentShift": "DAY",
+      "date": "2026-10-05"
+    },
+    {
+      "producedPieces": 12800,
+      "batchId": "F-068-CUT-01",
+      "timestamp": "08:27 am",
+      "producedQty": 1,
+      "relievedByOperator": "VISHAL",
+      "nextShift": "DAY",
+      "machine": "Cutting-2",
+      "scrapQty": 53.3,
+      "helpers": [],
+      "meterReading": 1090,
+      "date": "2026-10-05",
+      "outgoingOperator": "BALU",
+      "currentShift": "NIGHT",
+      "notes": "",
+      "department": "Cutting",
+      "jobId": "F-068",
+      "id": "HO-CUT-1791169058917"
+    }
   ],
+  "scrapLimitsMaster": {
+    "0": 5
+  },
   "machinesMaster": {
     "Forming": [
       "Forming-1",
@@ -522,456 +772,530 @@
     ]
   },
   "adminPassword": "1",
-  "deletedJobIds": [],
+  "deletedJobIds": [
+    "SPN-015",
+    "SPN-070"
+  ],
   "crateCapacityMaster": {
     "Fork": {
-      "formingPcs": 6500,
-      "cuttingPcs": 9000
+      "cuttingPcs": 9000,
+      "formingPcs": 6500
     },
     "Knife": {
       "cuttingPcs": 11000,
       "formingPcs": 7500
     },
     "Spoon": {
-      "cuttingPcs": 10000,
-      "formingPcs": 7000
+      "formingPcs": 7000,
+      "cuttingPcs": 10000
     },
     "Dessert Spoon": {
       "cuttingPcs": 12000,
       "formingPcs": 8500
     }
   },
-  "deptWorkers": {},
+  "deptWorkers": {
+    "Slitting": [
+      "AMISHBHAI",
+      "ABHAY"
+    ],
+    "Cutting": [
+      "BALU",
+      "SHILPA BEN"
+    ],
+    "Forming": [
+      "ROSHAN",
+      "KANTA BEN",
+      "SARITA",
+      "RAJMUNI",
+      "RAHUL",
+      "BIRU",
+      "RAVINABEN"
+    ]
+  },
   "productPrefixMap": {
-    "Knife": "KNF",
-    "Spoon": "SPN",
-    "Dessert Spoon": "DSP",
-    "Fork": "FRK"
+    "Knife": "K",
+    "Spoon": "S",
+    "Dessert Spoon": "DS",
+    "Fork": "F"
   },
   "auditLogs": [
     {
-      "timestamp": "2026-09-21T00:06:33.727Z",
-      "id": "AUDIT-1789949193727-545",
-      "action": "SUB_LOT_HANDOVER",
       "complianceReference": "21-CFR-P11",
-      "stage": "Cutting",
-      "machine": "Cutting-1",
-      "userId": "cut_supervisor",
+      "machine": "Cutting-2",
       "payload": {
-        "sliceProducedQty": 5,
-        "incomingOperator": "TUSHAR",
-        "outgoingOperator": "AMISH",
-        "jobId": "DSP-002",
-        "sliceScrapQty": 50,
-        "meterReading": 0,
-        "batchId": "DSP-002-CUT-01",
-        "sliceRejectedPcs": 0
-      }
+        "incomingOperator": "BALU",
+        "sliceScrapQty": 51,
+        "jobId": "F-067",
+        "batchId": "F-067-CUT-01",
+        "sliceRejectedPcs": 0,
+        "meterReading": 1000,
+        "outgoingOperator": "VISHAL",
+        "sliceProducedQty": 1
+      },
+      "timestamp": "2026-10-05T02:12:56.077Z",
+      "action": "SUB_LOT_HANDOVER",
+      "id": "AUDIT-1791166376077-840",
+      "userId": "cut_supervisor",
+      "stage": "Cutting"
+    },
+    {
+      "complianceReference": "21-CFR-P11",
+      "machine": "Cutting-2",
+      "payload": {
+        "incomingOperator": "VISHAL",
+        "sliceScrapQty": 0,
+        "batchId": "F-066-CUT-01",
+        "jobId": "F-066",
+        "meterReading": 4500,
+        "sliceRejectedPcs": 0,
+        "outgoingOperator": "BALU",
+        "sliceProducedQty": 4
+      },
+      "action": "SUB_LOT_HANDOVER",
+      "userId": "cut_supervisor",
+      "stage": "Cutting",
+      "timestamp": "2026-10-05T02:09:23.597Z",
+      "id": "AUDIT-1791166163597-59"
+    },
+    {
+      "id": "AUDIT-1791165881191-794",
+      "action": "SUB_LOT_HANDOVER",
+      "payload": {
+        "batchId": "S-070-CUT-01",
+        "sliceRejectedPcs": 0,
+        "sliceProducedQty": 8,
+        "outgoingOperator": "VISHAL SOLANKI",
+        "jobId": "S-070",
+        "sliceScrapQty": 0,
+        "meterReading": 8000,
+        "incomingOperator": "BALU"
+      },
+      "machine": "Cutting-2",
+      "timestamp": "2026-10-05T02:04:41.191Z",
+      "complianceReference": "21-CFR-P11",
+      "userId": "cut_supervisor",
+      "stage": "Cutting"
     },
     {
       "action": "SUB_LOT_HANDOVER",
-      "timestamp": "2026-09-20T16:04:52.452Z",
-      "stage": "Cutting",
-      "id": "AUDIT-1789920292452-521",
-      "complianceReference": "21-CFR-P11",
       "machine": "Cutting-1",
       "payload": {
-        "outgoingOperator": "CUT_OP1",
+        "meterReading": 0,
+        "outgoingOperator": "AMISH",
+        "sliceProducedQty": 5,
+        "jobId": "DSP-002",
+        "batchId": "DSP-002-CUT-01",
         "sliceRejectedPcs": 0,
+        "sliceScrapQty": 50,
+        "incomingOperator": "TUSHAR"
+      },
+      "stage": "Cutting",
+      "timestamp": "2026-09-21T00:06:33.727Z",
+      "id": "AUDIT-1789949193727-545",
+      "complianceReference": "21-CFR-P11",
+      "userId": "cut_supervisor"
+    },
+    {
+      "machine": "Cutting-1",
+      "payload": {
         "meterReading": 0,
         "batchId": "SPN-014-CUT-01",
+        "sliceRejectedPcs": 0,
+        "outgoingOperator": "CUT_OP1",
         "sliceProducedQty": 5,
         "sliceScrapQty": 50,
         "jobId": "SPN-014",
         "incomingOperator": "TUSHAR"
       },
-      "userId": "cut_supervisor"
+      "stage": "Cutting",
+      "complianceReference": "21-CFR-P11",
+      "userId": "cut_supervisor",
+      "id": "AUDIT-1789920292452-521",
+      "timestamp": "2026-09-20T16:04:52.452Z",
+      "action": "SUB_LOT_HANDOVER"
     },
     {
-      "complianceReference": "21-CFR-P11",
-      "action": "SUB_LOT_HANDOVER",
-      "payload": {
-        "incomingOperator": "AMISH",
-        "sliceScrapQty": 50,
-        "sliceProducedQty": 5,
-        "jobId": "SPN-012",
-        "sliceRejectedPcs": 0,
-        "meterReading": 0,
-        "batchId": "SPN-012-CUT-01",
-        "outgoingOperator": "TUSHAR"
-      },
       "userId": "cut_supervisor",
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "sliceProducedQty": 5,
+        "outgoingOperator": "TUSHAR",
+        "jobId": "SPN-012",
+        "batchId": "SPN-012-CUT-01",
+        "incomingOperator": "AMISH",
+        "meterReading": 0,
+        "sliceScrapQty": 50
+      },
+      "machine": "Cutting-1",
+      "complianceReference": "21-CFR-P11",
       "timestamp": "2026-09-20T12:42:53.147Z",
       "id": "AUDIT-1789908173147-373",
       "stage": "Cutting",
-      "machine": "Cutting-1"
+      "action": "SUB_LOT_HANDOVER"
     },
     {
-      "payload": {
-        "sliceRejectedPcs": 0,
-        "jobId": "SPN-011",
-        "outgoingOperator": "TUSHAR",
-        "incomingOperator": "AMISH",
-        "meterReading": 0,
-        "batchId": "SPN-011-CUT-01",
-        "sliceProducedQty": 5,
-        "sliceScrapQty": 50
-      },
-      "id": "AUDIT-1789906004133-170",
       "stage": "Cutting",
       "userId": "cut_supervisor",
-      "machine": "Cutting-1",
-      "action": "SUB_LOT_HANDOVER",
       "complianceReference": "21-CFR-P11",
+      "machine": "Cutting-1",
+      "payload": {
+        "batchId": "SPN-011-CUT-01",
+        "sliceScrapQty": 50,
+        "incomingOperator": "AMISH",
+        "meterReading": 0,
+        "jobId": "SPN-011",
+        "outgoingOperator": "TUSHAR",
+        "sliceProducedQty": 5,
+        "sliceRejectedPcs": 0
+      },
+      "action": "SUB_LOT_HANDOVER",
+      "id": "AUDIT-1789906004133-170",
       "timestamp": "2026-09-20T12:06:44.133Z"
     },
     {
+      "userId": "cut_supervisor",
       "id": "AUDIT-1789903118966-943",
-      "action": "SUB_LOT_HANDOVER",
-      "timestamp": "2026-09-20T11:18:38.966Z",
       "complianceReference": "21-CFR-P11",
       "stage": "Cutting",
-      "machine": "Cutting-2",
-      "userId": "cut_supervisor",
       "payload": {
+        "jobId": "FRK-003",
         "sliceRejectedPcs": 0,
         "outgoingOperator": "TUSHAR",
+        "sliceProducedQty": 10,
         "meterReading": 0,
-        "sliceScrapQty": 150,
         "batchId": "FRK-003-CUT-01",
-        "jobId": "FRK-003",
         "incomingOperator": "AMISH",
-        "sliceProducedQty": 10
-      }
+        "sliceScrapQty": 150
+      },
+      "machine": "Cutting-2",
+      "action": "SUB_LOT_HANDOVER",
+      "timestamp": "2026-09-20T11:18:38.966Z"
     },
     {
+      "complianceReference": "21-CFR-P11",
+      "userId": "cut_supervisor",
+      "timestamp": "2026-09-20T09:09:47.202Z",
       "action": "SUB_LOT_HANDOVER",
-      "machine": "Cutting-1",
       "payload": {
+        "sliceScrapQty": 0,
         "sliceRejectedPcs": 0,
         "meterReading": 0,
+        "sliceProducedQty": 5,
         "outgoingOperator": "AMISH",
         "jobId": "SPN-009",
-        "incomingOperator": "TUSHAR",
-        "sliceProducedQty": 5,
         "batchId": "SPN-009-CUT-01",
-        "sliceScrapQty": 0
+        "incomingOperator": "TUSHAR"
       },
+      "machine": "Cutting-1",
       "stage": "Cutting",
-      "timestamp": "2026-09-20T09:09:47.202Z",
-      "id": "AUDIT-1789895387202-493",
-      "userId": "cut_supervisor",
-      "complianceReference": "21-CFR-P11"
+      "id": "AUDIT-1789895387202-493"
     },
     {
-      "timestamp": "2026-09-20T09:09:15.996Z",
-      "id": "AUDIT-1789895355996-776",
       "action": "SUB_LOT_HANDOVER",
-      "userId": "cut_supervisor",
+      "id": "AUDIT-1789895355996-776",
+      "stage": "Cutting",
+      "timestamp": "2026-09-20T09:09:15.996Z",
+      "machine": "Cutting-1",
       "payload": {
-        "sliceRejectedPcs": 0,
-        "batchId": "SPN-009-CUT-01",
-        "meterReading": 0,
-        "outgoingOperator": "TUSHAR",
         "incomingOperator": "AMISH",
         "sliceScrapQty": 0,
+        "batchId": "SPN-009-CUT-01",
         "jobId": "SPN-009",
-        "sliceProducedQty": 5
+        "meterReading": 0,
+        "outgoingOperator": "TUSHAR",
+        "sliceProducedQty": 5,
+        "sliceRejectedPcs": 0
       },
-      "stage": "Cutting",
-      "machine": "Cutting-1",
-      "complianceReference": "21-CFR-P11"
+      "complianceReference": "21-CFR-P11",
+      "userId": "cut_supervisor"
     },
     {
-      "stage": "Cutting",
-      "action": "SUB_LOT_HANDOVER",
-      "machine": "Cutting-1",
       "payload": {
-        "outgoingOperator": "TUSHAR",
-        "sliceScrapQty": 50,
         "sliceRejectedPcs": 5,
-        "batchId": "SPN-008-CUT-01",
+        "outgoingOperator": "TUSHAR",
         "sliceProducedQty": 5,
+        "sliceScrapQty": 50,
         "meterReading": 0,
         "jobId": "SPN-008",
+        "batchId": "SPN-008-CUT-01",
         "incomingOperator": "AMISH"
       },
+      "machine": "Cutting-1",
+      "action": "SUB_LOT_HANDOVER",
       "timestamp": "2026-09-20T02:56:57.571Z",
+      "userId": "cut_supervisor",
+      "complianceReference": "21-CFR-P11",
       "id": "AUDIT-1789873017571-800",
-      "complianceReference": "21-CFR-P11",
-      "userId": "cut_supervisor"
+      "stage": "Cutting"
     },
     {
-      "userId": "cut_supervisor",
-      "id": "AUDIT-1789816115141-683",
-      "complianceReference": "21-CFR-P11",
+      "stage": "Cutting",
       "timestamp": "2026-09-19T11:08:35.141Z",
+      "userId": "cut_supervisor",
+      "complianceReference": "21-CFR-P11",
+      "id": "AUDIT-1789816115141-683",
+      "action": "SUB_LOT_HANDOVER",
+      "machine": "Cutting-1",
       "payload": {
-        "incomingOperator": "AMISH",
-        "batchId": "KNF-002-CUT-01",
+        "outgoingOperator": "TUSHAR",
         "sliceProducedQty": 5,
         "jobId": "KNF-002",
+        "batchId": "KNF-002-CUT-01",
         "sliceRejectedPcs": 0,
+        "incomingOperator": "AMISH",
         "sliceScrapQty": 50,
-        "outgoingOperator": "TUSHAR",
         "meterReading": 0
-      },
-      "stage": "Cutting",
-      "machine": "Cutting-1",
-      "action": "SUB_LOT_HANDOVER"
-    },
-    {
-      "stage": "Cutting",
-      "payload": {
-        "outgoingOperator": "AMISH",
-        "batchId": "KNF-002-CUT-01",
-        "sliceRejectedPcs": 5,
-        "sliceProducedQty": 5,
-        "sliceScrapQty": 50,
-        "jobId": "KNF-002",
-        "meterReading": 0,
-        "incomingOperator": "TUSHAR"
-      },
-      "id": "AUDIT-1789816027255-607",
-      "machine": "Cutting-1",
-      "userId": "cut_supervisor",
-      "timestamp": "2026-09-19T11:07:07.255Z",
-      "action": "SUB_LOT_HANDOVER",
-      "complianceReference": "21-CFR-P11"
-    },
-    {
-      "action": "SUB_LOT_HANDOVER",
-      "machine": "Cutting-1",
-      "id": "AUDIT-1789810001201-443",
-      "payload": {
-        "sliceRejectedPcs": 0,
-        "meterReading": 0,
-        "jobId": "FRK-002",
-        "outgoingOperator": "TUSHAR",
-        "incomingOperator": "AMISH",
-        "sliceScrapQty": 50,
-        "sliceProducedQty": 4,
-        "batchId": "FRK-002-CUT-01"
-      },
-      "timestamp": "2026-09-19T09:26:41.201Z",
-      "complianceReference": "21-CFR-P11",
-      "stage": "Cutting",
-      "userId": "cut_supervisor"
-    },
-    {
-      "timestamp": "2026-09-19T09:10:50.243Z",
-      "userId": "cut_supervisor",
-      "payload": {
-        "sliceScrapQty": 50,
-        "sliceRejectedPcs": 10,
-        "jobId": "FRK-002",
-        "outgoingOperator": "AMISH",
-        "batchId": "FRK-002-CUT-01",
-        "incomingOperator": "TUSHAR",
-        "meterReading": 0,
-        "sliceProducedQty": 4
-      },
-      "machine": "Cutting-1",
-      "id": "AUDIT-1789809050243-2",
-      "stage": "Cutting",
-      "complianceReference": "21-CFR-P11",
-      "action": "SUB_LOT_HANDOVER"
-    },
-    {
-      "action": "SUB_LOT_HANDOVER",
-      "stage": "Cutting",
-      "machine": "Cutting-1",
-      "complianceReference": "21-CFR-P11",
-      "id": "AUDIT-1789807681793-275",
-      "payload": {
-        "outgoingOperator": "AMISH",
-        "jobId": "SPN-006",
-        "sliceRejectedPcs": 0,
-        "batchId": "SPN-006-CUT-01",
-        "meterReading": 0,
-        "sliceProducedQty": 5,
-        "sliceScrapQty": 50,
-        "incomingOperator": "TUSHAR"
-      },
-      "timestamp": "2026-09-19T08:48:01.793Z",
-      "userId": "cut_supervisor"
-    },
-    {
-      "action": "SUB_LOT_HANDOVER",
-      "id": "AUDIT-1789807570457-279",
-      "stage": "Cutting",
-      "machine": "Cutting-1",
-      "payload": {
-        "sliceRejectedPcs": 0,
-        "meterReading": 0,
-        "sliceScrapQty": 50,
-        "batchId": "SPN-006-CUT-01",
-        "outgoingOperator": "TUSHAR",
-        "incomingOperator": "AMISH",
-        "sliceProducedQty": 5,
-        "jobId": "SPN-006"
-      },
-      "timestamp": "2026-09-19T08:46:10.457Z",
-      "complianceReference": "21-CFR-P11",
-      "userId": "cut_supervisor"
-    },
-    {
-      "complianceReference": "21-CFR-P11",
-      "id": "AUDIT-1789657207731-97",
-      "action": "SUB_LOT_HANDOVER",
-      "machine": "Cutting-1",
-      "timestamp": "2026-09-17T15:00:07.731Z",
-      "userId": "cut_supervisor",
-      "stage": "Cutting",
-      "payload": {
-        "outgoingOperator": "CUT_OP1",
-        "batchId": "SPN-004-CUT-01",
-        "sliceRejectedPcs": 0,
-        "meterReading": 0,
-        "sliceScrapQty": 50,
-        "jobId": "SPN-004",
-        "sliceProducedQty": 5,
-        "incomingOperator": "VIKRAM_CUT"
       }
     },
     {
+      "userId": "cut_supervisor",
+      "id": "AUDIT-1789816027255-607",
+      "stage": "Cutting",
+      "timestamp": "2026-09-19T11:07:07.255Z",
       "payload": {
+        "incomingOperator": "TUSHAR",
+        "sliceScrapQty": 50,
+        "jobId": "KNF-002",
+        "batchId": "KNF-002-CUT-01",
+        "outgoingOperator": "AMISH",
+        "sliceProducedQty": 5,
+        "sliceRejectedPcs": 5,
+        "meterReading": 0
+      },
+      "machine": "Cutting-1",
+      "complianceReference": "21-CFR-P11",
+      "action": "SUB_LOT_HANDOVER"
+    },
+    {
+      "action": "SUB_LOT_HANDOVER",
+      "stage": "Cutting",
+      "id": "AUDIT-1789810001201-443",
+      "timestamp": "2026-09-19T09:26:41.201Z",
+      "userId": "cut_supervisor",
+      "machine": "Cutting-1",
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "jobId": "FRK-002",
+        "meterReading": 0,
+        "sliceProducedQty": 4,
         "outgoingOperator": "TUSHAR",
-        "batchId": "KNF-001-CUT-01",
-        "jobId": "KNF-001",
+        "batchId": "FRK-002-CUT-01",
+        "incomingOperator": "AMISH",
+        "sliceScrapQty": 50
+      },
+      "complianceReference": "21-CFR-P11"
+    },
+    {
+      "stage": "Cutting",
+      "userId": "cut_supervisor",
+      "id": "AUDIT-1789809050243-2",
+      "action": "SUB_LOT_HANDOVER",
+      "complianceReference": "21-CFR-P11",
+      "machine": "Cutting-1",
+      "payload": {
+        "meterReading": 0,
+        "sliceRejectedPcs": 10,
+        "jobId": "FRK-002",
+        "sliceProducedQty": 4,
+        "outgoingOperator": "AMISH",
+        "sliceScrapQty": 50,
+        "incomingOperator": "TUSHAR",
+        "batchId": "FRK-002-CUT-01"
+      },
+      "timestamp": "2026-09-19T09:10:50.243Z"
+    },
+    {
+      "id": "AUDIT-1789807681793-275",
+      "userId": "cut_supervisor",
+      "complianceReference": "21-CFR-P11",
+      "stage": "Cutting",
+      "payload": {
+        "batchId": "SPN-006-CUT-01",
+        "sliceRejectedPcs": 0,
+        "outgoingOperator": "AMISH",
+        "sliceProducedQty": 5,
+        "meterReading": 0,
+        "incomingOperator": "TUSHAR",
+        "jobId": "SPN-006",
+        "sliceScrapQty": 50
+      },
+      "machine": "Cutting-1",
+      "action": "SUB_LOT_HANDOVER",
+      "timestamp": "2026-09-19T08:48:01.793Z"
+    },
+    {
+      "userId": "cut_supervisor",
+      "timestamp": "2026-09-19T08:46:10.457Z",
+      "stage": "Cutting",
+      "action": "SUB_LOT_HANDOVER",
+      "complianceReference": "21-CFR-P11",
+      "id": "AUDIT-1789807570457-279",
+      "payload": {
+        "incomingOperator": "AMISH",
+        "jobId": "SPN-006",
+        "batchId": "SPN-006-CUT-01",
+        "outgoingOperator": "TUSHAR",
+        "sliceProducedQty": 5,
+        "sliceScrapQty": 50,
+        "sliceRejectedPcs": 0,
+        "meterReading": 0
+      },
+      "machine": "Cutting-1"
+    },
+    {
+      "timestamp": "2026-09-17T15:00:07.731Z",
+      "stage": "Cutting",
+      "id": "AUDIT-1789657207731-97",
+      "userId": "cut_supervisor",
+      "complianceReference": "21-CFR-P11",
+      "payload": {
+        "sliceRejectedPcs": 0,
+        "sliceScrapQty": 50,
+        "sliceProducedQty": 5,
+        "outgoingOperator": "CUT_OP1",
+        "meterReading": 0,
+        "batchId": "SPN-004-CUT-01",
+        "jobId": "SPN-004",
+        "incomingOperator": "VIKRAM_CUT"
+      },
+      "machine": "Cutting-1",
+      "action": "SUB_LOT_HANDOVER"
+    },
+    {
+      "userId": "cut_supervisor",
+      "machine": "Cutting-2",
+      "payload": {
         "sliceRejectedPcs": 100,
+        "outgoingOperator": "TUSHAR",
         "sliceProducedQty": 10,
         "sliceScrapQty": 155,
         "meterReading": 0,
-        "incomingOperator": "BALU"
+        "incomingOperator": "BALU",
+        "batchId": "KNF-001-CUT-01",
+        "jobId": "KNF-001"
       },
-      "stage": "Cutting",
-      "machine": "Cutting-2",
-      "userId": "cut_supervisor",
-      "action": "SUB_LOT_HANDOVER",
-      "complianceReference": "21-CFR-P11",
       "timestamp": "2026-09-17T10:52:13.943Z",
-      "id": "AUDIT-1789642333943-213"
+      "id": "AUDIT-1789642333943-213",
+      "stage": "Cutting",
+      "action": "SUB_LOT_HANDOVER",
+      "complianceReference": "21-CFR-P11"
     },
     {
-      "payload": {
-        "incomingOperator": "AMISH",
-        "sliceProducedQty": 10,
-        "batchId": "SPN-003-CUT-01",
-        "jobId": "SPN-003",
-        "sliceRejectedPcs": 100,
-        "outgoingOperator": "TUSHAR",
-        "sliceScrapQty": 50,
-        "meterReading": 6000
-      },
-      "complianceReference": "21-CFR-P11",
-      "userId": "cut_supervisor",
-      "stage": "Cutting",
-      "machine": "Cutting-1",
-      "action": "SUB_LOT_HANDOVER",
       "id": "AUDIT-1789616337807-743",
-      "timestamp": "2026-09-17T03:38:57.807Z"
-    },
-    {
-      "complianceReference": "21-CFR-P11",
-      "action": "SUB_LOT_HANDOVER",
-      "timestamp": "2026-09-17T03:19:10.783Z",
       "stage": "Cutting",
-      "id": "AUDIT-1789615150783-128",
-      "machine": "Cutting-1",
+      "complianceReference": "21-CFR-P11",
       "userId": "cut_supervisor",
+      "action": "SUB_LOT_HANDOVER",
+      "timestamp": "2026-09-17T03:38:57.807Z",
+      "machine": "Cutting-1",
       "payload": {
-        "jobId": "SPN-003",
-        "sliceRejectedPcs": 100,
-        "meterReading": 3000,
-        "outgoingOperator": "AMISH",
-        "batchId": "SPN-003-CUT-01",
         "sliceScrapQty": 50,
-        "incomingOperator": "TUSHAR",
-        "sliceProducedQty": 5
+        "sliceProducedQty": 10,
+        "outgoingOperator": "TUSHAR",
+        "sliceRejectedPcs": 100,
+        "jobId": "SPN-003",
+        "meterReading": 6000,
+        "batchId": "SPN-003-CUT-01",
+        "incomingOperator": "AMISH"
       }
     },
     {
-      "userId": "cut_supervisor",
+      "id": "AUDIT-1789615150783-128",
+      "stage": "Cutting",
       "payload": {
-        "meterReading": 3000,
-        "incomingOperator": "AMISH",
         "sliceScrapQty": 50,
-        "jobId": "SPN-003",
         "batchId": "SPN-003-CUT-01",
+        "jobId": "SPN-003",
+        "incomingOperator": "TUSHAR",
+        "meterReading": 3000,
         "sliceProducedQty": 5,
-        "sliceRejectedPcs": 100,
-        "outgoingOperator": "VIPUL"
+        "outgoingOperator": "AMISH",
+        "sliceRejectedPcs": 100
       },
       "machine": "Cutting-1",
-      "id": "AUDIT-1789615095042-846",
-      "timestamp": "2026-09-17T03:18:15.042Z",
-      "complianceReference": "21-CFR-P11",
-      "stage": "Cutting",
-      "action": "SUB_LOT_HANDOVER"
+      "userId": "cut_supervisor",
+      "action": "SUB_LOT_HANDOVER",
+      "timestamp": "2026-09-17T03:19:10.783Z",
+      "complianceReference": "21-CFR-P11"
     },
     {
-      "id": "AUDIT-1789615019907-755",
       "complianceReference": "21-CFR-P11",
+      "id": "AUDIT-1789615095042-846",
       "action": "SUB_LOT_HANDOVER",
       "machine": "Cutting-1",
+      "payload": {
+        "sliceProducedQty": 5,
+        "outgoingOperator": "VIPUL",
+        "sliceRejectedPcs": 100,
+        "incomingOperator": "AMISH",
+        "jobId": "SPN-003",
+        "sliceScrapQty": 50,
+        "batchId": "SPN-003-CUT-01",
+        "meterReading": 3000
+      },
+      "userId": "cut_supervisor",
+      "timestamp": "2026-09-17T03:18:15.042Z",
+      "stage": "Cutting"
+    },
+    {
+      "action": "SUB_LOT_HANDOVER",
+      "machine": "Cutting-1",
+      "payload": {
+        "sliceRejectedPcs": 100,
+        "sliceScrapQty": 50,
+        "sliceProducedQty": 5,
+        "outgoingOperator": "CUT_OP1",
+        "jobId": "SPN-003",
+        "batchId": "SPN-003-CUT-01",
+        "incomingOperator": "VIPUL",
+        "meterReading": 1500
+      },
+      "complianceReference": "21-CFR-P11",
       "userId": "cut_supervisor",
       "stage": "Cutting",
       "timestamp": "2026-09-17T03:16:59.907Z",
-      "payload": {
-        "sliceProducedQty": 5,
-        "incomingOperator": "VIPUL",
-        "batchId": "SPN-003-CUT-01",
-        "outgoingOperator": "CUT_OP1",
-        "sliceScrapQty": 50,
-        "sliceRejectedPcs": 100,
-        "meterReading": 1500,
-        "jobId": "SPN-003"
-      }
+      "id": "AUDIT-1789615019907-755"
     },
     {
-      "userId": "cut_supervisor",
       "id": "AUDIT-1789613594693-954",
+      "action": "SUB_LOT_HANDOVER",
+      "stage": "Cutting",
+      "timestamp": "2026-09-17T02:53:14.693Z",
+      "machine": "Cutting-2",
       "complianceReference": "21-CFR-P11",
       "payload": {
-        "outgoingOperator": "AMISH",
-        "sliceScrapQty": 50,
         "jobId": "SPN-002",
-        "batchId": "SPN-002-CUT-01",
-        "sliceProducedQty": 5,
         "incomingOperator": "TUSHAR",
+        "sliceScrapQty": 50,
+        "sliceProducedQty": 5,
+        "outgoingOperator": "AMISH",
+        "batchId": "SPN-002-CUT-01",
         "meterReading": 0
       },
-      "stage": "Cutting",
-      "machine": "Cutting-2",
-      "timestamp": "2026-09-17T02:53:14.693Z",
-      "action": "SUB_LOT_HANDOVER"
+      "userId": "cut_supervisor"
     },
     {
-      "stage": "Cutting",
       "action": "SUB_LOT_HANDOVER",
-      "machine": "Cutting-2",
       "id": "AUDIT-1789613417025-411",
+      "stage": "Cutting",
+      "timestamp": "2026-09-17T02:50:17.025Z",
       "payload": {
+        "sliceProducedQty": 5,
+        "outgoingOperator": "TUSHAR",
+        "meterReading": 0,
         "incomingOperator": "AMISH",
         "batchId": "SPN-002-CUT-01",
-        "jobId": "SPN-002",
-        "sliceProducedQty": 5,
-        "meterReading": 0,
-        "outgoingOperator": "TUSHAR",
-        "sliceScrapQty": 50
+        "sliceScrapQty": 50,
+        "jobId": "SPN-002"
       },
+      "machine": "Cutting-2",
       "complianceReference": "21-CFR-P11",
-      "timestamp": "2026-09-17T02:50:17.025Z",
       "userId": "cut_supervisor"
     }
   ],
   "users": {
     "paras": {
-      "pass": "67",
-      "name": "paras",
-      "phone": "",
-      "role": "owner",
       "perms": [
         "Dashboard",
         "Marketing",
@@ -1003,12 +1327,17 @@
         "WA_BreakdownAlerts",
         "WhatsApp",
         "WA_DispatchNotes"
-      ]
+      ],
+      "name": "paras",
+      "role": "owner",
+      "phone": "",
+      "pass": "67"
     },
     "priti": {
+      "pass": "43",
+      "name": "PRITI",
       "role": "SUPERVISOR",
       "phone": "",
-      "pass": "43",
       "perms": [
         "Stock",
         "Orders",
@@ -1032,20 +1361,22 @@
         "Analytics",
         "Audit",
         "Search"
-      ],
-      "name": "PRITI"
+      ]
     },
     "sandip": {
-      "role": "Manager",
+      "phone": "",
       "perms": [
         "*"
       ],
+      "pass": "1632",
       "name": "SANDIP KAMARIYA",
-      "phone": "",
-      "pass": "1632"
+      "role": "Manager"
     },
     "amish": {
+      "pass": "59",
       "name": "AMISH",
+      "phone": "",
+      "role": "SUPERVISOR",
       "perms": [
         "Stock",
         "Slitting",
@@ -1064,12 +1395,12 @@
         "Analytics",
         "Audit",
         "Search"
-      ],
-      "pass": "59",
-      "role": "SUPERVISOR",
-      "phone": ""
+      ]
     },
     "sarang": {
+      "pass": "1122",
+      "phone": "",
+      "name": "Sarang Rathod",
       "role": "SUPERVISOR",
       "perms": [
         "Dashboard",
@@ -1089,28 +1420,23 @@
         "Mnt_Repair",
         "Mnt_SpareParts",
         "Mnt_Preventative"
-      ],
-      "pass": "1122",
-      "name": "Sarang Rathod",
-      "phone": ""
+      ]
     },
     "abhay": {
-      "name": "ABHAY",
-      "phone": "",
-      "pass": "28",
       "role": "Operator",
+      "name": "ABHAY",
       "perms": [
         "Stock",
         "Slitting",
         "Audit",
         "Search",
         "WA_ShiftReports"
-      ]
+      ],
+      "phone": "",
+      "pass": "28"
     },
     "kishan": {
-      "role": "marketing ",
       "phone": "",
-      "name": "kishan ladani",
       "perms": [
         "Dashboard",
         "Marketing",
@@ -1136,25 +1462,27 @@
         "Planning",
         "Manpower"
       ],
-      "pass": "912"
+      "pass": "912",
+      "name": "kishan ladani",
+      "role": "marketing "
     },
     "balu": {
+      "phone": "",
       "perms": [
         "Cutting",
         "Mnt_LogIncident"
       ],
-      "role": "Operator",
-      "phone": "",
       "pass": "08",
-      "name": "BALU"
+      "name": "BALU",
+      "role": "Operator"
     },
     "admin": {
+      "pass": "1118",
+      "phone": "",
       "perms": [
         "*"
       ],
       "role": "Administrator",
-      "pass": "1118",
-      "phone": "",
       "name": "Master Administrator"
     }
   },
@@ -1163,7 +1491,141 @@
     "BILT",
     "ORIENT PAPER"
   ],
-  "floorWorkers": [],
+  "floorWorkers": [
+    {
+      "assignedMachine": "Slitting-1",
+      "isPresent": true,
+      "shiftStatus": "PRESENT",
+      "inTime": "07:16 AM",
+      "name": "AMISHBHAI",
+      "role": "OPERATOR",
+      "id": "EMP-1791164780080-781",
+      "shift": "DAY",
+      "department": "Slitting"
+    },
+    {
+      "shift": "DAY",
+      "status": "PRODUCING",
+      "inTime": "07:16 AM",
+      "id": "EMP-1791164807631-556",
+      "department": "Slitting",
+      "assignedMachine": "Slitting-1",
+      "shiftStatus": "PRESENT",
+      "role": "OPERATOR",
+      "name": "ABHAY",
+      "isPresent": true
+    },
+    {
+      "assignedMachine": "Cutting-2",
+      "department": "Cutting",
+      "name": "BALU",
+      "role": "OPERATOR",
+      "id": "EMP-1791165644434-718",
+      "shiftStatus": "PRESENT",
+      "inTime": "07:30 AM",
+      "isPresent": true,
+      "shift": "NIGHT"
+    },
+    {
+      "shift": "DAY",
+      "status": "PRODUCING",
+      "shiftStatus": "PRESENT",
+      "inTime": "12:23 PM",
+      "department": "Forming",
+      "isPresent": true,
+      "role": "OPERATOR",
+      "name": "ROSHAN",
+      "assignedMachine": "Forming-3",
+      "id": "EMP-1791183219912-626"
+    },
+    {
+      "shiftStatus": "PRESENT",
+      "shift": "DAY",
+      "department": "Forming",
+      "status": "PRODUCING",
+      "inTime": "12:23 PM",
+      "id": "EMP-1791183219912-226",
+      "isPresent": true,
+      "pairedWithOperator": "ROSHAN",
+      "name": "KANTA BEN",
+      "role": "HELPER",
+      "assignedMachine": "Forming-3"
+    },
+    {
+      "id": "EMP-1791185747784-869",
+      "shiftStatus": "PRESENT",
+      "isPresent": true,
+      "department": "Forming",
+      "name": "SARITA",
+      "role": "OPERATOR",
+      "assignedMachine": "Forming-5",
+      "inTime": "01:05 PM",
+      "status": "PRODUCING",
+      "shift": "DAY"
+    },
+    {
+      "pairedWithOperator": "SARITA",
+      "name": "RAJMUNI",
+      "role": "HELPER",
+      "department": "Forming",
+      "shiftStatus": "PRESENT",
+      "isPresent": true,
+      "inTime": "01:05 PM",
+      "id": "EMP-1791185747784-610",
+      "shift": "DAY",
+      "status": "PRODUCING",
+      "assignedMachine": "Forming-5"
+    },
+    {
+      "department": "Forming",
+      "id": "EMP-1791190927981-19",
+      "name": "RAHUL",
+      "role": "OPERATOR",
+      "isPresent": true,
+      "inTime": "02:32 PM",
+      "shift": "NIGHT",
+      "shiftStatus": "PRESENT",
+      "assignedMachine": "Forming-5"
+    },
+    {
+      "assignedMachine": "Forming-4",
+      "id": "EMP-1791191669960-595",
+      "inTime": "02:44 PM",
+      "name": "BIRU",
+      "role": "OPERATOR",
+      "shiftStatus": "PRESENT",
+      "shift": "DAY",
+      "isPresent": true,
+      "status": "PRODUCING",
+      "department": "Forming"
+    },
+    {
+      "status": "PRODUCING",
+      "shiftStatus": "PRESENT",
+      "department": "Forming",
+      "id": "EMP-1791191669960-949",
+      "isPresent": true,
+      "shift": "DAY",
+      "inTime": "02:44 PM",
+      "role": "HELPER",
+      "name": "RAVINABEN",
+      "pairedWithOperator": "BIRU",
+      "assignedMachine": "Forming-4"
+    },
+    {
+      "pairedWithOperator": "BALU",
+      "status": "PRODUCING",
+      "name": "SHILPA BEN",
+      "id": "EMP-1791216945452-657",
+      "role": "HELPER",
+      "shiftStatus": "PRESENT",
+      "department": "Cutting",
+      "inTime": "09:45 PM",
+      "isPresent": true,
+      "assignedMachine": "Cutting-2",
+      "shift": "NIGHT"
+    }
+  ],
   "deletedVaultItems": [],
   "products": [
     "Spoon",
@@ -1172,7 +1634,9 @@
     "Dessert Spoon"
   ],
   "archivedLogs": [],
-  "deletedPlanIds": [],
+  "deletedPlanIds": [
+    "PLAN-2026-001"
+  ],
   "deletedHandoverIds": [
     "HO-SLIT-1789614500414",
     "HO-CUT-1789613594693",
@@ -1246,31 +1710,2014 @@
     "HO-CUT-1790557959990",
     "HO-CUT-1790558106606"
   ],
-  "jobs": [],
+  "jobs": [
+    {
+      "product": "Fork",
+      "tracedLots": {
+        "Slitting": "F-069-SLIT-01",
+        "Cutting": "F-069-CUT-01"
+      },
+      "reelNumbers": [
+        "5191"
+      ],
+      "availableForQcCrates": 0,
+      "totalFormedPieces": 0,
+      "runningBatches": [
+        {
+          "scrapPercent": 0,
+          "slices": [
+            {
+              "notes": "Single Shift Run Completion",
+              "operator": "ABHAY",
+              "startTime": "07:28 AM",
+              "sliceId": "SLC-SLIT-1791165508434-1",
+              "machine": "Slitting-1",
+              "stage": "Slitting",
+              "scrapQty": 0,
+              "date": "2026-10-05",
+              "consumedQty": 0,
+              "scrapKg": 0,
+              "handoverTime": "07:28 AM",
+              "shift": "DAY",
+              "producedQty": 1
+            }
+          ],
+          "producedPieces": 0,
+          "status": "Completed",
+          "machine": "Slitting-1",
+          "startTime": "07:28 AM",
+          "stage": "Slitting",
+          "worker": "ABHAY",
+          "reelNo": "5191",
+          "issuedQty": 8,
+          "supervisor": "admin",
+          "outputWeightKg": 141,
+          "producedQty": 1,
+          "gsm": "125 GSM",
+          "inputWeightKg": 141,
+          "scrapKg": 0,
+          "loosePieces": 0,
+          "consumedQty": 0,
+          "user": "admin",
+          "endTime": "07:28 AM",
+          "batchId": "F-069-SLIT-01",
+          "shift": "DAY"
+        },
+        {
+          "issuedQty": 8,
+          "startTime": "09:45 PM",
+          "supervisor": "admin",
+          "shift": "NIGHT",
+          "batchId": "F-069-CUT-01",
+          "stage": "Cutting",
+          "loosePieces": 0,
+          "reelsSummary": "5191",
+          "status": "Running",
+          "helpers": [
+            "SHILPA BEN"
+          ],
+          "helperCount": 1,
+          "producedPieces": 0,
+          "reelNumbers": [
+            "5191"
+          ],
+          "user": "admin",
+          "reelNo": "5191",
+          "parentReelNo": "5191",
+          "machine": "Cutting-2",
+          "worker": "BALU",
+          "gsm": "125 GSM",
+          "consumedQty": 0,
+          "producedQty": 0,
+          "parentBatchId": "F-069-SLIT-01"
+        }
+      ],
+      "cuttingLoosePcs": 0,
+      "qcLoosePcs": 0,
+      "customRemark": "",
+      "availableCuttingCrates": 0,
+      "totalCutPieces": 0,
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "targetGsm": "125 GSM",
+      "reelNo": "5191",
+      "availableRolls": 8,
+      "gsm": "125 GSM",
+      "totalQcPieces": 0,
+      "paperBrand": "AADHARA PAPER",
+      "outputWeightKg": 1128,
+      "targetLayers": 8,
+      "createdAt": "2026-10-05T01:45:18.135Z",
+      "scrapKg": 0,
+      "targetLengthMeters": 3800,
+      "plannedLayers": [
+        {
+          "gsm": 125,
+          "requiredReels": 8,
+          "type": "Plain"
+        }
+      ],
+      "status": "CUTTING_IN_PROGRESS",
+      "formingLoosePcs": 0,
+      "stage": "Slitting",
+      "availableFormingCrates": 0,
+      "availableQcCrates": 0,
+      "scrapPercent": 0,
+      "id": "F-069",
+      "planId": "PLAN-2026-007",
+      "reelsList": [
+        {
+          "reelNo": "5191",
+          "outputWeightKg": 141,
+          "gsm": "125 GSM",
+          "scrapKg": 0,
+          "paperBrand": "AADHARA PAPER",
+          "startTime": "07:28 AM",
+          "rolls": 1,
+          "weightKg": 141,
+          "batchId": "F-069-SLIT-01",
+          "endTime": "07:28 AM",
+          "worker": "ABHAY"
+        }
+      ],
+      "inputWeightKg": 1128,
+      "targetGlueBrand": "Pidilite FS35",
+      "targetScrapLimitPct": 2.5,
+      "updatedAt": "2026-10-05T16:15:45.453Z"
+    },
+    {
+      "targetGsm": "125 GSM",
+      "product": "Fork",
+      "cuttingScrapKg": 53.3,
+      "cuttingRejectedPcs": 0,
+      "gsmList": [
+        "125 GSM"
+      ],
+      "availableQcCrates": 0,
+      "cuttingScrapPcs": 0,
+      "cuttingPcsPerKg": 480,
+      "customRemark": "",
+      "cuttingLoosePcs": 2,
+      "totalQcPieces": 0,
+      "runningBatches": [
+        {
+          "batchId": "F-068-SLIT-01",
+          "endTime": "07:27 AM",
+          "producedQty": 3,
+          "worker": "ABHAY",
+          "scrapKg": 0,
+          "supervisor": "admin",
+          "slices": [
+            {
+              "shift": "DAY",
+              "scrapKg": 0,
+              "startTime": "07:25 AM",
+              "date": "2026-10-05",
+              "handoverTime": "07:27 AM",
+              "stage": "Slitting",
+              "producedQty": 3,
+              "sliceId": "SLC-SLIT-1791165431930-1",
+              "machine": "Slitting-1",
+              "scrapQty": 0,
+              "notes": "Single Shift Run Completion",
+              "operator": "ABHAY",
+              "consumedQty": 0
+            }
+          ],
+          "inputWeightKg": 423,
+          "stage": "Slitting",
+          "gsm": "125 GSM",
+          "scrapPercent": 0,
+          "startTime": "07:25 AM",
+          "outputWeightKg": 423,
+          "consumedQty": 0,
+          "status": "Completed",
+          "loosePieces": 0,
+          "machine": "Slitting-1",
+          "issuedQty": 1,
+          "user": "admin",
+          "producedPieces": 0,
+          "shift": "DAY",
+          "reelNo": "5044"
+        },
+        {
+          "user": "slit_user",
+          "gsm": "125 GSM",
+          "machine": "Slitting-1",
+          "producedPieces": 0,
+          "stage": "Slitting",
+          "reelNo": "5160",
+          "issuedQty": 1,
+          "batchId": "F-068-SLIT-02",
+          "endTime": "07:27 AM",
+          "inputWeightKg": 423,
+          "loosePieces": 0,
+          "startTime": "07:26 AM",
+          "outputWeightKg": 423,
+          "consumedQty": 0,
+          "scrapKg": 0,
+          "worker": "ABHAY",
+          "slices": [
+            {
+              "sliceId": "SLC-SLIT-1791165463825-1",
+              "machine": "Slitting-1",
+              "shift": "DAY",
+              "date": "2026-10-05",
+              "handoverTime": "07:27 AM",
+              "startTime": "07:26 AM",
+              "consumedQty": 0,
+              "scrapKg": 0,
+              "stage": "Slitting",
+              "scrapQty": 0,
+              "producedQty": 4,
+              "notes": "Single Shift Run Completion",
+              "operator": "ABHAY"
+            }
+          ],
+          "scrapPercent": 0,
+          "shift": "DAY",
+          "status": "Completed",
+          "producedQty": 4
+        },
+        {
+          "consumedQty": 0,
+          "slices": [
+            {
+              "machine": "Slitting-1",
+              "sliceId": "SLC-SLIT-1791165417345-1",
+              "scrapQty": 0,
+              "startTime": "07:26 AM",
+              "handoverTime": "07:26 AM",
+              "shift": "DAY",
+              "operator": "ABHAY",
+              "date": "2026-10-05",
+              "scrapKg": 0,
+              "producedQty": 1,
+              "notes": "Single Shift Run Completion",
+              "consumedQty": 0,
+              "stage": "Slitting"
+            }
+          ],
+          "loosePieces": 0,
+          "status": "Completed",
+          "machine": "Slitting-1",
+          "scrapPercent": 0,
+          "gsm": "125 GSM",
+          "issuedQty": 1,
+          "shift": "DAY",
+          "producedQty": 1,
+          "outputWeightKg": 141,
+          "worker": "ABHAY",
+          "scrapKg": 0,
+          "reelNo": "5191",
+          "startTime": "07:26 AM",
+          "batchId": "F-068-SLIT-03",
+          "endTime": "07:26 AM",
+          "inputWeightKg": 141,
+          "producedPieces": 0,
+          "user": "slit_user",
+          "stage": "Slitting"
+        },
+        {
+          "slices": [
+            {
+              "producedQty": 1,
+              "stage": "Cutting",
+              "helperCount": 0,
+              "notes": "",
+              "rejectedPieces": 0,
+              "producedPieces": 12800,
+              "startTime": "08:24",
+              "loosePieces": 0,
+              "consumedQty": 0,
+              "scrapKg": 53.3,
+              "shift": "NIGHT",
+              "handoverTime": "08:27 am",
+              "endMeterReading": 1090,
+              "helpers": [],
+              "handoverConfirmed": true,
+              "strokeCount": 1090,
+              "operator": "BALU",
+              "machine": "Cutting-2",
+              "sliceId": "SLICE-CUT-1791169058916",
+              "date": "2026-10-05",
+              "scrapQty": 53.3,
+              "relievedByOperator": "VISHAL"
+            },
+            {
+              "startTime": "08:27 am",
+              "notes": "Incoming Shift Final Completion",
+              "date": "2026-10-05",
+              "pcsPerKg": 480,
+              "sliceId": "SLC-1791206053906-2",
+              "machine": "Cutting-2",
+              "stage": "Cutting",
+              "helpers": [],
+              "rejectedPieces": 0,
+              "producedPieces": 192000,
+              "grossPieces": 192000,
+              "producedQty": 15,
+              "scrapKg": 480.5,
+              "operator": "VISHAL",
+              "consumedQty": 0,
+              "scrapPcs": 0,
+              "shift": "DAY",
+              "handoverTime": "18:44",
+              "scrapQty": 480.5,
+              "cuttingMaterialScrapKg": 480.5
+            },
+            {
+              "grossPieces": 2,
+              "notes": "Incoming Shift Final Completion",
+              "producedPieces": 2,
+              "scrapQty": 0,
+              "rejectedPieces": 0,
+              "producedQty": 0,
+              "consumedQty": 0,
+              "date": "2026-10-05",
+              "pcsPerKg": 480,
+              "scrapKg": 0,
+              "shift": "DAY",
+              "operator": "VISHAL",
+              "machine": "Cutting-2",
+              "handoverTime": "09:39 PM",
+              "sliceId": "SLC-1791216569866-3",
+              "cuttingMaterialScrapKg": 0,
+              "scrapPcs": 0,
+              "helpers": [],
+              "startTime": "18:44",
+              "stage": "Cutting"
+            }
+          ],
+          "loosePieces": 2,
+          "reelsSummary": "5044, 5160, 5191 (3 Jumbo Reels)",
+          "reelNumbers": [
+            "5044",
+            "5160",
+            "5191"
+          ],
+          "status": "Running",
+          "producedQty": 17,
+          "scrapPcs": 0,
+          "shift": "DAY",
+          "batchId": "F-068-CUT-01",
+          "endTime": "18:44",
+          "pcsPerCrate": 12800,
+          "glueEntries": [
+            {
+              "user": "cut_operator",
+              "machine": "Cutting-2",
+              "glueBrand": "Pidilite FS35",
+              "date": "2026-10-05",
+              "notes": "Issued on Cutting-2 by BALU",
+              "operator": "BALU",
+              "quantityKg": 50,
+              "time": "08:26",
+              "product": "Fork",
+              "stage": "Cutting",
+              "createdAt": "2026-10-05T02:56:02.848Z",
+              "shift": "NIGHT",
+              "id": "GLUE-LOG-1791168962849",
+              "batchId": "F-068-CUT-01",
+              "jobId": "F-068"
+            }
+          ],
+          "worker": "VISHAL",
+          "grossPieces": 192000,
+          "parentReelNo": "5044",
+          "user": "amish",
+          "glueBrand": "Pidilite FS35",
+          "rejectedPieces": 0,
+          "machine": "Cutting-2",
+          "helpers": [],
+          "glueUsageKg": 50,
+          "issuedQty": 8,
+          "gsm": "125 GSM",
+          "consumedQty": 0,
+          "parentBatchId": "F-068-SLIT-01",
+          "meterReading": 1090,
+          "scrapKg": 53.3,
+          "supervisor": "amish",
+          "helperCount": 0,
+          "cuttingMaterialScrapKg": 480.5,
+          "reelNo": "5044, 5160, 5191",
+          "startMeterReading": 1090,
+          "stage": "Cutting",
+          "producedPieces": 218242,
+          "pcsPerKg": 480,
+          "startTime": "08:24"
+        }
+      ],
+      "id": "F-068",
+      "targetScrapLimitPct": 2.5,
+      "availableRolls": 8,
+      "outputWeightKg": 987,
+      "stage": "Slitting",
+      "availableCuttingCrates": 18,
+      "reelNo": "5044, 5160, 5191",
+      "targetLayers": 8,
+      "totalCutPieces": 218242,
+      "reelsList": [
+        {
+          "paperBrand": "AADHARA PAPER",
+          "gsm": "125 GSM",
+          "worker": "ABHAY",
+          "batchId": "F-068-SLIT-01",
+          "endTime": "07:27 AM",
+          "rolls": 3,
+          "reelNo": "5044",
+          "weightKg": 423,
+          "outputWeightKg": 423,
+          "scrapKg": 0,
+          "startTime": "07:25 AM"
+        },
+        {
+          "startTime": "07:26 AM",
+          "worker": "ABHAY",
+          "endTime": "07:27 AM",
+          "batchId": "F-068-SLIT-02",
+          "rolls": 4,
+          "gsm": "125 GSM",
+          "outputWeightKg": 423,
+          "scrapKg": 0,
+          "customRemark": "",
+          "paperBrand": "AADHARA PAPER",
+          "reelNo": "5160",
+          "weightKg": 423
+        },
+        {
+          "customRemark": "",
+          "weightKg": 141,
+          "reelNo": "5191",
+          "paperBrand": "AADHARA PAPER",
+          "startTime": "07:26 AM",
+          "scrapKg": 0,
+          "outputWeightKg": 141,
+          "gsm": "125 GSM",
+          "batchId": "F-068-SLIT-03",
+          "endTime": "07:26 AM",
+          "worker": "ABHAY",
+          "rolls": 1
+        }
+      ],
+      "cuttingMaterialScrapKg": 53.3,
+      "tracedLots": {
+        "Cutting": "F-068-CUT-01",
+        "Slitting": "F-068-SLIT-01"
+      },
+      "gsmsSummary": "125 GSM",
+      "availableFormingCrates": 0,
+      "glueEntries": [
+        {
+          "shift": "NIGHT",
+          "date": "2026-10-05",
+          "stage": "Cutting",
+          "user": "cut_operator",
+          "machine": "Cutting-2",
+          "time": "08:26",
+          "product": "Fork",
+          "jobId": "F-068",
+          "glueBrand": "Pidilite FS35",
+          "notes": "Issued on Cutting-2 by BALU",
+          "id": "GLUE-LOG-1791168962849",
+          "operator": "BALU",
+          "createdAt": "2026-10-05T02:56:02.848Z",
+          "quantityKg": 50,
+          "batchId": "F-068-CUT-01"
+        }
+      ],
+      "availableForQcCrates": 0,
+      "scrapKg": 0,
+      "formingLoosePcs": 0,
+      "status": "READY_FOR_CUTTING",
+      "reelNumbers": [
+        "5044",
+        "5160",
+        "5191"
+      ],
+      "qcLoosePcs": 0,
+      "inputWeightKg": 987,
+      "pcsPerCrateCutting": 12800,
+      "targetLengthMeters": 3800,
+      "glueUsageKg": 50,
+      "planId": "PLAN-2026-006",
+      "scrapPercent": 0,
+      "targetGlueBrand": "Pidilite FS35",
+      "createdAt": "2026-10-05T01:44:43.627Z",
+      "gsm": "125 GSM",
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "totalFormedPieces": 0,
+      "glueBrand": "Pidilite FS35",
+      "paperBrand": "AADHARA PAPER",
+      "plannedLayers": [
+        {
+          "requiredReels": 8,
+          "type": "Plain",
+          "gsm": 125
+        }
+      ],
+      "updatedAt": "2026-10-05T14:00:29.323Z"
+    },
+    {
+      "plannedLayers": [
+        {
+          "requiredReels": 8,
+          "gsm": 125,
+          "type": "Plain"
+        }
+      ],
+      "cuttingLoosePcs": 1,
+      "stage": "Slitting",
+      "cuttingPcsPerKg": 480,
+      "glueUsageKg": 120,
+      "targetGsm": "125 GSM",
+      "cuttingScrapPcs": 0,
+      "availableCuttingCrates": 17,
+      "gsm": "125 GSM",
+      "targetScrapLimitPct": 2.5,
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "gsmsSummary": "125 GSM",
+      "glueEntries": [
+        {
+          "product": "Fork",
+          "operator": "BALU",
+          "notes": "Issued on Cutting-2 by BALU",
+          "id": "GLUE-LOG-1791168653572",
+          "machine": "Cutting-2",
+          "createdAt": "2026-10-05T02:50:53.572Z",
+          "quantityKg": 120,
+          "batchId": "F-067-CUT-01",
+          "jobId": "F-067",
+          "time": "08:20",
+          "user": "cut_operator",
+          "glueBrand": "Pidilite FS35",
+          "stage": "Cutting",
+          "shift": "NIGHT",
+          "date": "2026-10-05"
+        }
+      ],
+      "cuttingRejectedPcs": 0,
+      "scrapPercent": 0,
+      "inputWeightKg": 1128,
+      "reelNo": "5211, 5176",
+      "reelNumbers": [
+        "5211",
+        "5176"
+      ],
+      "scrapKg": 0,
+      "availableQcCrates": 0,
+      "status": "CUTTING_IN_PROGRESS",
+      "reelsList": [
+        {
+          "scrapKg": 0,
+          "outputWeightKg": 564,
+          "reelNo": "5211",
+          "paperBrand": "AADHARA PAPER",
+          "batchId": "F-067-SLIT-01",
+          "endTime": "07:24 AM",
+          "startTime": "07:23 AM",
+          "gsm": "125 GSM",
+          "weightKg": 564,
+          "rolls": 4,
+          "worker": "ABHAY"
+        },
+        {
+          "paperBrand": "AADHARA PAPER",
+          "weightKg": 564,
+          "rolls": 4,
+          "reelNo": "5176",
+          "gsm": "125 GSM",
+          "customRemark": "",
+          "outputWeightKg": 564,
+          "scrapKg": 0,
+          "worker": "ABHAY",
+          "startTime": "07:24 AM",
+          "endTime": "07:24 AM",
+          "batchId": "F-067-SLIT-02"
+        }
+      ],
+      "runningBatches": [
+        {
+          "stage": "Slitting",
+          "producedPieces": 0,
+          "startTime": "07:23 AM",
+          "gsm": "125 GSM",
+          "endTime": "07:24 AM",
+          "batchId": "F-067-SLIT-01",
+          "supervisor": "admin",
+          "scrapKg": 0,
+          "reelNo": "5211",
+          "worker": "ABHAY",
+          "shift": "DAY",
+          "outputWeightKg": 564,
+          "user": "admin",
+          "producedQty": 4,
+          "inputWeightKg": 564,
+          "scrapPercent": 0,
+          "loosePieces": 0,
+          "issuedQty": 1,
+          "status": "Completed",
+          "consumedQty": 0,
+          "machine": "Slitting-1",
+          "slices": [
+            {
+              "consumedQty": 0,
+              "shift": "DAY",
+              "scrapKg": 0,
+              "producedQty": 4,
+              "startTime": "07:23 AM",
+              "operator": "ABHAY",
+              "date": "2026-10-05",
+              "stage": "Slitting",
+              "scrapQty": 0,
+              "handoverTime": "07:24 AM",
+              "notes": "Single Shift Run Completion",
+              "machine": "Slitting-1",
+              "sliceId": "SLC-SLIT-1791165278890-1"
+            }
+          ]
+        },
+        {
+          "scrapKg": 0,
+          "scrapPercent": 0,
+          "slices": [
+            {
+              "notes": "Single Shift Run Completion",
+              "handoverTime": "07:24 AM",
+              "stage": "Slitting",
+              "date": "2026-10-05",
+              "machine": "Slitting-1",
+              "sliceId": "SLC-SLIT-1791165267491-1",
+              "producedQty": 4,
+              "operator": "ABHAY",
+              "scrapQty": 0,
+              "startTime": "07:24 AM",
+              "shift": "DAY",
+              "consumedQty": 0,
+              "scrapKg": 0
+            }
+          ],
+          "status": "Completed",
+          "batchId": "F-067-SLIT-02",
+          "endTime": "07:24 AM",
+          "outputWeightKg": 564,
+          "inputWeightKg": 564,
+          "startTime": "07:24 AM",
+          "worker": "ABHAY",
+          "user": "slit_user",
+          "stage": "Slitting",
+          "reelNo": "5176",
+          "issuedQty": 1,
+          "producedPieces": 0,
+          "machine": "Slitting-1",
+          "producedQty": 4,
+          "consumedQty": 0,
+          "loosePieces": 0,
+          "shift": "DAY",
+          "gsm": "125 GSM"
+        },
+        {
+          "scrapKg": 51,
+          "glueUsageKg": 120,
+          "reelsSummary": "5211, 5176 (2 Jumbo Reels)",
+          "scrapPcs": 0,
+          "user": "admin",
+          "parentReelNo": "5211",
+          "producedQty": 17,
+          "parentBatchId": "F-067-SLIT-01",
+          "slices": [
+            {
+              "startTime": "07:41 AM",
+              "date": "2026-10-05",
+              "helperCount": 1,
+              "handoverConfirmed": true,
+              "producedQty": 1,
+              "handoverTime": "07:42 am",
+              "rejectedPieces": 0,
+              "producedPieces": 11500,
+              "scrapKg": 51,
+              "loosePieces": 0,
+              "consumedQty": 0,
+              "shift": "DAY",
+              "endMeterReading": 1000,
+              "operator": "VISHAL",
+              "scrapQty": 51,
+              "notes": "",
+              "machine": "Cutting-2",
+              "sliceId": "SLICE-CUT-1791166376076",
+              "relievedByOperator": "BALU",
+              "strokeCount": 1000,
+              "stage": "Cutting",
+              "helpers": [
+                "AJAY"
+              ]
+            },
+            {
+              "cuttingMaterialScrapKg": 540.8,
+              "notes": "Incoming Shift Final Completion",
+              "pcsPerKg": 480,
+              "sliceId": "SLC-1791168712458-2",
+              "machine": "Cutting-2",
+              "helpers": [
+                "SHILPA"
+              ],
+              "stage": "Cutting",
+              "handoverTime": "08:21",
+              "grossPieces": 204800,
+              "startTime": "07:42 am",
+              "producedQty": 16,
+              "date": "2026-10-05",
+              "operator": "BALU",
+              "scrapKg": 540.8,
+              "producedPieces": 204800,
+              "rejectedPieces": 0,
+              "consumedQty": 0,
+              "scrapPcs": 0,
+              "shift": "NIGHT",
+              "scrapQty": 540.8
+            },
+            {
+              "scrapQty": 1,
+              "notes": "Incoming Shift Final Completion",
+              "pcsPerKg": 480,
+              "date": "2026-10-05",
+              "handoverTime": "09:40 PM",
+              "startTime": "08:21",
+              "machine": "Cutting-2",
+              "grossPieces": 1,
+              "operator": "BALU",
+              "producedPieces": 0,
+              "stage": "Cutting",
+              "scrapKg": 1,
+              "scrapPcs": 1,
+              "shift": "NIGHT",
+              "cuttingMaterialScrapKg": 1,
+              "rejectedPieces": 1,
+              "helpers": [
+                "SHILPA"
+              ],
+              "consumedQty": 0,
+              "producedQty": 0,
+              "sliceId": "SLC-1791216653933-3"
+            }
+          ],
+          "grossPieces": 204800,
+          "status": "Running",
+          "glueEntries": [
+            {
+              "shift": "NIGHT",
+              "stage": "Cutting",
+              "product": "Fork",
+              "jobId": "F-067",
+              "machine": "Cutting-2",
+              "quantityKg": 120,
+              "createdAt": "2026-10-05T02:50:53.572Z",
+              "batchId": "F-067-CUT-01",
+              "date": "2026-10-05",
+              "user": "cut_operator",
+              "notes": "Issued on Cutting-2 by BALU",
+              "id": "GLUE-LOG-1791168653572",
+              "glueBrand": "Pidilite FS35",
+              "time": "08:20",
+              "operator": "BALU"
+            }
+          ],
+          "pcsPerCrate": 12800,
+          "reelNumbers": [
+            "5211",
+            "5176"
+          ],
+          "supervisor": "admin",
+          "shift": "NIGHT",
+          "rejectedPieces": 0,
+          "loosePieces": 1,
+          "worker": "BALU",
+          "glueBrand": "Pidilite FS35",
+          "reelNo": "5211, 5176",
+          "issuedQty": 8,
+          "gsm": "125 GSM",
+          "batchId": "F-067-CUT-01",
+          "endTime": "08:21",
+          "meterReading": 1000,
+          "stage": "Cutting",
+          "cuttingMaterialScrapKg": 540.8,
+          "pcsPerKg": 480,
+          "helperCount": 1,
+          "machine": "Cutting-2",
+          "startMeterReading": 1000,
+          "helpers": [
+            "SHILPA"
+          ],
+          "startTime": "07:41 AM",
+          "consumedQty": 0,
+          "producedPieces": 216300
+        },
+        {
+          "pcsPerCrate": 12800,
+          "sourceLotId": "SLC-1791168712458-2",
+          "batchId": "F-067-FORM-01",
+          "sourceOperator": "BALU",
+          "worker": "ROSHAN",
+          "loosePieces": 0,
+          "issuedQty": 0,
+          "startTime": "07:35 PM",
+          "supervisor": "admin",
+          "stage": "Forming",
+          "parentBatchId": "SLC-1791168712458-2",
+          "user": "admin",
+          "status": "Cancelled",
+          "inputPieces": 152,
+          "machine": "Forming-1",
+          "shift": "DAY",
+          "inputCrates": 2,
+          "producedPieces": 0,
+          "consumedQty": 0,
+          "producedQty": 0
+        }
+      ],
+      "qcLoosePcs": 0,
+      "cuttingScrapKg": 51,
+      "formingLoosePcs": 0,
+      "totalFormedPieces": 0,
+      "customRemark": "",
+      "tracedLots": {
+        "Slitting": "F-067-SLIT-01",
+        "Cutting": "F-067-CUT-01",
+        "Forming": "F-067-FORM-01"
+      },
+      "totalQcPieces": 0,
+      "paperBrand": "AADHARA PAPER",
+      "totalCutPieces": 216300,
+      "gsmList": [
+        "125 GSM"
+      ],
+      "availableRolls": 8,
+      "cuttingMaterialScrapKg": 51,
+      "createdAt": "2026-10-05T01:44:30.689Z",
+      "planId": "PLAN-2026-005",
+      "targetGlueBrand": "Pidilite FS35",
+      "availableFormingCrates": 0,
+      "id": "F-067",
+      "pcsPerCrateCutting": 11500,
+      "glueBrand": "Pidilite FS35",
+      "availableForQcCrates": 0,
+      "targetLengthMeters": 3800,
+      "targetLayers": 8,
+      "outputWeightKg": 1128,
+      "product": "Fork",
+      "updatedAt": "2026-10-05T14:05:35.512Z"
+    },
+    {
+      "product": "Fork",
+      "cuttingMaterialScrapKg": 433,
+      "availableFormingCrates": 19,
+      "stage": "QC",
+      "paperBrand": "AADHARA PAPER",
+      "formingRejectedPcs": 29,
+      "targetGlueBrand": "Pidilite FS35",
+      "id": "F-066",
+      "gsm": "125 GSM",
+      "formingScrapPcs": 29,
+      "availableForQcCrates": 0,
+      "glueUsageKg": 130,
+      "targetLayers": 8,
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "cuttingRejectedPcs": 0,
+      "reelsList": [
+        {
+          "gsm": "125 GSM",
+          "rolls": 3,
+          "paperBrand": "AADHARA PAPER",
+          "outputWeightKg": 423,
+          "scrapKg": 0,
+          "weightKg": 423,
+          "endTime": "07:22 AM",
+          "batchId": "F-066-SLIT-01",
+          "reelNo": "5023",
+          "worker": "ABHAY",
+          "startTime": "07:19 AM"
+        },
+        {
+          "paperBrand": "AADHARA PAPER",
+          "startTime": "07:22 AM",
+          "worker": "ABHAY",
+          "endTime": "07:22 AM",
+          "batchId": "F-066-SLIT-02",
+          "rolls": 3,
+          "gsm": "125 GSM",
+          "scrapKg": 0,
+          "weightKg": 423,
+          "reelNo": "5175",
+          "outputWeightKg": 423,
+          "customRemark": ""
+        },
+        {
+          "paperBrand": "AADHARA PAPER",
+          "endTime": "07:23 AM",
+          "batchId": "F-066-SLIT-03",
+          "scrapKg": 0,
+          "worker": "ABHAY",
+          "weightKg": 282,
+          "customRemark": "",
+          "gsm": "125 GSM",
+          "reelNo": "ST-01",
+          "outputWeightKg": 282,
+          "startTime": "07:23 AM",
+          "rolls": 2
+        }
+      ],
+      "scrapKg": 0,
+      "outputWeightKg": 1128,
+      "reelNo": "5023, 5175, ST-01",
+      "availableRolls": 8,
+      "cuttingLoosePcs": 80,
+      "totalFormedPieces": 194298,
+      "targetLengthMeters": 3800,
+      "cuttingScrapPcs": 0,
+      "glueBrand": "Pidilite FS35",
+      "scrapPercent": 0,
+      "cuttingScrapKg": 433,
+      "createdAt": "2026-10-05T01:44:02.734Z",
+      "glueEntries": [
+        {
+          "glueBrand": "Pidilite FS35",
+          "time": "07:38 AM",
+          "operator": "BALU",
+          "shift": "NIGHT",
+          "product": "Fork",
+          "stage": "Cutting",
+          "quantityKg": 50,
+          "machine": "Cutting-2",
+          "date": "2026-10-05",
+          "jobId": "F-066",
+          "user": "cut_operator",
+          "id": "GLUE-LOG-1791166111092",
+          "batchId": "F-066-CUT-01",
+          "notes": "Issued on Cutting-2 by BALU",
+          "createdAt": "2026-10-05T02:08:31.091Z"
+        },
+        {
+          "machine": "Cutting-2",
+          "createdAt": "2026-10-05T02:10:23.477Z",
+          "notes": "Issued on Cutting-2 by VISHAL",
+          "quantityKg": 80,
+          "product": "Fork",
+          "stage": "Cutting",
+          "id": "GLUE-LOG-1791166223477",
+          "glueBrand": "Pidilite FS35",
+          "user": "cut_operator",
+          "shift": "DAY",
+          "date": "2026-10-05",
+          "operator": "VISHAL",
+          "batchId": "F-066-CUT-01",
+          "jobId": "F-066",
+          "time": "07:40 AM"
+        }
+      ],
+      "gsmsSummary": "125 GSM",
+      "targetGsm": "125 GSM",
+      "customRemark": "",
+      "availableQcCrates": 0,
+      "planId": "PLAN-2026-004",
+      "totalQcPieces": 0,
+      "targetScrapLimitPct": 2.5,
+      "gsmList": [
+        "125 GSM"
+      ],
+      "reelNumbers": [
+        "5023",
+        "5175",
+        "ST-01"
+      ],
+      "pcsPerCrateForming": 10355,
+      "tracedLots": {
+        "Cutting": "F-066-CUT-01",
+        "Forming": "F-066-FORM-02",
+        "Slitting": "F-066-SLIT-01"
+      },
+      "formingLoosePcs": 100,
+      "qcLoosePcs": 0,
+      "status": "CUTTING_IN_PROGRESS",
+      "totalCutPieces": 222668,
+      "inputWeightKg": 1128,
+      "pcsPerCrateCutting": 12366,
+      "cuttingPcsPerKg": 480,
+      "runningBatches": [
+        {
+          "inputWeightKg": 423,
+          "consumedQty": 0,
+          "stage": "Slitting",
+          "loosePieces": 0,
+          "outputWeightKg": 423,
+          "startTime": "07:19 AM",
+          "producedQty": 3,
+          "endTime": "07:22 AM",
+          "batchId": "F-066-SLIT-01",
+          "reelNo": "5023",
+          "user": "admin",
+          "scrapKg": 0,
+          "scrapPercent": 0,
+          "worker": "ABHAY",
+          "shift": "DAY",
+          "issuedQty": 1,
+          "status": "Completed",
+          "machine": "Slitting-1",
+          "gsm": "125 GSM",
+          "supervisor": "admin",
+          "producedPieces": 0,
+          "slices": [
+            {
+              "machine": "Slitting-1",
+              "sliceId": "SLC-SLIT-1791165165401-1",
+              "startTime": "07:19 AM",
+              "stage": "Slitting",
+              "scrapQty": 0,
+              "notes": "Single Shift Run Completion",
+              "operator": "ABHAY",
+              "producedQty": 3,
+              "shift": "DAY",
+              "date": "2026-10-05",
+              "scrapKg": 0,
+              "handoverTime": "07:22 AM",
+              "consumedQty": 0
+            }
+          ]
+        },
+        {
+          "producedQty": 3,
+          "slices": [
+            {
+              "stage": "Slitting",
+              "consumedQty": 0,
+              "machine": "Slitting-1",
+              "sliceId": "SLC-SLIT-1791165150163-1",
+              "date": "2026-10-05",
+              "notes": "Single Shift Run Completion",
+              "producedQty": 3,
+              "scrapQty": 0,
+              "shift": "DAY",
+              "scrapKg": 0,
+              "operator": "ABHAY",
+              "handoverTime": "07:22 AM",
+              "startTime": "07:22 AM"
+            }
+          ],
+          "gsm": "125 GSM",
+          "outputWeightKg": 423,
+          "status": "Completed",
+          "startTime": "07:22 AM",
+          "scrapKg": 0,
+          "consumedQty": 0,
+          "batchId": "F-066-SLIT-02",
+          "endTime": "07:22 AM",
+          "loosePieces": 0,
+          "worker": "ABHAY",
+          "shift": "DAY",
+          "reelNo": "5175",
+          "inputWeightKg": 423,
+          "producedPieces": 0,
+          "user": "slit_user",
+          "issuedQty": 1,
+          "stage": "Slitting",
+          "machine": "Slitting-1",
+          "scrapPercent": 0
+        },
+        {
+          "reelNo": "ST-01",
+          "user": "slit_user",
+          "consumedQty": 0,
+          "scrapPercent": 0,
+          "startTime": "07:23 AM",
+          "producedPieces": 0,
+          "loosePieces": 0,
+          "inputWeightKg": 282,
+          "producedQty": 2,
+          "shift": "DAY",
+          "scrapKg": 0,
+          "batchId": "F-066-SLIT-03",
+          "endTime": "07:23 AM",
+          "slices": [
+            {
+              "producedQty": 2,
+              "sliceId": "SLC-SLIT-1791165211979-1",
+              "machine": "Slitting-1",
+              "notes": "Single Shift Run Completion",
+              "scrapQty": 0,
+              "operator": "ABHAY",
+              "handoverTime": "07:23 AM",
+              "consumedQty": 0,
+              "stage": "Slitting",
+              "scrapKg": 0,
+              "startTime": "07:23 AM",
+              "date": "2026-10-05",
+              "shift": "DAY"
+            }
+          ],
+          "outputWeightKg": 282,
+          "status": "Completed",
+          "gsm": "125 GSM",
+          "issuedQty": 1,
+          "stage": "Slitting",
+          "worker": "ABHAY",
+          "machine": "Slitting-1"
+        },
+        {
+          "loosePieces": 80,
+          "slices": [
+            {
+              "scrapQty": 0,
+              "shift": "NIGHT",
+              "helpers": [
+                "SHILPA"
+              ],
+              "operator": "BALU",
+              "startTime": "07:36 AM",
+              "machine": "Cutting-2",
+              "sliceId": "SLICE-CUT-1791166163596",
+              "endMeterReading": 4500,
+              "producedPieces": 49464,
+              "rejectedPieces": 0,
+              "strokeCount": 4500,
+              "handoverTime": "07:39 am",
+              "relievedByOperator": "VISHAL",
+              "stage": "Cutting",
+              "producedQty": 4,
+              "helperCount": 1,
+              "scrapKg": 0,
+              "notes": "",
+              "date": "2026-10-05",
+              "handoverConfirmed": true,
+              "consumedQty": 4,
+              "loosePieces": 0
+            },
+            {
+              "startTime": "07:39 am",
+              "shift": "DAY",
+              "handoverTime": "07:40 AM",
+              "operator": "VISHAL",
+              "scrapPcs": 0,
+              "cuttingMaterialScrapKg": 433,
+              "helpers": [
+                "AJAY"
+              ],
+              "producedPieces": 173204,
+              "rejectedPieces": 0,
+              "sliceId": "SLC-1791166226007-2",
+              "machine": "Cutting-2",
+              "scrapQty": 433,
+              "producedQty": 14,
+              "date": "2026-10-05",
+              "grossPieces": 173204,
+              "stage": "Cutting",
+              "scrapKg": 433,
+              "consumedQty": 13,
+              "notes": "Incoming Shift Final Completion",
+              "pcsPerKg": 480
+            }
+          ],
+          "reelNumbers": [
+            "5023",
+            "5175",
+            "ST-01"
+          ],
+          "status": "Completed",
+          "pcsPerCrate": 12366,
+          "glueEntries": [
+            {
+              "batchId": "F-066-CUT-01",
+              "glueBrand": "Pidilite FS35",
+              "jobId": "F-066",
+              "quantityKg": 50,
+              "stage": "Cutting",
+              "shift": "NIGHT",
+              "createdAt": "2026-10-05T02:08:31.091Z",
+              "product": "Fork",
+              "time": "07:38 AM",
+              "machine": "Cutting-2",
+              "user": "cut_operator",
+              "notes": "Issued on Cutting-2 by BALU",
+              "operator": "BALU",
+              "date": "2026-10-05",
+              "id": "GLUE-LOG-1791166111092"
+            },
+            {
+              "operator": "VISHAL",
+              "createdAt": "2026-10-05T02:10:23.477Z",
+              "machine": "Cutting-2",
+              "stage": "Cutting",
+              "shift": "DAY",
+              "id": "GLUE-LOG-1791166223477",
+              "product": "Fork",
+              "jobId": "F-066",
+              "quantityKg": 80,
+              "notes": "Issued on Cutting-2 by VISHAL",
+              "time": "07:40 AM",
+              "glueBrand": "Pidilite FS35",
+              "user": "cut_operator",
+              "batchId": "F-066-CUT-01",
+              "date": "2026-10-05"
+            }
+          ],
+          "startMeterReading": 4500,
+          "rejectedPieces": 0,
+          "grossPieces": 173204,
+          "meterReading": 4500,
+          "supervisor": "admin",
+          "endTime": "07:40 AM",
+          "batchId": "F-066-CUT-01",
+          "issuedQty": 8,
+          "producedQty": 18,
+          "worker": "VISHAL",
+          "shift": "DAY",
+          "startTime": "07:36 AM",
+          "scrapPcs": 0,
+          "glueUsageKg": 130,
+          "machine": "Cutting-2",
+          "helpers": [
+            "AJAY"
+          ],
+          "gsm": "125 GSM",
+          "cuttingMaterialScrapKg": 433,
+          "consumedQty": 17,
+          "reelsSummary": "5023, 5175, ST-01 (3 Jumbo Reels)",
+          "pcsPerKg": 480,
+          "scrapKg": 433,
+          "producedPieces": 222668,
+          "user": "admin",
+          "parentReelNo": "5023",
+          "helperCount": 1,
+          "reelNo": "5023, 5175, ST-01",
+          "glueBrand": "Pidilite FS35",
+          "parentBatchId": "F-066-SLIT-01",
+          "stage": "Cutting"
+        },
+        {
+          "scrapPcs": 29,
+          "startTime": "01:07 PM",
+          "inputPieces": 173188,
+          "holdReason": "[OPERATIONAL_PAUSE] Waiting for Raw Material / Roll / Crates",
+          "inputCrates": 3,
+          "worker": "SARITA",
+          "loosePieces": 100,
+          "status": "Completed",
+          "sourceOperator": "BALU, VISHAL",
+          "meterReading": 7486,
+          "pcsPerCrate": 12371.714285714286,
+          "supervisor": "sarang",
+          "producedQty": 17,
+          "slices": [
+            {
+              "shift": "DAY",
+              "relievedByOperator": "RAHUL",
+              "strokeCount": 3464,
+              "handoverTime": "02:27 pm",
+              "producedPieces": 49185,
+              "handoverConfirmed": true,
+              "stage": "Forming",
+              "helpers": [
+                "KANTABEN"
+              ],
+              "helperCount": 1,
+              "producedQty": 4,
+              "sliceId": "SLICE-FORM-1791190654014",
+              "machine": "Forming-5",
+              "notes": "",
+              "scrapQty": 15,
+              "consumedQty": 0,
+              "startTime": "01:07 PM",
+              "endMeterReading": 3464,
+              "operator": "SARITA",
+              "date": "2026-10-05",
+              "scrapPcs": 15
+            },
+            {
+              "producedPieces": 62116,
+              "shift": "NIGHT",
+              "handoverTime": "02:41 pm",
+              "endMeterReading": 7486,
+              "handoverConfirmed": true,
+              "consumedQty": 0,
+              "producedQty": 6,
+              "helperCount": 1,
+              "startMeterReading": 3464,
+              "stage": "Forming",
+              "strokeCount": 7486,
+              "relievedByOperator": "SARITA",
+              "helpers": [
+                "RAJMUNI"
+              ],
+              "machine": "Forming-5",
+              "sliceId": "SLICE-FORM-1791191492567",
+              "notes": "",
+              "scrapQty": 14,
+              "date": "2026-10-05",
+              "operator": "RAHUL",
+              "scrapPcs": 14,
+              "startTime": "01:07 PM"
+            },
+            {
+              "operator": "SARITA",
+              "date": "2026-10-05",
+              "consumedQty": 0,
+              "scrapPcs": 78,
+              "producedQty": 7,
+              "notes": "Incoming Shift Final Completion",
+              "producedPieces": 61697,
+              "handoverTime": "07:46 PM",
+              "machine": "Forming-5",
+              "stage": "Forming",
+              "scrapQty": 78,
+              "startTime": "02:41 pm",
+              "sliceId": "SLC-FORM-1791209762656-3",
+              "shift": "DAY"
+            },
+            {
+              "shift": "DAY",
+              "operator": "SARITA",
+              "consumedQty": 0,
+              "producedQty": 0,
+              "scrapPcs": 0,
+              "producedPieces": 100,
+              "date": "2026-10-05",
+              "stage": "Forming",
+              "startTime": "07:46 PM",
+              "machine": "Forming-5",
+              "handoverTime": "09:20 PM",
+              "notes": "Incoming Shift Final Completion",
+              "scrapQty": 0,
+              "sliceId": "SLC-FORM-1791215400251-4"
+            }
+          ],
+          "shift": "DAY",
+          "parentBatchId": "SLICE-CUT-1791166163596",
+          "issuedQty": 14,
+          "consumedQty": 0,
+          "producedPieces": 173098,
+          "stage": "Forming",
+          "user": "sarang",
+          "startMeterReading": 7486,
+          "batchId": "F-066-FORM-01",
+          "helperCount": 1,
+          "helpers": [
+            "RAJMUNI"
+          ],
+          "machine": "Forming-5",
+          "sourceLotId": "SLICE-CUT-1791166163596, SLC-1791166226007-2",
+          "formingAdjustmentPcs": 5,
+          "endTime": "07:46 PM"
+        },
+        {
+          "inputPieces": 37115,
+          "consumedQty": 0,
+          "inputCrates": 1,
+          "batchId": "F-066-FORM-02",
+          "loosePieces": 0,
+          "stage": "Forming",
+          "sourceOperator": "VISHAL",
+          "parentBatchId": "SLC-1791166226007-2",
+          "user": "sarang",
+          "startTime": "02:44 PM",
+          "pcsPerCrate": 12371.714285714286,
+          "producedQty": 2,
+          "producedPieces": 21200,
+          "machine": "Forming-4",
+          "worker": "BIRU",
+          "supervisor": "sarang",
+          "issuedQty": 3,
+          "shift": "DAY",
+          "status": "Completed",
+          "sourceLotId": "SLC-1791166226007-2",
+          "scrapPcs": 0,
+          "endTime": "09:21 PM",
+          "slices": [
+            {
+              "scrapPcs": 0,
+              "stage": "Forming",
+              "machine": "Forming-4",
+              "handoverTime": "09:21 PM",
+              "shift": "DAY",
+              "sliceId": "SLC-FORM-1791215492140-1",
+              "operator": "BIRU",
+              "scrapQty": 0,
+              "producedQty": 2,
+              "consumedQty": 0,
+              "producedPieces": 21200,
+              "date": "2026-10-05",
+              "startTime": "02:44 PM",
+              "notes": "Single Shift Run Completion"
+            }
+          ],
+          "formingAdjustmentPcs": 3545
+        }
+      ],
+      "plannedLayers": [
+        {
+          "gsm": 125,
+          "requiredReels": 8,
+          "type": "Plain"
+        }
+      ],
+      "availableCuttingCrates": 1,
+      "updatedAt": "2026-10-05T16:42:20.225Z",
+      "formingAdjustmentPcs": 5,
+      "isReadyForQcInspection": true
+    },
+    {
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "reelsList": [
+        {
+          "gsm": "125 GSM",
+          "worker": "ABHAY",
+          "batchId": "S-071-SLIT-01",
+          "endTime": "07:19 AM",
+          "rolls": 4,
+          "startTime": "07:18 AM",
+          "reelNo": "5215",
+          "outputWeightKg": 564,
+          "scrapKg": 0,
+          "paperBrand": "AADHARA PAPER",
+          "weightKg": 564
+        },
+        {
+          "rolls": 4,
+          "customRemark": "",
+          "scrapKg": 0,
+          "weightKg": 564,
+          "gsm": "125 GSM",
+          "startTime": "07:18 AM",
+          "reelNo": "5200",
+          "batchId": "S-071-SLIT-02",
+          "endTime": "07:19 AM",
+          "worker": "ABHAY",
+          "outputWeightKg": 564,
+          "paperBrand": "AADHARA PAPER"
+        }
+      ],
+      "paperBrand": "AADHARA PAPER",
+      "targetLengthMeters": 3800,
+      "totalQcPieces": 0,
+      "planId": "PLAN-2026-003",
+      "scrapPercent": 0,
+      "id": "S-071",
+      "runningBatches": [
+        {
+          "producedQty": 4,
+          "worker": "ABHAY",
+          "endTime": "07:19 AM",
+          "batchId": "S-071-SLIT-01",
+          "scrapKg": 0,
+          "outputWeightKg": 564,
+          "stage": "Slitting",
+          "status": "Completed",
+          "startTime": "07:18 AM",
+          "consumedQty": 0,
+          "slices": [
+            {
+              "shift": "DAY",
+              "date": "2026-10-05",
+              "sliceId": "SLC-SLIT-1791164959455-1",
+              "machine": "Slitting-1",
+              "stage": "Slitting",
+              "operator": "ABHAY",
+              "producedQty": 4,
+              "startTime": "07:18 AM",
+              "scrapQty": 0,
+              "notes": "Single Shift Run Completion",
+              "scrapKg": 0,
+              "handoverTime": "07:19 AM",
+              "consumedQty": 0
+            }
+          ],
+          "loosePieces": 0,
+          "machine": "Slitting-1",
+          "producedPieces": 0,
+          "shift": "DAY",
+          "issuedQty": 1,
+          "scrapPercent": 0,
+          "inputWeightKg": 564,
+          "gsm": "125 GSM",
+          "user": "admin",
+          "reelNo": "5215",
+          "supervisor": "admin"
+        },
+        {
+          "consumedQty": 0,
+          "inputWeightKg": 564,
+          "stage": "Slitting",
+          "worker": "ABHAY",
+          "loosePieces": 0,
+          "startTime": "07:18 AM",
+          "outputWeightKg": 564,
+          "machine": "Slitting-1",
+          "status": "Completed",
+          "producedQty": 4,
+          "slices": [
+            {
+              "notes": "Single Shift Run Completion",
+              "handoverTime": "07:19 AM",
+              "stage": "Slitting",
+              "date": "2026-10-05",
+              "scrapKg": 0,
+              "startTime": "07:18 AM",
+              "consumedQty": 0,
+              "producedQty": 4,
+              "shift": "DAY",
+              "sliceId": "SLC-SLIT-1791164945650-1",
+              "machine": "Slitting-1",
+              "operator": "ABHAY",
+              "scrapQty": 0
+            }
+          ],
+          "user": "slit_user",
+          "gsm": "125 GSM",
+          "producedPieces": 0,
+          "shift": "DAY",
+          "batchId": "S-071-SLIT-02",
+          "endTime": "07:19 AM",
+          "issuedQty": 1,
+          "scrapPercent": 0,
+          "reelNo": "5200",
+          "scrapKg": 0
+        }
+      ],
+      "availableCuttingCrates": 0,
+      "availableRolls": 8,
+      "outputWeightKg": 1128,
+      "reelNumbers": [
+        "5215",
+        "5200"
+      ],
+      "status": "READY_FOR_CUTTING",
+      "gsmList": [
+        "125 GSM"
+      ],
+      "qcLoosePcs": 0,
+      "createdAt": "2026-10-05T01:43:34.546Z",
+      "availableQcCrates": 0,
+      "cuttingLoosePcs": 0,
+      "gsmsSummary": "125 GSM",
+      "product": "Spoon",
+      "totalCutPieces": 0,
+      "tracedLots": {},
+      "targetLayers": 8,
+      "targetGlueBrand": "Pidilite FS35",
+      "reelNo": "5215, 5200",
+      "targetGsm": "125 GSM",
+      "inputWeightKg": 1128,
+      "stage": "Slitting Completed",
+      "totalFormedPieces": 0,
+      "availableFormingCrates": 0,
+      "targetScrapLimitPct": 2.5,
+      "formingLoosePcs": 0,
+      "customRemark": "",
+      "availableForQcCrates": 0,
+      "plannedLayers": [
+        {
+          "requiredReels": 8,
+          "gsm": 125,
+          "type": "Plain"
+        }
+      ],
+      "scrapKg": 0,
+      "gsm": "125 GSM"
+    },
+    {
+      "product": "Spoon",
+      "availableFormingCrates": 5,
+      "cuttingMaterialScrapKg": 432,
+      "glueUsageKg": 120,
+      "reelsList": [
+        {
+          "scrapKg": 0,
+          "startTime": "07:16 AM",
+          "reelNo": "5203",
+          "paperBrand": "AADHARA PAPER",
+          "batchId": "S-070-SLIT-01",
+          "endTime": "07:17 AM",
+          "weightKg": 564,
+          "worker": "AMISHBHAI",
+          "rolls": 4,
+          "outputWeightKg": 564,
+          "gsm": "125 GSM"
+        },
+        {
+          "reelNo": "5035",
+          "customRemark": "",
+          "gsm": "125 GSM",
+          "outputWeightKg": 564,
+          "scrapKg": 0,
+          "weightKg": 564,
+          "startTime": "07:16 AM",
+          "rolls": 4,
+          "batchId": "S-070-SLIT-02",
+          "endTime": "07:17 AM",
+          "paperBrand": "AADHARA PAPER",
+          "worker": "ABHAY"
+        }
+      ],
+      "paperBrand": "AADHARA PAPER",
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "targetGlueBrand": "Pidilite FS35",
+      "gsmList": [
+        "125 GSM"
+      ],
+      "customRemark": "",
+      "totalQcPieces": 0,
+      "createdAt": "2026-10-05T01:43:14.138Z",
+      "glueEntries": [
+        {
+          "user": "cut_operator",
+          "id": "GLUE-LOG-1791165746130",
+          "jobId": "S-070",
+          "date": "2026-10-05",
+          "glueBrand": "Pidilite FS35",
+          "stage": "Cutting",
+          "shift": "DAY",
+          "time": "07:32 AM",
+          "quantityKg": 20,
+          "batchId": "S-070-CUT-01",
+          "createdAt": "2026-10-05T02:02:26.129Z",
+          "operator": "VISHAL SOLANKI",
+          "machine": "Cutting-2",
+          "product": "Spoon",
+          "notes": "Issued on Cutting-2 by VISHAL SOLANKI"
+        },
+        {
+          "batchId": "S-070-CUT-01",
+          "createdAt": "2026-10-05T02:02:34.354Z",
+          "notes": "Issued on Cutting-2 by VISHAL SOLANKI",
+          "quantityKg": 100,
+          "machine": "Cutting-2",
+          "operator": "VISHAL SOLANKI",
+          "jobId": "S-070",
+          "user": "cut_operator",
+          "date": "2026-10-05",
+          "id": "GLUE-LOG-1791165754354",
+          "stage": "Cutting",
+          "glueBrand": "Pidilite FS35",
+          "shift": "DAY",
+          "time": "07:32 AM",
+          "product": "Spoon"
+        }
+      ],
+      "gsmsSummary": "125 GSM",
+      "tracedLots": {
+        "Cutting": "S-070-CUT-01",
+        "Slitting": "S-070-SLIT-01",
+        "Forming": "S-070-FORM-01"
+      },
+      "glueBrand": "Pidilite FS35",
+      "totalFormedPieces": 45280,
+      "reelNo": "5203, 5035",
+      "formingLoosePcs": 0,
+      "targetLayers": 8,
+      "gsm": "125 GSM",
+      "qcLoosePcs": 0,
+      "pcsPerCrateCutting": 11380,
+      "targetLengthMeters": 3800,
+      "stage": "QC",
+      "reelNumbers": [
+        "5203",
+        "5035"
+      ],
+      "cuttingScrapKg": 432,
+      "availableForQcCrates": 0,
+      "scrapKg": 0,
+      "targetGsm": "125 GSM",
+      "status": "CUTTING_IN_PROGRESS",
+      "runningBatches": [
+        {
+          "worker": "AMISHBHAI",
+          "producedQty": 4,
+          "stage": "Slitting",
+          "startTime": "07:16 AM",
+          "status": "Completed",
+          "user": "admin",
+          "outputWeightKg": 564,
+          "machine": "Slitting-1",
+          "inputWeightKg": 564,
+          "loosePieces": 0,
+          "slices": [
+            {
+              "date": "2026-10-05",
+              "stage": "Slitting",
+              "operator": "AMISHBHAI",
+              "handoverTime": "07:17 AM",
+              "sliceId": "SLC-SLIT-1791164842695-1",
+              "machine": "Slitting-1",
+              "notes": "Single Shift Run Completion",
+              "scrapQty": 0,
+              "startTime": "07:16 AM",
+              "consumedQty": 0,
+              "shift": "DAY",
+              "scrapKg": 0,
+              "producedQty": 4
+            }
+          ],
+          "consumedQty": 0,
+          "supervisor": "admin",
+          "gsm": "125 GSM",
+          "shift": "DAY",
+          "issuedQty": 1,
+          "scrapPercent": 0,
+          "batchId": "S-070-SLIT-01",
+          "endTime": "07:17 AM",
+          "reelNo": "5203",
+          "scrapKg": 0,
+          "producedPieces": 0
+        },
+        {
+          "worker": "ABHAY",
+          "machine": "Slitting-1",
+          "stage": "Slitting",
+          "outputWeightKg": 564,
+          "gsm": "125 GSM",
+          "status": "Completed",
+          "issuedQty": 1,
+          "slices": [
+            {
+              "startTime": "07:16 AM",
+              "operator": "ABHAY",
+              "scrapQty": 0,
+              "notes": "Single Shift Run Completion",
+              "scrapKg": 0,
+              "stage": "Slitting",
+              "handoverTime": "07:17 AM",
+              "consumedQty": 0,
+              "date": "2026-10-05",
+              "machine": "Slitting-1",
+              "sliceId": "SLC-SLIT-1791164821469-1",
+              "shift": "DAY",
+              "producedQty": 4
+            }
+          ],
+          "startTime": "07:16 AM",
+          "producedPieces": 0,
+          "batchId": "S-070-SLIT-02",
+          "endTime": "07:17 AM",
+          "scrapPercent": 0,
+          "producedQty": 4,
+          "shift": "DAY",
+          "scrapKg": 0,
+          "inputWeightKg": 564,
+          "consumedQty": 0,
+          "loosePieces": 0,
+          "user": "slit_user",
+          "reelNo": "5035"
+        },
+        {
+          "user": "admin",
+          "shift": "NIGHT",
+          "status": "Completed",
+          "gsm": "125 GSM",
+          "slices": [
+            {
+              "operator": "VISHAL SOLANKI",
+              "relievedByOperator": "BALU",
+              "handoverTime": "07:34 am",
+              "scrapQty": 0,
+              "notes": "",
+              "scrapKg": 0,
+              "rejectedPieces": 0,
+              "producedPieces": 91040,
+              "strokeCount": 8000,
+              "handoverConfirmed": true,
+              "stage": "Cutting",
+              "helperCount": 1,
+              "producedQty": 8,
+              "date": "2026-10-05",
+              "startTime": "07:30 AM",
+              "sliceId": "SLICE-CUT-1791165881191",
+              "machine": "Cutting-2",
+              "shift": "DAY",
+              "loosePieces": 0,
+              "helpers": [
+                "AJAY"
+              ],
+              "consumedQty": 3,
+              "endMeterReading": 8000
+            },
+            {
+              "scrapKg": 432,
+              "shift": "NIGHT",
+              "consumedQty": 1,
+              "producedQty": 12,
+              "date": "2026-10-05",
+              "scrapQty": 432,
+              "grossPieces": 136560,
+              "operator": "BALU",
+              "scrapPcs": 0,
+              "stage": "Cutting",
+              "helpers": [
+                "SHILPA"
+              ],
+              "sliceId": "SLC-1791165909699-2",
+              "machine": "Cutting-2",
+              "notes": "Incoming Shift Final Completion",
+              "pcsPerKg": 450,
+              "rejectedPieces": 0,
+              "producedPieces": 136560,
+              "cuttingMaterialScrapKg": 432,
+              "startTime": "07:34 am",
+              "handoverTime": "07:35 AM"
+            }
+          ],
+          "worker": "BALU",
+          "issuedQty": 8,
+          "endTime": "07:35 AM",
+          "batchId": "S-070-CUT-01",
+          "meterReading": 8000,
+          "helperCount": 1,
+          "startTime": "07:30 AM",
+          "rejectedPieces": 0,
+          "helpers": [
+            "SHILPA"
+          ],
+          "consumedQty": 4,
+          "pcsPerKg": 450,
+          "supervisor": "admin",
+          "machine": "Cutting-2",
+          "reelsSummary": "5203, 5035 (2 Jumbo Reels)",
+          "glueUsageKg": 120,
+          "parentReelNo": "5203",
+          "scrapPcs": 0,
+          "scrapKg": 432,
+          "stage": "Cutting",
+          "producedQty": 20,
+          "glueBrand": "Pidilite FS35",
+          "grossPieces": 136560,
+          "cuttingMaterialScrapKg": 432,
+          "parentBatchId": "S-070-SLIT-01",
+          "reelNo": "5203, 5035",
+          "glueEntries": [
+            {
+              "id": "GLUE-LOG-1791165746130",
+              "user": "cut_operator",
+              "jobId": "S-070",
+              "date": "2026-10-05",
+              "stage": "Cutting",
+              "shift": "DAY",
+              "time": "07:32 AM",
+              "quantityKg": 20,
+              "createdAt": "2026-10-05T02:02:26.129Z",
+              "batchId": "S-070-CUT-01",
+              "operator": "VISHAL SOLANKI",
+              "machine": "Cutting-2",
+              "glueBrand": "Pidilite FS35",
+              "product": "Spoon",
+              "notes": "Issued on Cutting-2 by VISHAL SOLANKI"
+            },
+            {
+              "id": "GLUE-LOG-1791165754354",
+              "notes": "Issued on Cutting-2 by VISHAL SOLANKI",
+              "glueBrand": "Pidilite FS35",
+              "operator": "VISHAL SOLANKI",
+              "batchId": "S-070-CUT-01",
+              "machine": "Cutting-2",
+              "createdAt": "2026-10-05T02:02:34.354Z",
+              "time": "07:32 AM",
+              "stage": "Cutting",
+              "shift": "DAY",
+              "user": "cut_operator",
+              "quantityKg": 100,
+              "product": "Spoon",
+              "date": "2026-10-05",
+              "jobId": "S-070"
+            }
+          ],
+          "pcsPerCrate": 11380,
+          "producedPieces": 227600,
+          "startMeterReading": 8000,
+          "reelNumbers": [
+            "5203",
+            "5035"
+          ],
+          "loosePieces": 0
+        },
+        {
+          "user": "sarang",
+          "issuedQty": 3,
+          "worker": "ROSHAN",
+          "producedPieces": 45280,
+          "supervisor": "sarang",
+          "sourceLotId": "SLICE-CUT-1791165881191, SLC-1791165909699-2",
+          "batchId": "S-070-FORM-01",
+          "shift": "DAY",
+          "sourceOperator": "VISHAL SOLANKI, BALU",
+          "status": "Completed",
+          "pcsPerCrate": 11380,
+          "producedQty": 5,
+          "consumedQty": 0,
+          "inputPieces": 34140,
+          "stage": "Forming",
+          "machine": "Forming-3",
+          "loosePieces": 0,
+          "inputCrates": 1,
+          "startTime": "12:26 PM",
+          "parentBatchId": "SLICE-CUT-1791165881191",
+          "endTime": "09:10 PM",
+          "scrapPcs": 120,
+          "formingAdjustmentPcs": 0,
+          "slices": [
+            {
+              "handoverTime": "09:10 PM",
+              "stage": "Forming",
+              "producedPieces": 45280,
+              "consumedQty": 0,
+              "machine": "Forming-3",
+              "producedQty": 5,
+              "date": "2026-10-05",
+              "operator": "ROSHAN",
+              "sliceId": "SLC-FORM-1791214827092-1",
+              "scrapPcs": 120,
+              "shift": "DAY",
+              "startTime": "12:26 PM",
+              "scrapQty": 120,
+              "notes": "Single Shift Run Completion"
+            }
+          ]
+        }
+      ],
+      "inputWeightKg": 1128,
+      "availableQcCrates": 0,
+      "scrapPercent": 0,
+      "targetScrapLimitPct": 2.5,
+      "availableRolls": 8,
+      "cuttingPcsPerKg": 450,
+      "cuttingRejectedPcs": 0,
+      "cuttingLoosePcs": 0,
+      "planId": "PLAN-2026-002",
+      "outputWeightKg": 1128,
+      "cuttingScrapPcs": 0,
+      "availableCuttingCrates": 16,
+      "pcsPerCrateForming": 755,
+      "totalCutPieces": 227600,
+      "plannedLayers": [
+        {
+          "type": "Plain",
+          "gsm": 125,
+          "requiredReels": 8
+        }
+      ],
+      "id": "S-070",
+      "updatedAt": "2026-10-05T16:42:20.225Z",
+      "formingRejectedPcs": 120,
+      "isReadyForQcInspection": true,
+      "formingScrapPcs": 120,
+      "formingAdjustmentPcs": 0
+    }
+  ],
   "scrapSales": [],
-  "maintenanceIncidents": [],
+  "maintenanceIncidents": [
+    {
+      "whatsAppAlertSent": true,
+      "breakdownDate": "2026-10-05",
+      "id": "MNT-001",
+      "priority": "Urgent",
+      "status": "ACKNOWLEDGED",
+      "machine": "Forming-5",
+      "maintenancePhone": "+91 9033912511",
+      "reportedBy": "SARITA",
+      "stage": "Forming",
+      "acknowledgedAt": "2026-10-05T08:50:13.102Z",
+      "breakdownStartTime": "2026-10-05T08:49:57.861Z",
+      "reason": "Hydraulic / Pneumatic Pressure Loss",
+      "description": "Machine stopped due to technical failure"
+    }
+  ],
   "autoNotifyDeptHeadsOnCritical": true,
   "maintenanceContacts": [
     {
-      "role": "Mechanical & Tooling",
-      "dept": "Mechanical",
-      "name": "Ramesh Sharma (Head Mech)",
+      "phone": "+91 98250 12345",
       "id": "MC-1",
-      "phone": "+91 98250 12345"
+      "dept": "Mechanical",
+      "role": "Mechanical & Tooling",
+      "name": "Ramesh Sharma (Head Mech)"
     },
     {
       "phone": "+91 98251 67890",
       "id": "MC-2",
       "dept": "Electrical",
-      "role": "Heater & PLC Sensors",
-      "name": "Kishan Patel (Sr. Electrical)"
+      "name": "Kishan Patel (Sr. Electrical)",
+      "role": "Heater & PLC Sensors"
     },
     {
-      "name": "Dinesh Varma (Pneumatics)",
       "role": "Hydraulic & Air Pressure",
+      "name": "Dinesh Varma (Pneumatics)",
+      "phone": "+91 98252 54321",
       "id": "MC-3",
-      "dept": "Pneumatic",
-      "phone": "+91 98252 54321"
+      "dept": "Pneumatic"
     }
   ],
   "packJobs": [],
@@ -1280,12 +3727,12 @@
     "autoSend": false,
     "lastSentKey": "",
     "webhookUrl": "https://script.google.com/macros/s/AKfycbxKFAms8M4eMCZG6jqunIR49btnEdzSHDXVHhjZzRShG5sq_0SLq1C-wFwlim4nNy8/exec",
-    "customMessage": "W\u00fcnderkraf Paperware Factory Live Shift Report",
+    "customMessage": "Wünderkraf Paperware Factory Live Shift Report",
     "dayShiftReportTime": "20:00",
     "nightShiftReportTime": "08:00",
     "autoSendShiftReportDay": true,
     "autoSendShiftReportNight": true,
-    "lastSentDayDate": "2026-09-13",
+    "lastSentDayDate": "2026-10-05",
     "lastSentNightDate": "2026-09-17",
     "autoNotifyMaintenanceBreakdown": true,
     "autoNotifyCriticalQcDefect": true,
@@ -1297,449 +3744,527 @@
     "userRights": {},
     "dispatchLogs": [
       {
-        "sender": "SYSTEM (Auto-Trigger)",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "status": "SENT",
-        "id": "AUTO-NIGHT-1790908202654",
-        "timestamp": "08:00 AM",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "category": "SHIFT_NIGHT"
-      },
-      {
-        "timestamp": "08:00 PM",
-        "recipient": "Coordination Matrix (2 Contacts)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
         "category": "SHIFT_DAY",
         "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 PM",
+        "id": "AUTO-DAY-1791210609920"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT",
+        "timestamp": "08:00 AM",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1790908202654"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
         "id": "AUTO-DAY-1790865003605",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "status": "SENT"
+        "category": "SHIFT_DAY",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 PM"
       },
       {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "status": "SENT",
         "id": "AUTO-DAY-1790433001094",
-        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
         "timestamp": "08:00 PM",
-        "category": "SHIFT_DAY",
-        "sender": "SYSTEM (Auto-Trigger)"
-      },
-      {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "category": "SHIFT_DAY",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "id": "AUTO-DAY-1790196725791",
-        "timestamp": "02:22 AM",
-        "status": "SENT",
-        "sender": "SYSTEM (Auto-Trigger)"
-      },
-      {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "category": "SHIFT_DAY",
-        "id": "DEMO-1790196701069",
-        "sender": "admin (Live Demo Test)",
-        "timestamp": "02:21 AM",
-        "recipient": "Floor Coordination Matrix (DAY Shift Alert)",
-        "status": "SENT"
-      },
-      {
-        "id": "AUTO-NIGHT-1790196369441",
-        "timestamp": "02:16 AM",
-        "recipient": "Coordination Matrix (2 Contacts)",
         "sender": "SYSTEM (Auto-Trigger)",
-        "category": "SHIFT_NIGHT",
-        "status": "SENT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501..."
-      },
-      {
-        "status": "OPENED",
-        "sender": "admin",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "timestamp": "02:02 AM",
-        "category": "SHIFT_DAY",
-        "id": "WA-1790195536264",
-        "recipient": "Primary Plant Gateway (+91 9033912511)"
-      },
-      {
-        "id": "WA-1790194824391",
-        "recipient": "+91 9033912511",
-        "timestamp": "01:50 AM",
-        "status": "OPENED",
-        "preview": "\ud83d\udce2 *W\u00dcNDERKRAF FACTORY ANNOUNCEMENT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\ud83d\udcc5 *Date:* 9/24/2...",
-        "category": "CUSTOM_BROADCAST",
-        "sender": "admin"
-      },
-      {
         "recipient": "Coordination Matrix (2 Contacts)",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "timestamp": "08:00 AM",
-        "id": "AUTO-NIGHT-1790389804853",
-        "status": "SENT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "category": "SHIFT_NIGHT"
-      },
-      {
-        "id": "AUTO-NIGHT-1790303400048",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "status": "SENT",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "08:00 AM",
-        "category": "SHIFT_NIGHT"
-      },
-      {
-        "sender": "SYSTEM (Auto-Trigger)",
-        "id": "AUTO-NIGHT-1790821809521",
-        "status": "SENT",
-        "category": "SHIFT_NIGHT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "timestamp": "08:00 AM",
-        "recipient": "Coordination Matrix (2 Contacts)"
-      },
-      {
-        "sender": "SYSTEM (Auto-Trigger)",
-        "status": "SENT",
-        "id": "AUTO-DAY-1790820061509",
-        "category": "SHIFT_DAY",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "07:31 AM"
-      },
-      {
-        "sender": "admin",
-        "timestamp": "09:37 AM",
-        "id": "WA-1790568428492",
-        "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "status": "SENT",
-        "category": "PURCHASE_INDENT",
-        "preview": "\ud83d\uded2 *URGENT PURCHASE REQUISITION ALERT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\ud83d\udccb *Indent ID:* *MR-2026-..."
-      },
-      {
-        "id": "WA-1790568366652",
-        "timestamp": "09:36 AM",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "category": "SHIFT_DAY",
-        "status": "OPENED",
-        "sender": "admin"
-      },
-      {
-        "id": "WA-1790568354183",
-        "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "timestamp": "09:35 AM",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "category": "SHIFT_DAY",
-        "status": "SENT",
-        "sender": "admin"
-      },
-      {
-        "id": "WA-1790565407713",
-        "sender": "admin",
-        "status": "SENT",
-        "timestamp": "08:46 AM",
-        "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_DAY"
       },
       {
-        "id": "WA-1790565366781",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
         "category": "SHIFT_DAY",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "sender": "admin",
-        "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "timestamp": "08:46 AM",
+        "timestamp": "02:22 AM",
+        "id": "AUTO-DAY-1790196725791",
         "status": "SENT"
       },
       {
-        "timestamp": "08:33 AM",
-        "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "id": "WA-1790564604882",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "sender": "admin",
-        "category": "SHIFT_DAY",
-        "status": "OPENED"
-      },
-      {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "sender": "admin",
-        "category": "SHIFT_NIGHT",
-        "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "id": "WA-1790564418020",
-        "status": "OPENED",
-        "timestamp": "08:30 AM"
-      },
-      {
-        "sender": "SYSTEM (Auto-Trigger)",
-        "id": "AUTO-NIGHT-1790562616363",
-        "category": "SHIFT_NIGHT",
-        "status": "SENT",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "08:00 AM",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501..."
-      },
-      {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "id": "AUTO-DAY-1790560867723",
-        "category": "SHIFT_DAY",
-        "timestamp": "07:31 AM",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "status": "SENT",
-        "sender": "SYSTEM (Auto-Trigger)"
-      },
-      {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "08:00 AM",
-        "status": "SENT",
-        "id": "AUTO-NIGHT-1790476206637",
-        "category": "SHIFT_NIGHT"
-      },
-      {
-        "id": "DEMO-1790474676255",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "timestamp": "07:34 AM",
         "recipient": "Floor Coordination Matrix (DAY Shift Alert)",
+        "id": "DEMO-1790196701069",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
         "status": "SENT",
+        "timestamp": "02:21 AM",
         "category": "SHIFT_DAY",
         "sender": "admin (Live Demo Test)"
       },
       {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_NIGHT",
+        "id": "AUTO-NIGHT-1790196369441",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT",
+        "timestamp": "02:16 AM"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "admin",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "category": "SHIFT_DAY",
+        "timestamp": "02:02 AM",
+        "status": "OPENED",
+        "id": "WA-1790195536264"
+      },
+      {
+        "category": "CUSTOM_BROADCAST",
+        "sender": "admin",
+        "id": "WA-1790194824391",
+        "preview": "📢 *WÜNDERKRAF FACTORY ANNOUNCEMENT*\n━━━━━━━━━━━━━━━━━━━━\n📅 *Date:* 9/24/2...",
+        "recipient": "+91 9033912511",
+        "status": "OPENED",
+        "timestamp": "01:50 AM"
+      },
+      {
+        "category": "SHIFT_NIGHT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-NIGHT-1790389804853",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM"
+      },
+      {
+        "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "id": "AUTO-NIGHT-1790303400048",
+        "category": "SHIFT_NIGHT",
+        "sender": "SYSTEM (Auto-Trigger)"
+      },
+      {
+        "timestamp": "08:00 AM",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "category": "SHIFT_NIGHT",
+        "id": "AUTO-NIGHT-1790821809521",
+        "sender": "SYSTEM (Auto-Trigger)"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
         "sender": "SYSTEM (Auto-Trigger)",
         "status": "SENT",
-        "id": "AUTO-DAY-1790474469505",
-        "category": "SHIFT_DAY",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "07:31 AM",
-        "recipient": "Coordination Matrix (2 Contacts)"
+        "category": "SHIFT_DAY",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "id": "AUTO-DAY-1790820061509"
+      },
+      {
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "preview": "🛒 *URGENT PURCHASE REQUISITION ALERT*\n━━━━━━━━━━━━━━━━━━━━\n📋 *Indent ID:* *MR-2026-...",
+        "id": "WA-1790568428492",
+        "sender": "admin",
+        "category": "PURCHASE_INDENT",
+        "timestamp": "09:37 AM",
+        "status": "SENT"
+      },
+      {
+        "id": "WA-1790568366652",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "09:36 AM",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "category": "SHIFT_DAY",
+        "sender": "admin",
+        "status": "OPENED"
+      },
+      {
+        "category": "SHIFT_DAY",
+        "status": "SENT",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "timestamp": "09:35 AM",
+        "sender": "admin",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "WA-1790568354183"
+      },
+      {
+        "id": "WA-1790565407713",
+        "sender": "admin",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:46 AM",
+        "category": "SHIFT_DAY",
+        "status": "SENT",
+        "recipient": "Primary Plant Gateway (+91 9033912511)"
+      },
+      {
+        "status": "SENT",
+        "id": "WA-1790565366781",
+        "timestamp": "08:46 AM",
+        "category": "SHIFT_DAY",
+        "sender": "admin",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "recipient": "Primary Plant Gateway (+91 9033912511)"
       },
       {
         "status": "OPENED",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "timestamp": "05:32 PM",
+        "id": "WA-1790564604882",
+        "timestamp": "08:33 AM",
+        "category": "SHIFT_DAY",
         "sender": "admin",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+      },
+      {
+        "timestamp": "08:30 AM",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "status": "OPENED",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "WA-1790564418020",
+        "category": "SHIFT_NIGHT",
+        "sender": "admin"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "AUTO-NIGHT-1790562616363",
+        "timestamp": "08:00 AM",
+        "status": "SENT"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-DAY-1790560867723",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "07:31 AM",
+        "category": "SHIFT_DAY",
+        "status": "SENT"
+      },
+      {
+        "timestamp": "08:00 AM",
+        "status": "SENT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "id": "AUTO-NIGHT-1790476206637",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_NIGHT"
+      },
+      {
+        "id": "DEMO-1790474676255",
+        "sender": "admin (Live Demo Test)",
+        "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_DAY",
+        "timestamp": "07:34 AM",
+        "recipient": "Floor Coordination Matrix (DAY Shift Alert)"
+      },
+      {
+        "timestamp": "07:31 AM",
+        "id": "AUTO-DAY-1790474469505",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "category": "SHIFT_DAY",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT"
+      },
+      {
+        "status": "OPENED",
         "id": "WA-1790596948333",
-        "category": "SHIFT_DAY"
-      },
-      {
-        "status": "FAILED",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "05:32 PM",
-        "recipient": "+91 9033912511",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
         "sender": "admin",
-        "id": "WA-1790596945388",
         "category": "SHIFT_DAY"
       },
       {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
+        "category": "SHIFT_DAY",
         "sender": "admin",
+        "recipient": "+91 9033912511",
+        "id": "WA-1790596945388",
+        "timestamp": "05:32 PM",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "FAILED"
+      },
+      {
+        "category": "SHIFT_DAY",
         "status": "FAILED",
         "id": "WA-1790595498302",
-        "category": "SHIFT_DAY",
-        "timestamp": "05:08 PM",
-        "recipient": "+91 9033912511"
+        "sender": "admin",
+        "recipient": "+91 9033912511",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "05:08 PM"
       },
       {
-        "category": "JOB_STATUS",
-        "id": "WA-1790594089513",
-        "preview": "\ud83d\udccb *W\u00dcNDERKRAF JOB STATUS REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\u26a0\ufe0f *Status:* No active product...",
-        "sender": "admin",
-        "recipient": "Primary Plant Gateway (+91 9033912511)",
         "status": "OPENED",
-        "timestamp": "04:44 PM"
-      },
-      {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "status": "SENT",
-        "timestamp": "12:42 PM",
-        "sender": "admin",
+        "timestamp": "04:44 PM",
+        "preview": "📋 *WÜNDERKRAF JOB STATUS REPORT*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ *Status:* No active product...",
         "recipient": "Primary Plant Gateway (+91 9033912511)",
-        "category": "SHIFT_DAY",
-        "id": "WA-1790579575576"
+        "sender": "admin",
+        "category": "JOB_STATUS",
+        "id": "WA-1790594089513"
       },
       {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "category": "SHIFT_DAY",
-        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "WA-1790579575576",
+        "sender": "admin",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "recipient": "Primary Plant Gateway (+91 9033912511)",
+        "status": "SENT",
+        "timestamp": "12:42 PM"
+      },
+      {
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 PM",
         "id": "AUTO-DAY-1790865007334",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "status": "SENT",
-        "timestamp": "08:00 PM"
-      },
-      {
-        "category": "SHIFT_NIGHT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "timestamp": "08:00 AM",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "status": "SENT",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "id": "AUTO-NIGHT-1790908200858"
+        "category": "SHIFT_DAY",
+        "sender": "SYSTEM (Auto-Trigger)"
       },
       {
         "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-NIGHT-1790908200858",
+        "category": "SHIFT_NIGHT"
+      },
+      {
         "sender": "SYSTEM (Auto-Trigger)",
         "category": "SHIFT_NIGHT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
         "timestamp": "08:00 AM",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
         "recipient": "Coordination Matrix (2 Contacts)",
         "id": "AUTO-NIGHT-1790908200612"
       },
       {
-        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
         "id": "AUTO-NIGHT-1790908259834",
-        "status": "SENT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "recipient": "Coordination Matrix (2 Contacts)",
         "category": "SHIFT_NIGHT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "timestamp": "08:00 AM",
-        "recipient": "Coordination Matrix (2 Contacts)"
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT"
       },
       {
+        "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
         "id": "AUTO-NIGHT-1790908254601",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "category": "SHIFT_NIGHT",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "timestamp": "08:00 AM",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "status": "SENT"
-      },
-      {
-        "id": "AUTO-NIGHT-1790908241391",
-        "timestamp": "08:00 AM",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "category": "SHIFT_NIGHT",
-        "status": "SENT",
-        "sender": "SYSTEM (Auto-Trigger)"
-      },
-      {
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "08:00 AM",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "category": "SHIFT_NIGHT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "status": "SENT",
-        "id": "AUTO-NIGHT-1790908240864"
-      },
-      {
-        "category": "SHIFT_NIGHT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "id": "AUTO-NIGHT-1790908230613",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "timestamp": "08:00 AM",
-        "status": "SENT"
-      },
-      {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "timestamp": "08:00 AM",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "id": "AUTO-NIGHT-1790908230300",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "category": "SHIFT_NIGHT",
-        "status": "SENT"
-      },
-      {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "category": "SHIFT_NIGHT",
-        "status": "SENT",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "08:00 AM",
-        "id": "AUTO-NIGHT-1790908225686"
-      },
-      {
-        "category": "SHIFT_NIGHT",
-        "id": "AUTO-NIGHT-1790908215275",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "timestamp": "08:00 AM",
-        "status": "SENT"
-      },
-      {
-        "sender": "SYSTEM (Auto-Trigger)",
-        "status": "SENT",
-        "category": "SHIFT_NIGHT",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "timestamp": "08:00 AM",
-        "id": "AUTO-NIGHT-1790908214925"
-      },
-      {
-        "sender": "SYSTEM (Auto-Trigger)",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "status": "SENT",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "08:00 AM",
-        "id": "AUTO-NIGHT-1790908208129",
         "category": "SHIFT_NIGHT"
       },
       {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "id": "AUTO-DAY-1791037801155",
-        "category": "SHIFT_DAY",
-        "status": "SENT",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "20:00",
-        "sender": "SYSTEM (Auto-Trigger)"
-      },
-      {
-        "sender": "SYSTEM (Auto-Trigger)",
+        "category": "SHIFT_NIGHT",
         "recipient": "Coordination Matrix (2 Contacts)",
         "timestamp": "08:00 AM",
+        "id": "AUTO-NIGHT-1790908241391",
+        "sender": "SYSTEM (Auto-Trigger)",
         "status": "SENT",
-        "id": "AUTO-NIGHT-1790994656159",
-        "category": "SHIFT_NIGHT",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501..."
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
       },
       {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "category": "SHIFT_NIGHT",
-        "id": "AUTO-NIGHT-1790994656148",
-        "sender": "SYSTEM (Auto-Trigger)",
-        "timestamp": "08:00 AM",
         "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-NIGHT-1790908240864",
+        "timestamp": "08:00 AM",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
         "status": "SENT"
       },
       {
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "sender": "System Scheduler",
-        "category": "SHIFT_NIGHT",
-        "id": "SCHED-NIGHT-1790994626145",
-        "timestamp": "08:00 am",
+        "recipient": "Coordination Matrix (2 Contacts)",
         "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT",
+        "timestamp": "08:00 AM",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-NIGHT-1790908230613"
+      },
+      {
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1790908230300"
+      },
+      {
+        "id": "AUTO-NIGHT-1790908225686",
+        "status": "SENT",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM"
+      },
+      {
+        "status": "SENT",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "08:00 AM",
+        "id": "AUTO-NIGHT-1790908215275",
+        "category": "SHIFT_NIGHT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+      },
+      {
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT",
+        "id": "AUTO-NIGHT-1790908214925",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "status": "SENT"
+      },
+      {
+        "sender": "SYSTEM (Auto-Trigger)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1790908208129",
+        "timestamp": "08:00 AM",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "category": "SHIFT_NIGHT"
+      },
+      {
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "id": "AUTO-DAY-1791037801155",
+        "category": "SHIFT_DAY",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "timestamp": "20:00",
+        "status": "SENT"
+      },
+      {
+        "category": "SHIFT_NIGHT",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1790994656159",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━..."
+      },
+      {
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "category": "SHIFT_NIGHT",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "timestamp": "08:00 AM",
+        "id": "AUTO-NIGHT-1790994656148",
+        "status": "SENT"
+      },
+      {
+        "sender": "System Scheduler",
+        "id": "SCHED-NIGHT-1790994626145",
+        "status": "SENT",
+        "timestamp": "08:00 am",
+        "category": "SHIFT_NIGHT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
         "recipient": "919033912511"
       },
       {
         "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "08:00 PM",
-        "id": "AUTO-DAY-1791037803660",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
         "sender": "SYSTEM (Auto-Trigger)",
         "category": "SHIFT_DAY",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
+        "timestamp": "08:00 PM",
+        "id": "AUTO-DAY-1791037803660",
         "status": "SENT"
       },
       {
-        "id": "AUTO-NIGHT-1791081004762",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "timestamp": "08:00 AM",
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "status": "SENT",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
         "sender": "SYSTEM (Auto-Trigger)",
-        "category": "SHIFT_NIGHT"
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "category": "SHIFT_NIGHT",
+        "timestamp": "08:00 AM",
+        "status": "SENT",
+        "id": "AUTO-NIGHT-1791081004762"
       },
       {
-        "recipient": "Coordination Matrix (2 Contacts)",
-        "timestamp": "20:00",
-        "preview": "\ud83c\udfed *W\u00dcNDERKRAF PAPERWARE ERP*\n\ud83d\udccb *DAILY SHIFT CHANGEOVER REPORT*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501...",
-        "id": "AUTO-DAY-1791124214460",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE ERP*\n📋 *DAILY SHIFT CHANGEOVER REPORT*\n━━━━━━━━━━━━━━━━━━━━...",
+        "sender": "SYSTEM (Auto-Trigger)",
         "status": "SENT",
+        "timestamp": "20:00",
+        "recipient": "Coordination Matrix (2 Contacts)",
         "category": "SHIFT_DAY",
-        "sender": "SYSTEM (Auto-Trigger)"
+        "id": "AUTO-DAY-1791124214460"
       }
     ]
   },
-  "glueUsageLogs": [],
+  "glueUsageLogs": [
+    {
+      "createdAt": "2026-10-05T02:10:23.477Z",
+      "user": "cut_operator",
+      "batchId": "F-066-CUT-01",
+      "operator": "VISHAL",
+      "notes": "Issued on Cutting-2 by VISHAL",
+      "date": "2026-10-05",
+      "time": "07:40 AM",
+      "product": "Fork",
+      "stage": "Cutting",
+      "shift": "DAY",
+      "quantityKg": 80,
+      "glueBrand": "Pidilite FS35",
+      "jobId": "F-066",
+      "id": "GLUE-LOG-1791166223477",
+      "machine": "Cutting-2"
+    },
+    {
+      "time": "07:38 AM",
+      "glueBrand": "Pidilite FS35",
+      "date": "2026-10-05",
+      "notes": "Issued on Cutting-2 by BALU",
+      "batchId": "F-066-CUT-01",
+      "user": "cut_operator",
+      "machine": "Cutting-2",
+      "quantityKg": 50,
+      "id": "GLUE-LOG-1791166111092",
+      "createdAt": "2026-10-05T02:08:31.091Z",
+      "jobId": "F-066",
+      "operator": "BALU",
+      "shift": "NIGHT",
+      "stage": "Cutting",
+      "product": "Fork"
+    },
+    {
+      "jobId": "S-070",
+      "product": "Spoon",
+      "id": "GLUE-LOG-1791165754354",
+      "glueBrand": "Pidilite FS35",
+      "shift": "DAY",
+      "stage": "Cutting",
+      "machine": "Cutting-2",
+      "createdAt": "2026-10-05T02:02:34.354Z",
+      "date": "2026-10-05",
+      "quantityKg": 100,
+      "user": "cut_operator",
+      "batchId": "S-070-CUT-01",
+      "time": "07:32 AM",
+      "notes": "Issued on Cutting-2 by VISHAL SOLANKI",
+      "operator": "VISHAL SOLANKI"
+    },
+    {
+      "batchId": "S-070-CUT-01",
+      "createdAt": "2026-10-05T02:02:26.129Z",
+      "jobId": "S-070",
+      "stage": "Cutting",
+      "shift": "DAY",
+      "id": "GLUE-LOG-1791165746130",
+      "glueBrand": "Pidilite FS35",
+      "product": "Spoon",
+      "time": "07:32 AM",
+      "machine": "Cutting-2",
+      "user": "cut_operator",
+      "notes": "Issued on Cutting-2 by VISHAL SOLANKI",
+      "operator": "VISHAL SOLANKI",
+      "quantityKg": 20,
+      "date": "2026-10-05"
+    }
+  ],
   "maintenanceSparePartsMaster": [
     "Upper Mould Heater Band (220V/1500W)",
     "High-Speed Cutting Blade Punch Set",
@@ -1764,36 +4289,8 @@
   "machineReadyAlerts": [],
   "productionPlans": [
     {
-      "id": "PLAN-2026-001",
-      "jobId": "SPN-070",
-      "product": "Spoon",
-      "targetLayers": 8,
-      "targetLengthMeters": 3800,
-      "adhesiveBrand": "Pidilite FS35",
-      "targetScrapLimitPct": 2.5,
-      "targetScrapLimitKg": 15,
-      "assignedMachine": "Slitting-1",
-      "assignedShift": "DAY",
-      "plannedDate": "2026-10-04",
-      "targetQuantity": 300000,
-      "paperBrand": "AADHARA PAPER",
-      "targetGsm": "125 GSM",
-      "plannedGsms": [
-        "125 GSM"
-      ],
-      "status": "In-Progress",
-      "createdAt": "2026-10-04T18:17:40.211Z",
-      "plannedLayers": [
-        {
-          "gsm": 125,
-          "type": "Plain",
-          "requiredReels": 8
-        }
-      ]
-    },
-    {
       "id": "PLAN-2026-002",
-      "jobId": "SPN-071",
+      "jobId": "S-070",
       "product": "Spoon",
       "targetLayers": 8,
       "targetLengthMeters": 3800,
@@ -1802,27 +4299,32 @@
       "targetScrapLimitKg": 15,
       "assignedMachine": "Slitting-1",
       "assignedShift": "DAY",
-      "plannedDate": "2026-10-04",
+      "plannedDate": "2026-10-05",
       "targetQuantity": 300000,
       "paperBrand": "AADHARA PAPER",
       "targetGsm": "125 GSM",
       "plannedGsms": [
         "125 GSM"
       ],
-      "status": "In-Progress",
-      "createdAt": "2026-10-04T18:20:10.000Z",
+      "status": "Completed",
+      "createdAt": "2026-10-05T01:43:14.138Z",
       "plannedLayers": [
         {
           "gsm": 125,
           "type": "Plain",
           "requiredReels": 8
         }
-      ]
+      ],
+      "actualLayersUsed": 2,
+      "actualScrapKg": 0,
+      "notes": "",
+      "actualScrapPct": 0,
+      "actualMetersSlit": 3800
     },
     {
       "id": "PLAN-2026-003",
-      "jobId": "FRK-066",
-      "product": "Fork",
+      "jobId": "S-071",
+      "product": "Spoon",
       "targetLayers": 8,
       "targetLengthMeters": 3800,
       "adhesiveBrand": "Pidilite FS35",
@@ -1830,26 +4332,31 @@
       "targetScrapLimitKg": 15,
       "assignedMachine": "Slitting-1",
       "assignedShift": "DAY",
-      "plannedDate": "2026-10-04",
+      "plannedDate": "2026-10-05",
       "targetQuantity": 300000,
       "paperBrand": "AADHARA PAPER",
       "targetGsm": "125 GSM",
       "plannedGsms": [
         "125 GSM"
       ],
-      "status": "In-Progress",
-      "createdAt": "2026-10-04T18:25:00.000Z",
+      "status": "Completed",
+      "createdAt": "2026-10-05T01:43:34.546Z",
       "plannedLayers": [
         {
           "gsm": 125,
           "type": "Plain",
           "requiredReels": 8
         }
-      ]
+      ],
+      "actualMetersSlit": 3800,
+      "actualScrapKg": 0,
+      "actualScrapPct": 0,
+      "notes": "",
+      "actualLayersUsed": 2
     },
     {
       "id": "PLAN-2026-004",
-      "jobId": "FRK-067",
+      "jobId": "F-066",
       "product": "Fork",
       "targetLayers": 8,
       "targetLengthMeters": 3800,
@@ -1858,26 +4365,31 @@
       "targetScrapLimitKg": 15,
       "assignedMachine": "Slitting-1",
       "assignedShift": "DAY",
-      "plannedDate": "2026-10-04",
+      "plannedDate": "2026-10-05",
       "targetQuantity": 300000,
       "paperBrand": "AADHARA PAPER",
       "targetGsm": "125 GSM",
       "plannedGsms": [
         "125 GSM"
       ],
-      "status": "In-Progress",
-      "createdAt": "2026-10-04T18:30:00.000Z",
+      "status": "Completed",
+      "createdAt": "2026-10-05T01:44:02.734Z",
       "plannedLayers": [
         {
           "gsm": 125,
           "type": "Plain",
           "requiredReels": 8
         }
-      ]
+      ],
+      "actualScrapPct": 0,
+      "actualLayersUsed": 3,
+      "notes": "",
+      "actualScrapKg": 0,
+      "actualMetersSlit": 3800
     },
     {
       "id": "PLAN-2026-005",
-      "jobId": "FRK-068",
+      "jobId": "F-067",
       "product": "Fork",
       "targetLayers": 8,
       "targetLengthMeters": 3800,
@@ -1886,26 +4398,31 @@
       "targetScrapLimitKg": 15,
       "assignedMachine": "Slitting-1",
       "assignedShift": "DAY",
-      "plannedDate": "2026-10-04",
+      "plannedDate": "2026-10-05",
       "targetQuantity": 300000,
       "paperBrand": "AADHARA PAPER",
       "targetGsm": "125 GSM",
       "plannedGsms": [
         "125 GSM"
       ],
-      "status": "In-Progress",
-      "createdAt": "2026-10-04T18:35:00.000Z",
+      "status": "Completed",
+      "createdAt": "2026-10-05T01:44:30.689Z",
       "plannedLayers": [
         {
           "gsm": 125,
           "type": "Plain",
           "requiredReels": 8
         }
-      ]
+      ],
+      "actualScrapPct": 0,
+      "actualLayersUsed": 2,
+      "actualMetersSlit": 3800,
+      "notes": "",
+      "actualScrapKg": 0
     },
     {
       "id": "PLAN-2026-006",
-      "jobId": "FRK-069",
+      "jobId": "F-068",
       "product": "Fork",
       "targetLayers": 8,
       "targetLengthMeters": 3800,
@@ -1914,22 +4431,60 @@
       "targetScrapLimitKg": 15,
       "assignedMachine": "Slitting-1",
       "assignedShift": "DAY",
-      "plannedDate": "2026-10-04",
+      "plannedDate": "2026-10-05",
       "targetQuantity": 300000,
       "paperBrand": "AADHARA PAPER",
       "targetGsm": "125 GSM",
       "plannedGsms": [
         "125 GSM"
       ],
-      "status": "In-Progress",
-      "createdAt": "2026-10-04T18:40:00.000Z",
+      "status": "Completed",
+      "createdAt": "2026-10-05T01:44:43.627Z",
       "plannedLayers": [
         {
           "gsm": 125,
           "type": "Plain",
           "requiredReels": 8
         }
-      ]
+      ],
+      "actualMetersSlit": 3800,
+      "actualScrapPct": 0,
+      "actualLayersUsed": 3,
+      "notes": "",
+      "actualScrapKg": 0
+    },
+    {
+      "targetLengthMeters": 3800,
+      "notes": "",
+      "actualMetersSlit": 3800,
+      "targetQuantity": 300000,
+      "targetLayers": 8,
+      "plannedGsms": [
+        "125 GSM"
+      ],
+      "plannedLayers": [
+        {
+          "requiredReels": 8,
+          "gsm": 125,
+          "type": "Plain"
+        }
+      ],
+      "createdAt": "2026-10-05T01:45:18.135Z",
+      "actualScrapKg": 0,
+      "id": "PLAN-2026-007",
+      "jobId": "F-069",
+      "targetScrapLimitKg": 15,
+      "plannedDate": "2026-10-05",
+      "actualScrapPct": 0,
+      "targetScrapLimitPct": 2.5,
+      "assignedMachine": "Slitting-1",
+      "adhesiveBrand": "Pidilite FS35",
+      "paperBrand": "AADHARA PAPER",
+      "product": "Fork",
+      "assignedShift": "DAY",
+      "status": "Completed",
+      "targetGsm": "125 GSM",
+      "actualLayersUsed": 1
     }
   ],
   "pcsPerKgMaster": {
@@ -1940,27 +4495,1216 @@
   },
   "logs": [
     {
-      "jobId": "MASTER-BRAND",
-      "stage": "Admin Master",
-      "machine": "ADMIN-SETTINGS",
-      "shift": "DAY",
-      "action": "\ud83c\udff7\ufe0f Added New Paper Mill Brand: ORIENT PAPER",
-      "worker": "ADMIN",
       "user": "admin",
+      "rawDate": "2026-10-05",
+      "action": "🛠️ Master Overwrite on Job [F-068]: Admin modified details (Reel: 5044, 5160, 5191, GSM: 125 GSM, In: 987kg, Out: 987kg, Scrap: 0kg)",
+      "jobId": "F-068",
+      "worker": "ADMIN",
+      "machine": "MASTER-OVERWRITE",
+      "timestamp": "10/5/2026, 7:30:29 PM",
+      "stage": "Admin Master",
+      "shift": "DAY",
+      "product": "Fork"
+    },
+    {
+      "user": "admin",
+      "action": "🏷️ Added New Paper Mill Brand: ORIENT PAPER",
       "rawDate": "2026-10-04",
+      "jobId": "MASTER-BRAND",
+      "worker": "ADMIN",
+      "machine": "ADMIN-SETTINGS",
+      "stage": "Admin Master",
+      "shift": "DAY",
       "timestamp": "10/5/2026, 1:21:20 AM"
     },
     {
+      "user": "admin",
       "jobId": "MASTER-BRAND",
-      "stage": "Admin Master",
+      "timestamp": "10/5/2026, 1:21:16 AM",
       "machine": "ADMIN-SETTINGS",
+      "action": "✏️ Renamed Paper Mill Brand from Orient Paper to AADHARA PAPER",
+      "stage": "Admin Master",
       "shift": "DAY",
-      "action": "\u270f\ufe0f Renamed Paper Mill Brand from Orient Paper to AADHARA PAPER",
+      "worker": "ADMIN",
+      "rawDate": "2026-10-04"
+    },
+    {
+      "worker": "BALU",
+      "user": "cut_supervisor",
+      "product": "Fork",
+      "stage": "Cutting",
+      "timestamp": "07:42 am",
+      "shift": "NIGHT",
+      "action": "🔄 Shift Handover: Operator [VISHAL] handed over active run [F-067-CUT-01] to [BALU] (NIGHT) with 1 Helpers (SHILPA). Locked slice: 1 Cut Crates, 0 Loose Pcs, 0 Rejected Pcs, 51kg Scrap, Meter: 1000.",
+      "jobId": "F-067",
+      "rawDate": "2026-10-05",
+      "machine": "Cutting-2"
+    },
+    {
+      "timestamp": "07:40 am",
+      "machine": "Cutting-2",
+      "shift": "DAY",
+      "rawDate": "2026-10-05",
+      "stage": "Cutting",
+      "worker": "VISHAL",
+      "jobId": "F-066",
+      "product": "Fork",
+      "user": "cut_operator",
+      "action": "💧 Adhesive Glue Added: +80 KG | New Cumulative Total: 130 KG | Brand: Pidilite FS35 | Op: VISHAL"
+    },
+    {
+      "worker": "VISHAL",
+      "stage": "Cutting",
+      "product": "Fork",
+      "user": "cut_supervisor",
+      "shift": "DAY",
+      "action": "🔄 Shift Handover: Operator [BALU] handed over active run [F-066-CUT-01] to [VISHAL] (DAY) with 1 Helpers (AJAY). Locked slice: 4 Cut Crates, 0 Loose Pcs, 0 Rejected Pcs, 0kg Scrap, Meter: 4500.",
+      "rawDate": "2026-10-05",
+      "timestamp": "07:39 am",
+      "jobId": "F-066",
+      "machine": "Cutting-2"
+    },
+    {
+      "machine": "Cutting-2",
+      "timestamp": "07:38 am",
+      "jobId": "F-066",
+      "rawDate": "2026-10-05",
+      "action": "💧 Adhesive Glue Added: +50 KG | New Cumulative Total: 50 KG | Brand: Pidilite FS35 | Op: BALU",
+      "shift": "NIGHT",
+      "user": "cut_operator",
+      "product": "Fork",
+      "worker": "BALU",
+      "stage": "Cutting"
+    },
+    {
+      "user": "cut_supervisor",
+      "action": "🔄 Shift Handover: Operator [VISHAL SOLANKI] handed over active run [S-070-CUT-01] to [BALU] (NIGHT) with 1 Helpers (SHILPA). Locked slice: 8 Cut Crates, 0 Loose Pcs, 0 Rejected Pcs, 0kg Scrap, Meter: 8000.",
+      "rawDate": "2026-10-05",
+      "jobId": "S-070",
+      "worker": "BALU",
+      "timestamp": "07:34 am",
+      "machine": "Cutting-2",
+      "stage": "Cutting",
+      "shift": "NIGHT",
+      "product": "Spoon"
+    },
+    {
+      "shift": "DAY",
+      "timestamp": "07:32 am",
+      "worker": "VISHAL SOLANKI",
+      "stage": "Cutting",
+      "rawDate": "2026-10-05",
+      "action": "💧 Adhesive Glue Added: +100 KG | New Cumulative Total: 120 KG | Brand: Pidilite FS35 | Op: VISHAL SOLANKI",
+      "user": "cut_operator",
+      "machine": "Cutting-2",
+      "jobId": "S-070",
+      "product": "Spoon"
+    },
+    {
+      "product": "Spoon",
+      "worker": "VISHAL SOLANKI",
+      "shift": "DAY",
+      "action": "💧 Adhesive Glue Added: +20 KG | New Cumulative Total: 20 KG | Brand: Pidilite FS35 | Op: VISHAL SOLANKI",
+      "stage": "Cutting",
+      "timestamp": "07:32 am",
+      "rawDate": "2026-10-05",
+      "jobId": "S-070",
+      "user": "cut_operator",
+      "machine": "Cutting-2"
+    },
+    {
+      "action": "🛠️ Master Overwrite on Job [F-069]: Admin modified details (Reel: 5191, GSM: 125 GSM, In: 1128kg, Out: 1128kg, Scrap: 0kg)",
+      "rawDate": "2026-10-05",
+      "user": "admin",
+      "jobId": "F-069",
+      "worker": "ADMIN",
+      "machine": "MASTER-OVERWRITE",
+      "stage": "Admin Master",
+      "product": "Fork",
+      "shift": "DAY",
+      "timestamp": "10/5/2026, 6:57:25 PM"
+    },
+    {
+      "action": "Started Cutting on Cutting-2 (8 Rolls Issued) | Op: VISHAL | Sup: admin",
+      "jobId": "F-067",
+      "timestamp": "10/5/2026, 7:41:23 AM",
+      "product": "Fork",
+      "worker": "VISHAL",
+      "startTime": "07:41 AM",
+      "user": "admin",
+      "rawDate": "2026-10-05",
+      "shift": "DAY",
+      "stage": "Cutting",
+      "machine": "Cutting-2"
+    },
+    {
+      "timestamp": "10/5/2026, 7:40:26 AM",
+      "product": "Fork",
+      "startTime": "07:36 AM",
+      "stage": "Cutting",
+      "shift": "DAY",
+      "user": "admin",
+      "endTime": "07:40 AM",
+      "worker": "VISHAL",
+      "machine": "Cutting-2",
+      "rawDate": "2026-10-05",
+      "jobId": "F-066",
+      "action": "⏹️ Finished Cutting Batch F-066-CUT-01 (14 Crates + 80 Loose = 173,204 Gross - 0 Rejected Pcs = 173,204 Net Passed Cut Blanks | Extra Paper Scrap: 433 KG [Added separately to scrap, not minus from pieces]) | Adhesive Glue: 130 KG of Pidilite FS35"
+    },
+    {
+      "machine": "Cutting-2",
+      "timestamp": "10/5/2026, 7:36:08 AM",
+      "jobId": "F-066",
+      "user": "admin",
+      "rawDate": "2026-10-05",
+      "startTime": "07:36 AM",
+      "stage": "Cutting",
+      "action": "Started Cutting on Cutting-2 (8 Rolls Issued) | Op: BALU | Sup: admin",
+      "shift": "NIGHT",
+      "worker": "BALU",
+      "product": "Fork"
+    },
+    {
+      "machine": "Cutting-2",
+      "stage": "Cutting",
+      "shift": "DAY",
+      "timestamp": "05:20 pm",
+      "rawDate": "2026-10-05",
+      "user": "cut_operator",
+      "worker": "VISHAL",
+      "product": "Fork",
+      "jobId": "F-068",
+      "action": "💧 Adhesive Glue Added: +70 KG | New Cumulative Total: 120 KG | Brand: Pidilite FS35 | Op: VISHAL"
+    },
+    {
+      "action": "🔄 Shift Handover: Operator [RAHUL] handed over active run [F-066-FORM-01] to [SARITA] (DAY). Locked slice: 6 Formed Crates, 14 Defect Pcs, Meter: 7486.",
+      "product": "Fork",
+      "jobId": "F-066",
+      "timestamp": "02:41 pm",
+      "worker": "SARITA",
+      "rawDate": "2026-10-05",
+      "user": "forming_supervisor",
+      "shift": "DAY",
+      "machine": "Forming-5",
+      "stage": "Forming"
+    },
+    {
+      "action": "🔄 Shift Handover: Operator [SARITA] handed over active run [F-066-FORM-01] to [RAHUL] (NIGHT). Locked slice: 4 Formed Crates, 15 Defect Pcs, Meter: 3464.",
+      "rawDate": "2026-10-05",
+      "user": "forming_supervisor",
+      "jobId": "F-066",
+      "worker": "RAHUL",
+      "timestamp": "02:27 pm",
+      "machine": "Forming-5",
+      "stage": "Forming",
+      "shift": "NIGHT",
+      "product": "Fork"
+    },
+    {
+      "user": "cut_supervisor",
+      "worker": "VISHAL",
+      "product": "Fork",
+      "stage": "Cutting",
+      "shift": "DAY",
+      "action": "🔄 Shift Handover: Operator [BALU] handed over active run [F-068-CUT-01] to [VISHAL] (DAY). Locked slice: 1 Cut Crates, 0 Loose Pcs, 0 Rejected Pcs, 53.3kg Scrap, Meter: 1090.",
+      "jobId": "F-068",
+      "rawDate": "2026-10-05",
+      "timestamp": "08:27 am",
+      "machine": "Cutting-2"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "action": "💧 Adhesive Glue Added: +50 KG | New Cumulative Total: 50 KG | Brand: Pidilite FS35 | Op: BALU",
+      "machine": "Cutting-2",
+      "jobId": "F-068",
+      "worker": "BALU",
+      "user": "cut_operator",
+      "timestamp": "08:26 am",
+      "product": "Fork",
+      "stage": "Cutting",
+      "shift": "NIGHT"
+    },
+    {
+      "machine": "Cutting-2",
+      "rawDate": "2026-10-05",
+      "jobId": "F-067",
+      "timestamp": "08:20 am",
+      "action": "💧 Adhesive Glue Added: +120 KG | New Cumulative Total: 120 KG | Brand: Pidilite FS35 | Op: BALU",
+      "user": "cut_operator",
+      "stage": "Cutting",
+      "product": "Fork",
+      "worker": "BALU",
+      "shift": "NIGHT"
+    },
+    {
+      "timestamp": "10/5/2026, 6:55:36 PM",
+      "stage": "Admin Master",
+      "shift": "DAY",
+      "machine": "MASTER-OVERWRITE",
+      "user": "admin",
+      "rawDate": "2026-10-05",
+      "worker": "ADMIN",
+      "jobId": "F-069",
+      "product": "Fork",
+      "action": "🛠️ Master Overwrite on Job [F-069]: Admin modified details (Reel: 5191, GSM: 125 GSM, In: 141kg, Out: 141kg, Scrap: 0kg)"
+    },
+    {
+      "timestamp": "10/5/2026, 6:50:23 PM",
+      "machine": "Forming-5",
+      "rawDate": "2026-10-05",
+      "jobId": "F-066",
+      "startTime": "06:50 PM",
+      "action": "⏸️ Machine Paused for Operational Break (Waiting for Raw Material / Roll / Crates) | Operator: SARITA",
+      "stage": "Operational Pause",
+      "product": "Workstation",
+      "user": "SARITA"
+    },
+    {
+      "machine": "Forming-4",
+      "rawDate": "2026-10-05",
+      "jobId": "F-066",
+      "startTime": "02:45 PM",
+      "action": "Forming Top-up on Forming-4 (+2 Crates = +24,743 Net Blanks Added from Lot SLC-1791166226007-2 by VISHAL)",
+      "timestamp": "10/5/2026, 2:45:45 PM",
+      "shift": "DAY",
+      "stage": "Forming",
+      "product": "Fork",
+      "worker": "BIRU",
+      "user": "sarang"
+    },
+    {
+      "machine": "Forming-4",
+      "jobId": "F-066",
+      "rawDate": "2026-10-05",
+      "user": "sarang",
+      "action": "Started Forming on Forming-4 (1 Crates = 12,372 Net Blanks Issued from VISHAL's Cut Lot @ 12,371.714 pcs/crate) | Op: BIRU | Sup: sarang",
+      "shift": "DAY",
+      "stage": "Forming",
+      "timestamp": "10/5/2026, 2:44:38 PM",
+      "worker": "BIRU",
+      "startTime": "02:44 PM",
+      "product": "Fork"
+    },
+    {
+      "jobId": "F-066",
+      "startTime": "02:43 PM",
+      "timestamp": "10/5/2026, 2:43:10 PM",
+      "user": "sarang",
+      "product": "Fork",
+      "action": "Forming Top-up on Forming-5 (+5 Crates = +61,859 Net Blanks Added from Lot SLC-1791166226007-2 by VISHAL)",
+      "machine": "Forming-5",
+      "shift": "DAY",
+      "stage": "Forming",
+      "rawDate": "2026-10-05",
+      "worker": "SARITA"
+    },
+    {
+      "startTime": "02:32 PM",
+      "timestamp": "10/5/2026, 2:32:07 PM",
+      "product": "Fork",
+      "jobId": "F-066",
+      "machine": "Forming-5",
+      "user": "sarang",
+      "action": "Forming Top-up on Forming-5 (+5 Crates = +61,859 Net Blanks Added from Lot SLC-1791166226007-2 by VISHAL)",
+      "rawDate": "2026-10-05",
+      "stage": "Forming",
+      "worker": "RAHUL",
+      "shift": "NIGHT"
+    },
+    {
+      "startTime": "02:20 PM",
+      "product": "Fork",
+      "stage": "Forming",
+      "timestamp": "10/5/2026, 2:20:13 PM",
+      "shift": "DAY",
+      "user": "form_user",
+      "machine": "Forming-5",
+      "worker": "SARITA",
+      "rawDate": "2026-10-05",
+      "action": "▶️ Forming Run Resumed to RUNNING | Worker: SARITA",
+      "jobId": "F-066"
+    },
+    {
+      "timestamp": "10/5/2026, 2:19:57 PM",
+      "product": "Workstation",
+      "stage": "Station Breakdown",
+      "startTime": "02:19 PM",
+      "machine": "Forming-5",
+      "jobId": "F-066",
+      "user": "SARITA",
+      "rawDate": "2026-10-05",
+      "action": "🚨 Machine Breakdown Logged [Ticket: MNT-001] (Hydraulic / Pneumatic Pressure Loss) - Phone: +91 9033912511"
+    },
+    {
+      "product": "Fork",
+      "action": "▶️ Forming Run Resumed to RUNNING | Worker: SARITA",
+      "timestamp": "10/5/2026, 2:17:05 PM",
+      "jobId": "F-066",
+      "startTime": "02:17 PM",
+      "worker": "SARITA",
+      "rawDate": "2026-10-05",
+      "machine": "Forming-5",
+      "shift": "DAY",
+      "stage": "Forming",
+      "user": "form_user"
+    },
+    {
+      "product": "Workstation",
+      "timestamp": "10/5/2026, 2:16:47 PM",
+      "stage": "Operational Pause",
+      "startTime": "02:16 PM",
+      "action": "⏸️ Machine Paused for Operational Break (Shift Handover / Briefing (शिफ्ट बदलाव)) | Operator: Operator",
+      "user": "Operator",
+      "rawDate": "2026-10-05",
+      "jobId": "F-066",
+      "machine": "Forming-5"
+    },
+    {
+      "startTime": "01:08 PM",
+      "worker": "SARITA",
+      "rawDate": "2026-10-05",
+      "stage": "Forming",
+      "timestamp": "10/5/2026, 1:08:19 PM",
+      "machine": "Forming-5",
+      "shift": "DAY",
+      "action": "Forming Top-up on Forming-5 (+1 Crates = +12,372 Net Blanks Added from Lot SLC-1791166226007-2 by VISHAL)",
+      "product": "Fork",
+      "user": "sarang",
+      "jobId": "F-066"
+    },
+    {
+      "action": "Started Forming on Forming-5 (3 Crates = 37,098 Net Blanks Issued from BALU's Cut Lot @ 12,366 pcs/crate) | Op: SARITA | Sup: sarang",
+      "jobId": "F-066",
+      "product": "Fork",
+      "user": "sarang",
+      "worker": "SARITA",
+      "stage": "Forming",
+      "rawDate": "2026-10-05",
+      "startTime": "01:07 PM",
+      "shift": "DAY",
+      "timestamp": "10/5/2026, 1:07:07 PM",
+      "machine": "Forming-5"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "action": "Forming Top-up on Forming-3 (+2 Crates = +22,760 Net Blanks Added from Lot SLC-1791165909699-2 by BALU)",
+      "timestamp": "10/5/2026, 12:26:30 PM",
+      "machine": "Forming-3",
+      "jobId": "S-070",
+      "startTime": "12:26 PM",
+      "worker": "ROSHAN",
+      "product": "Spoon",
+      "shift": "DAY",
+      "user": "sarang",
+      "stage": "Forming"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 12:26:13 PM",
+      "worker": "ROSHAN",
+      "shift": "DAY",
+      "stage": "Forming",
+      "machine": "Forming-3",
+      "action": "Started Forming on Forming-3 (1 Crates = 11,380 Net Blanks Issued from VISHAL SOLANKI's Cut Lot @ 11,380 pcs/crate) | Op: ROSHAN | Sup: sarang",
+      "startTime": "12:26 PM",
+      "product": "Spoon",
+      "jobId": "S-070",
+      "user": "sarang"
+    },
+    {
+      "stage": "Cutting",
+      "worker": "BALU",
+      "user": "admin",
+      "shift": "NIGHT",
+      "rawDate": "2026-10-05",
+      "endTime": "07:35 AM",
+      "action": "⏹️ Finished Cutting Batch S-070-CUT-01 (12 Crates + 0 Loose = 136,560 Gross - 0 Rejected Pcs = 136,560 Net Passed Cut Blanks | Extra Paper Scrap: 432 KG [Added separately to scrap, not minus from pieces]) | Adhesive Glue: 120 KG of Pidilite FS35",
+      "machine": "Cutting-2",
+      "timestamp": "10/5/2026, 7:35:09 AM",
+      "product": "Spoon",
+      "jobId": "S-070",
+      "startTime": "07:30 AM"
+    },
+    {
+      "jobId": "S-070",
+      "startTime": "07:30 AM",
+      "timestamp": "10/5/2026, 7:30:44 AM",
+      "product": "Spoon",
+      "user": "admin",
+      "action": "Started Cutting on Cutting-2 (8 Rolls Issued) | Op: VISHAL SOLANKI | Sup: admin",
+      "machine": "Cutting-2",
+      "shift": "DAY",
+      "stage": "Cutting",
+      "rawDate": "2026-10-05",
+      "worker": "VISHAL SOLANKI"
+    },
+    {
+      "user": "admin",
+      "stage": "Slitting",
+      "shift": "DAY",
+      "product": "Fork",
+      "worker": "ABHAY",
+      "endTime": "07:28 AM",
+      "timestamp": "10/5/2026, 7:28:28 AM",
+      "jobId": "F-069",
+      "machine": "Slitting-1",
+      "action": "⏹ Slitting Finished (1 Rolls, 141 KG Output | Jumbo In: 141 KG | Scrap: 0 KG (0% Wastage))",
+      "startTime": "07:28 AM",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 7:28:11 AM",
+      "action": "🚀 Started New Slitting Reel [5191] | Jumbo Weight: 141 KG | GSM: 125 GSM | Mill: AADHARA PAPER (Standard Reel) | Job: F-069 | Worker: ABHAY | Linked Plan: PLAN-2026-007",
+      "machine": "Slitting-1",
+      "jobId": "F-069",
+      "startTime": "07:28 AM",
+      "worker": "ABHAY",
+      "product": "Fork",
+      "shift": "DAY",
+      "user": "admin",
+      "stage": "Slitting"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "action": "⏹ Slitting Finished (4 Rolls, 423 KG Output | Jumbo In: 423 KG | Scrap: 0 KG (0% Wastage))",
+      "user": "admin",
+      "jobId": "F-068",
+      "startTime": "07:26 AM",
+      "worker": "ABHAY",
+      "machine": "Slitting-1",
+      "endTime": "07:27 AM",
+      "timestamp": "10/5/2026, 7:27:43 AM",
+      "stage": "Slitting",
+      "shift": "DAY",
+      "product": "Fork"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "action": "⏹ Slitting Finished (3 Rolls, 423 KG Output | Jumbo In: 423 KG | Scrap: 0 KG (0% Wastage))",
+      "startTime": "07:25 AM",
+      "jobId": "F-068",
+      "user": "admin",
+      "worker": "ABHAY",
+      "machine": "Slitting-1",
+      "endTime": "07:27 AM",
+      "timestamp": "10/5/2026, 7:27:11 AM",
+      "stage": "Slitting",
+      "shift": "DAY",
+      "product": "Fork"
+    },
+    {
+      "user": "admin",
+      "startTime": "07:26 AM",
+      "action": "⏹ Slitting Finished (1 Rolls, 141 KG Output | Jumbo In: 141 KG | Scrap: 0 KG (0% Wastage))",
+      "jobId": "F-068",
+      "product": "Fork",
+      "worker": "ABHAY",
+      "timestamp": "10/5/2026, 7:26:57 AM",
+      "stage": "Slitting",
+      "rawDate": "2026-10-05",
+      "shift": "DAY",
+      "machine": "Slitting-1",
+      "endTime": "07:26 AM"
+    },
+    {
+      "machine": "Slitting-1",
+      "user": "slit_user",
+      "jobId": "F-068",
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 7:26:43 AM",
+      "stage": "Slitting Re-open",
+      "action": "➕ Added Reel [5191] (Weight: 141 KG | GSM: 125 GSM) to Existing Job F-068 | Worker: ABHAY",
+      "shift": "DAY",
+      "worker": "ABHAY",
+      "startTime": "07:26 AM",
+      "product": "Fork"
+    },
+    {
+      "jobId": "F-068",
+      "startTime": "07:26 AM",
+      "user": "slit_user",
+      "timestamp": "10/5/2026, 7:26:26 AM",
+      "product": "Fork",
+      "action": "➕ Added Reel [5160] (Weight: 423 KG | GSM: 125 GSM) to Existing Job F-068 | Worker: ABHAY",
+      "shift": "DAY",
+      "machine": "Slitting-1",
+      "stage": "Slitting Re-open",
+      "worker": "ABHAY",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "jobId": "F-068",
+      "machine": "Slitting-1",
+      "rawDate": "2026-10-05",
+      "user": "admin",
+      "action": "🚀 Started New Slitting Reel [5044] | Jumbo Weight: 423 KG | GSM: 125 GSM | Mill: AADHARA PAPER (Standard Reel) | Job: F-068 | Worker: ABHAY | Linked Plan: PLAN-2026-006",
+      "shift": "DAY",
+      "startTime": "07:25 AM",
+      "stage": "Slitting",
+      "timestamp": "10/5/2026, 7:25:59 AM",
+      "worker": "ABHAY",
+      "product": "Fork"
+    },
+    {
+      "shift": "DAY",
+      "timestamp": "10/5/2026, 7:24:38 AM",
+      "stage": "Slitting",
+      "product": "Fork",
+      "user": "admin",
+      "startTime": "07:23 AM",
+      "endTime": "07:24 AM",
+      "jobId": "F-067",
+      "worker": "ABHAY",
+      "machine": "Slitting-1",
+      "action": "⏹ Slitting Finished (4 Rolls, 564 KG Output | Jumbo In: 564 KG | Scrap: 0 KG (0% Wastage))",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "endTime": "07:24 AM",
+      "shift": "DAY",
+      "timestamp": "10/5/2026, 7:24:27 AM",
+      "machine": "Slitting-1",
+      "stage": "Slitting",
+      "user": "admin",
+      "rawDate": "2026-10-05",
+      "startTime": "07:24 AM",
+      "jobId": "F-067",
+      "worker": "ABHAY",
+      "action": "⏹ Slitting Finished (4 Rolls, 564 KG Output | Jumbo In: 564 KG | Scrap: 0 KG (0% Wastage))",
+      "product": "Fork"
+    },
+    {
+      "product": "Fork",
+      "startTime": "07:24 AM",
+      "worker": "ABHAY",
+      "shift": "DAY",
+      "action": "➕ Added Reel [5176] (Weight: 564 KG | GSM: 125 GSM) to Existing Job F-067 | Worker: ABHAY",
+      "stage": "Slitting Re-open",
+      "timestamp": "10/5/2026, 7:24:15 AM",
+      "rawDate": "2026-10-05",
+      "jobId": "F-067",
+      "machine": "Slitting-1",
+      "user": "slit_user"
+    },
+    {
+      "product": "Fork",
+      "startTime": "07:23 AM",
+      "action": "🚀 Started New Slitting Reel [5211] | Jumbo Weight: 564 KG | GSM: 125 GSM | Mill: AADHARA PAPER (Standard Reel) | Job: F-067 | Worker: ABHAY | Linked Plan: PLAN-2026-005",
+      "jobId": "F-067",
+      "worker": "ABHAY",
+      "timestamp": "10/5/2026, 7:23:56 AM",
+      "rawDate": "2026-10-05",
+      "shift": "DAY",
+      "machine": "Slitting-1",
+      "user": "admin",
+      "stage": "Slitting"
+    },
+    {
+      "timestamp": "10/5/2026, 7:23:31 AM",
+      "jobId": "F-066",
+      "startTime": "07:23 AM",
+      "user": "admin",
+      "product": "Fork",
+      "action": "⏹ Slitting Finished (2 Rolls, 282 KG Output | Jumbo In: 282 KG | Scrap: 0 KG (0% Wastage))",
+      "shift": "DAY",
+      "machine": "Slitting-1",
+      "stage": "Slitting",
+      "endTime": "07:23 AM",
+      "worker": "ABHAY",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "action": "➕ Added Reel [ST-01] (Weight: 282 KG | GSM: 125 GSM) to Existing Job F-066 | Worker: ABHAY",
+      "product": "Fork",
+      "jobId": "F-066",
+      "worker": "ABHAY",
+      "startTime": "07:23 AM",
+      "rawDate": "2026-10-05",
+      "machine": "Slitting-1",
+      "timestamp": "10/5/2026, 7:23:16 AM",
+      "shift": "DAY",
+      "stage": "Slitting Re-open",
+      "user": "slit_user"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "action": "⏹ Slitting Finished (3 Rolls, 423 KG Output | Jumbo In: 423 KG | Scrap: 0 KG (0% Wastage))",
+      "machine": "Slitting-1",
+      "jobId": "F-066",
+      "worker": "ABHAY",
+      "endTime": "07:22 AM",
+      "user": "admin",
+      "timestamp": "10/5/2026, 7:22:45 AM",
+      "product": "Fork",
+      "startTime": "07:19 AM",
+      "stage": "Slitting",
+      "shift": "DAY"
+    },
+    {
+      "product": "Fork",
+      "worker": "ABHAY",
+      "shift": "DAY",
+      "action": "⏹ Slitting Finished (3 Rolls, 423 KG Output | Jumbo In: 423 KG | Scrap: 0 KG (0% Wastage))",
+      "stage": "Slitting",
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 7:22:30 AM",
+      "user": "admin",
+      "jobId": "F-066",
+      "endTime": "07:22 AM",
+      "machine": "Slitting-1",
+      "startTime": "07:22 AM"
+    },
+    {
+      "stage": "Slitting Re-open",
+      "user": "slit_user",
+      "shift": "DAY",
+      "machine": "Slitting-1",
+      "rawDate": "2026-10-05",
+      "worker": "ABHAY",
+      "timestamp": "10/5/2026, 7:22:10 AM",
+      "jobId": "F-066",
+      "product": "Fork",
+      "action": "➕ Added Reel [5175] (Weight: 423 KG | GSM: 125 GSM) to Existing Job F-066 | Worker: ABHAY",
+      "startTime": "07:22 AM"
+    },
+    {
+      "product": "Fork",
+      "timestamp": "10/5/2026, 7:19:54 AM",
+      "worker": "ABHAY",
+      "startTime": "07:19 AM",
+      "stage": "Slitting",
+      "shift": "DAY",
+      "action": "🚀 Started New Slitting Reel [5023] | Jumbo Weight: 423 KG | GSM: 125 GSM | Mill: AADHARA PAPER (Standard Reel) | Job: F-066 | Worker: ABHAY | Linked Plan: PLAN-2026-004",
+      "user": "admin",
+      "rawDate": "2026-10-05",
+      "jobId": "F-066",
+      "machine": "Slitting-1"
+    },
+    {
+      "startTime": "07:18 AM",
+      "product": "Spoon",
+      "action": "⏹ Slitting Finished (4 Rolls, 564 KG Output | Jumbo In: 564 KG | Scrap: 0 KG (0% Wastage))",
+      "timestamp": "10/5/2026, 7:19:19 AM",
+      "worker": "ABHAY",
+      "jobId": "S-071",
+      "rawDate": "2026-10-05",
+      "user": "admin",
+      "stage": "Slitting",
+      "machine": "Slitting-1",
+      "shift": "DAY",
+      "endTime": "07:19 AM"
+    },
+    {
+      "machine": "Slitting-1",
+      "timestamp": "10/5/2026, 7:19:05 AM",
+      "endTime": "07:19 AM",
+      "rawDate": "2026-10-05",
+      "jobId": "S-071",
+      "startTime": "07:18 AM",
+      "action": "⏹ Slitting Finished (4 Rolls, 564 KG Output | Jumbo In: 564 KG | Scrap: 0 KG (0% Wastage))",
+      "user": "admin",
+      "shift": "DAY",
+      "product": "Spoon",
+      "stage": "Slitting",
+      "worker": "ABHAY"
+    },
+    {
+      "product": "Spoon",
+      "action": "➕ Added Reel [5200] (Weight: 564 KG | GSM: 125 GSM) to Existing Job S-071 | Worker: ABHAY",
+      "jobId": "S-071",
+      "worker": "ABHAY",
+      "rawDate": "2026-10-05",
+      "user": "slit_user",
+      "startTime": "07:18 AM",
+      "machine": "Slitting-1",
+      "stage": "Slitting Re-open",
+      "shift": "DAY",
+      "timestamp": "10/5/2026, 7:18:33 AM"
+    },
+    {
+      "worker": "ABHAY",
+      "rawDate": "2026-10-05",
+      "stage": "Slitting",
+      "machine": "Slitting-1",
+      "shift": "DAY",
+      "action": "🚀 Started New Slitting Reel [5215] | Jumbo Weight: 564 KG | GSM: 125 GSM | Mill: AADHARA PAPER (Standard Reel) | Job: S-071 | Worker: ABHAY | Linked Plan: PLAN-2026-003",
+      "startTime": "07:18 AM",
+      "product": "Spoon",
+      "user": "admin",
+      "timestamp": "10/5/2026, 7:18:20 AM",
+      "jobId": "S-071"
+    },
+    {
+      "action": "⏹ Slitting Finished (4 Rolls, 564 KG Output | Jumbo In: 564 KG | Scrap: 0 KG (0% Wastage))",
+      "jobId": "S-070",
+      "product": "Spoon",
+      "user": "admin",
+      "worker": "AMISHBHAI",
+      "startTime": "07:16 AM",
+      "shift": "DAY",
+      "rawDate": "2026-10-05",
+      "stage": "Slitting",
+      "timestamp": "10/5/2026, 7:17:22 AM",
+      "machine": "Slitting-1",
+      "endTime": "07:17 AM"
+    },
+    {
+      "worker": "ABHAY",
+      "rawDate": "2026-10-05",
+      "stage": "Slitting",
+      "endTime": "07:17 AM",
+      "machine": "Slitting-1",
+      "shift": "DAY",
+      "action": "⏹ Slitting Finished (4 Rolls, 564 KG Output | Jumbo In: 564 KG | Scrap: 0 KG (0% Wastage))",
+      "product": "Spoon",
+      "user": "admin",
+      "timestamp": "10/5/2026, 7:17:01 AM",
+      "startTime": "07:16 AM",
+      "jobId": "S-070"
+    },
+    {
+      "action": "➕ Added Reel [5035] (Weight: 564 KG | GSM: 125 GSM) to Existing Job S-070 | Worker: ABHAY",
+      "jobId": "S-070",
+      "rawDate": "2026-10-05",
+      "user": "slit_user",
+      "worker": "ABHAY",
+      "machine": "Slitting-1",
+      "shift": "DAY",
+      "startTime": "07:16 AM",
+      "product": "Spoon",
+      "stage": "Slitting Re-open",
+      "timestamp": "10/5/2026, 7:16:47 AM"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "worker": "AMISHBHAI",
+      "timestamp": "10/5/2026, 7:16:20 AM",
+      "shift": "DAY",
+      "startTime": "07:16 AM",
+      "action": "🚀 Started New Slitting Reel [5203] | Jumbo Weight: 564 KG | GSM: 125 GSM | Mill: AADHARA PAPER (Standard Reel) | Job: S-070 | Worker: AMISHBHAI | Linked Plan: PLAN-2026-002",
+      "machine": "Slitting-1",
+      "stage": "Slitting",
+      "product": "Spoon",
+      "user": "admin",
+      "jobId": "S-070"
+    },
+    {
+      "action": "🗑️ [BACKUP & CASCADE DELETE] Job [SPN-070] and Plan [PLAN-2026-001] permanently deleted by admin. Cascaded Purge: 0 Slitting, 0 Cutting, 0 Forming. Backup #BCK-1791164456534-3323 saved.",
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 7:10:56 AM",
+      "user": "admin",
+      "jobId": "SPN-070",
+      "worker": "ADMIN",
+      "machine": "CASCADE-DELETE",
+      "stage": "Admin Master",
+      "shift": "DAY"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "user": "admin",
+      "timestamp": "10/5/2026, 7:10:36 AM",
+      "action": "🔢 Admin updated Item [Dessert Spoon] sequence counter to #3 (Prefix: DS)",
+      "machine": "ADMIN-CONTROL",
+      "stage": "Admin Master",
+      "shift": "DAY",
+      "worker": "ADMIN"
+    },
+    {
+      "stage": "Admin Master",
+      "rawDate": "2026-10-05",
+      "action": "🔢 Admin updated Item [Knife] sequence counter to #19 (Prefix: K)",
+      "shift": "DAY",
+      "user": "admin",
+      "worker": "ADMIN",
+      "machine": "ADMIN-CONTROL",
+      "timestamp": "10/5/2026, 7:10:08 AM"
+    },
+    {
+      "shift": "DAY",
+      "action": "🔢 Admin updated Item [Fork] sequence counter to #66 (Prefix: F)",
+      "machine": "ADMIN-CONTROL",
+      "stage": "Admin Master",
+      "worker": "ADMIN",
+      "rawDate": "2026-10-05",
+      "user": "admin",
+      "timestamp": "10/5/2026, 7:09:59 AM"
+    },
+    {
+      "stage": "Admin Master",
+      "action": "🔢 Admin updated Item [Spoon] sequence counter to #70 (Prefix: S)",
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 7:09:49 AM",
+      "shift": "DAY",
+      "user": "admin",
+      "worker": "ADMIN",
+      "machine": "ADMIN-CONTROL"
+    },
+    {
+      "worker": "ADMIN",
+      "timestamp": "10/5/2026, 7:08:12 AM",
+      "stage": "Admin Master",
+      "shift": "DAY",
+      "action": "🗑️ [BACKUP & CASCADE DELETE] Job [SPN-015] and Plan [PLAN-2026-001] permanently deleted by ADMIN. Cascaded Purge: 0 Slitting, 0 Cutting, 0 Forming. Backup #BCK-1791164292512-4841 saved.",
+      "user": "ADMIN",
+      "rawDate": "2026-10-05",
+      "jobId": "SPN-015",
+      "machine": "CASCADE-DELETE"
+    },
+    {
+      "shift": "DAY",
+      "stage": "Admin Master",
+      "product": "Spoon",
+      "user": "admin",
+      "jobId": "SPN-070",
+      "worker": "ADMIN",
+      "machine": "MASTER-OVERWRITE",
+      "action": "🛠️ Master Overwrite on Job [SPN-070]: Admin modified details (Reel: -, GSM: 125 GSM, In: 0kg, Out: 0kg, Scrap: 0kg)",
+      "timestamp": "10/5/2026, 7:06:31 AM",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "stage": "Admin Master",
+      "shift": "DAY",
+      "machine": "CASCADE-DELETE",
       "worker": "ADMIN",
       "user": "admin",
-      "rawDate": "2026-10-04",
-      "timestamp": "10/5/2026, 1:21:16 AM"
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 7:02:46 AM",
+      "jobId": "SPN-015",
+      "action": "🗑️ [BACKUP & CASCADE DELETE] Job [SPN-015] and Plan [PLAN-2026-001] permanently deleted by admin. Cascaded Purge: 0 Slitting, 0 Cutting, 0 Forming. Backup #BCK-1791163966899-4991 saved."
+    },
+    {
+      "shift": "DAY",
+      "worker": "ADMIN",
+      "stage": "Admin Master",
+      "machine": "ADMIN-CONTROL",
+      "action": "🔢 Admin updated Item [Spoon] sequence counter to #70 (Prefix: S)",
+      "timestamp": "10/5/2026, 6:48:21 AM",
+      "user": "admin",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "shift": "DAY",
+      "action": "🔢 Admin updated Item [Fork] sequence counter to #66 (Prefix: F)",
+      "machine": "ADMIN-CONTROL",
+      "timestamp": "10/5/2026, 6:48:15 AM",
+      "stage": "Admin Master",
+      "rawDate": "2026-10-05",
+      "user": "admin",
+      "worker": "ADMIN"
+    },
+    {
+      "shift": "DAY",
+      "worker": "ADMIN",
+      "machine": "ADMIN-CONTROL",
+      "stage": "Admin Master",
+      "user": "admin",
+      "action": "🔢 Admin updated Item [Knife] sequence counter to #19 (Prefix: K)",
+      "timestamp": "10/5/2026, 6:48:09 AM",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "action": "🔢 Admin updated Item [Dessert Spoon] sequence counter to #3 (Prefix: DS)",
+      "stage": "Admin Master",
+      "user": "admin",
+      "shift": "DAY",
+      "machine": "ADMIN-CONTROL",
+      "worker": "ADMIN",
+      "timestamp": "10/5/2026, 6:48:02 AM",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "machine": "ADMIN-CONTROL",
+      "worker": "ADMIN",
+      "timestamp": "10/5/2026, 6:47:47 AM",
+      "shift": "DAY",
+      "stage": "Admin Master",
+      "action": "🔢 Admin updated Item [Knife] sequence counter to #19 (Prefix: KNF)",
+      "rawDate": "2026-10-05",
+      "user": "admin"
+    },
+    {
+      "user": "admin",
+      "rawDate": "2026-10-05",
+      "action": "🔢 Admin updated Item [Fork] sequence counter to #66 (Prefix: FRK)",
+      "timestamp": "10/5/2026, 6:47:40 AM",
+      "stage": "Admin Master",
+      "worker": "ADMIN",
+      "machine": "ADMIN-CONTROL",
+      "shift": "DAY"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "action": "🔢 Admin updated Item [Spoon] sequence counter to #70 (Prefix: SPN)",
+      "machine": "ADMIN-CONTROL",
+      "shift": "DAY",
+      "stage": "Admin Master",
+      "user": "admin",
+      "timestamp": "10/5/2026, 6:47:34 AM",
+      "worker": "ADMIN"
+    },
+    {
+      "endTime": "18:44",
+      "stage": "Cutting",
+      "user": "amish",
+      "shift": "DAY",
+      "startTime": "08:24",
+      "machine": "Cutting-2",
+      "timestamp": "05/10/2026, 18:44:13",
+      "rawDate": "2026-10-05",
+      "worker": "VISHAL",
+      "jobId": "F-068",
+      "product": "Fork",
+      "action": "⏹️ Finished Cutting Batch F-068-CUT-01 (15 Crates + 0 Loose = 192,000 Gross - 0 Rejected Pcs = 192,000 Net Passed Cut Blanks | Extra Paper Scrap: 480.5 KG [Added separately to scrap, not minus from pieces]) | Adhesive Glue: 120 KG of Pidilite FS35"
+    },
+    {
+      "product": "Fork",
+      "worker": "VISHAL",
+      "shift": "DAY",
+      "timestamp": "05/10/2026, 18:43:13",
+      "action": "⚡ Partial Forward: 1 Cut Crates (= 13,440 Flat Blanks) forwarded. Created Lot: LOT-CUT-1791205993798-403",
+      "stage": "Cutting Forward",
+      "rawDate": "2026-10-05",
+      "jobId": "F-068",
+      "machine": "Cutting-2",
+      "user": "cut_user"
+    },
+    {
+      "machine": "Cutting-2",
+      "rawDate": "2026-10-05",
+      "jobId": "F-068",
+      "startTime": "08:24",
+      "action": "Started Cutting on Cutting-2 (8 Rolls Issued) | Op: BALU | Sup: amish",
+      "timestamp": "05/10/2026, 08:24:51",
+      "shift": "NIGHT",
+      "product": "Fork",
+      "user": "amish",
+      "stage": "Cutting",
+      "worker": "BALU"
+    },
+    {
+      "worker": "BALU",
+      "rawDate": "2026-10-05",
+      "startTime": "07:41 AM",
+      "endTime": "08:21",
+      "stage": "Cutting",
+      "shift": "NIGHT",
+      "machine": "Cutting-2",
+      "timestamp": "05/10/2026, 08:21:52",
+      "action": "⏹️ Finished Cutting Batch F-067-CUT-01 (16 Crates + 0 Loose = 204,800 Gross - 0 Rejected Pcs = 204,800 Net Passed Cut Blanks | Extra Paper Scrap: 540.8 KG [Added separately to scrap, not minus from pieces]) | Adhesive Glue: 120 KG of Pidilite FS35",
+      "product": "Fork",
+      "user": "amish",
+      "jobId": "F-067"
+    },
+    {
+      "shift": "NIGHT",
+      "worker": "BALU",
+      "stage": "Cutting",
+      "rawDate": "2026-10-05",
+      "action": "👥 Station Crew Assigned: Operator [BALU] with 1 Helpers (SHILPA BEN) on Cutting-2 for Batch [F-069-CUT-01]",
+      "user": "cut_supervisor",
+      "machine": "Cutting-2",
+      "jobId": "F-069",
+      "product": "Fork",
+      "timestamp": "09:45 pm"
+    },
+    {
+      "rawDate": "2026-10-05",
+      "action": "💧 Adhesive Glue Added: +70 KG | New Cumulative Total: 120 KG | Brand: Pidilite FS35 | Op: VISHAL",
+      "jobId": "F-068",
+      "machine": "Cutting-2",
+      "worker": "VISHAL",
+      "product": "Fork",
+      "timestamp": "09:23 pm",
+      "user": "cut_operator",
+      "shift": "DAY",
+      "stage": "Cutting"
+    },
+    {
+      "worker": "BALU",
+      "stage": "Cutting",
+      "product": "Fork",
+      "user": "admin",
+      "shift": "NIGHT",
+      "action": "Started Cutting on Cutting-2 (8 Rolls Issued) | Op: BALU | Sup: admin",
+      "timestamp": "10/5/2026, 9:45:16 PM",
+      "jobId": "F-069",
+      "rawDate": "2026-10-05",
+      "startTime": "09:45 PM",
+      "machine": "Cutting-2"
+    },
+    {
+      "user": "admin",
+      "rawDate": "2026-10-05",
+      "action": "⏹️ Finished Cutting Batch F-067-CUT-01 (0 Crates + 1 Loose = 1 Gross - 1 Rejected Pcs = 0 Net Passed Cut Blanks | Extra Paper Scrap: 1 KG [Added separately to scrap, not minus from pieces]) | Adhesive Glue: 120 KG of Pidilite FS35",
+      "jobId": "F-067",
+      "worker": "BALU",
+      "machine": "Cutting-2",
+      "endTime": "09:40 PM",
+      "startTime": "07:41 AM",
+      "stage": "Cutting",
+      "shift": "NIGHT",
+      "product": "Fork",
+      "timestamp": "10/5/2026, 9:40:53 PM"
+    },
+    {
+      "startTime": "08:24",
+      "product": "Fork",
+      "timestamp": "10/5/2026, 9:39:29 PM",
+      "jobId": "F-068",
+      "machine": "Cutting-2",
+      "endTime": "09:39 PM",
+      "user": "admin",
+      "action": "⏹️ Finished Cutting Batch F-068-CUT-01 (0 Crates + 2 Loose = 2 Gross - 0 Rejected Pcs = 2 Net Passed Cut Blanks | Extra Paper Scrap: 0 KG [Added separately to scrap, not minus from pieces]) | Adhesive Glue: 120 KG of Pidilite FS35",
+      "stage": "Cutting",
+      "rawDate": "2026-10-05",
+      "worker": "VISHAL",
+      "shift": "DAY"
+    },
+    {
+      "machine": "Forming-4",
+      "timestamp": "10/5/2026, 9:21:32 PM",
+      "endTime": "09:21 PM",
+      "rawDate": "2026-10-05",
+      "startTime": "02:44 PM",
+      "jobId": "F-066",
+      "user": "admin",
+      "action": "⏹️ Finished Forming Batch F-066-FORM-02 (2 Crates = 21,200 3D Pieces) | Auto-Returned 1 Unused Cutting Crates back to Stock | Defect/Scrap: 0 Pieces | Auto-Adjustment: +3,545 Pcs",
+      "stage": "Forming",
+      "shift": "DAY",
+      "product": "Fork",
+      "worker": "BIRU"
+    },
+    {
+      "action": "⏹️ Finished Forming Batch F-066-FORM-01 (0 Crates = 100 3D Pieces) | Defect/Scrap: 0 Pieces | Auto-Adjustment: +61 Pcs",
+      "rawDate": "2026-10-05",
+      "user": "admin",
+      "jobId": "F-066",
+      "worker": "SARITA",
+      "machine": "Forming-5",
+      "endTime": "09:20 PM",
+      "timestamp": "10/5/2026, 9:20:00 PM",
+      "stage": "Forming",
+      "shift": "DAY",
+      "product": "Fork",
+      "startTime": "01:07 PM"
+    },
+    {
+      "user": "admin",
+      "stage": "Admin Master",
+      "shift": "DAY",
+      "machine": "MASTER-OVERWRITE",
+      "rawDate": "2026-10-05",
+      "worker": "ADMIN",
+      "jobId": "S-070",
+      "timestamp": "10/5/2026, 9:15:33 PM",
+      "product": "Spoon",
+      "action": "🛠️ Master Overwrite on Job [S-070]: Admin modified details (Reel: 5203, 5035, GSM: 125 GSM, In: 1128kg, Out: 1128kg, Scrap: 0kg)"
+    },
+    {
+      "product": "Spoon",
+      "action": "🛠️ Master Overwrite on Job [S-070]: Admin modified details (Reel: 5203, 5035, GSM: 125 GSM, In: 1128kg, Out: 1128kg, Scrap: 0kg)",
+      "worker": "ADMIN",
+      "jobId": "S-070",
+      "rawDate": "2026-10-05",
+      "user": "admin",
+      "machine": "MASTER-OVERWRITE",
+      "stage": "Admin Master",
+      "timestamp": "10/5/2026, 9:13:17 PM",
+      "shift": "DAY"
+    },
+    {
+      "timestamp": "10/5/2026, 9:10:27 PM",
+      "jobId": "S-070",
+      "product": "Spoon",
+      "startTime": "12:26 PM",
+      "machine": "Forming-3",
+      "action": "⏹️ Finished Forming Batch S-070-FORM-01 (5 Crates = 45,400 3D Pieces) | Defect/Scrap: 120 Pieces",
+      "endTime": "09:10 PM",
+      "rawDate": "2026-10-05",
+      "shift": "DAY",
+      "user": "admin",
+      "worker": "ROSHAN",
+      "stage": "Forming"
+    },
+    {
+      "action": "Forming Top-up on Forming-3 (+1 Crates = +11,380 Net Blanks Added from Lot SLC-1791165909699-2 by BALU)",
+      "rawDate": "2026-10-05",
+      "jobId": "S-070",
+      "startTime": "09:08 PM",
+      "machine": "Forming-3",
+      "worker": "ROSHAN",
+      "user": "admin",
+      "timestamp": "10/5/2026, 9:08:45 PM",
+      "shift": "NIGHT",
+      "stage": "Forming",
+      "product": "Spoon"
+    },
+    {
+      "product": "Fork",
+      "action": "⏹️ Finished Forming Batch F-066-FORM-01 (7 Crates = 61,775 3D Pieces) | Defect/Scrap: 78 Pieces | Auto-Adjustment: +5 Pcs",
+      "jobId": "F-066",
+      "worker": "SARITA",
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 7:46:02 PM",
+      "machine": "Forming-5",
+      "shift": "DAY",
+      "user": "admin",
+      "stage": "Forming",
+      "endTime": "07:46 PM",
+      "startTime": "01:07 PM"
+    },
+    {
+      "machine": "Forming-1",
+      "rawDate": "2026-10-05",
+      "jobId": "F-067",
+      "user": "form_user",
+      "action": "↩️ Quick Un-issue: 2 Cut Crates returned to BALU's Cutting Lot (Remaining in Forming: 0)",
+      "stage": "Forming Un-issue",
+      "product": "Fork",
+      "worker": "ROSHAN",
+      "timestamp": "10/5/2026, 7:35:35 PM",
+      "shift": "DAY"
+    },
+    {
+      "user": "admin",
+      "startTime": "07:35 PM",
+      "jobId": "F-067",
+      "timestamp": "10/5/2026, 7:35:17 PM",
+      "product": "Fork",
+      "machine": "Forming-1",
+      "action": "Started Forming on Forming-1 (2 Crates = 25,600 Net Blanks Issued from BALU's Cut Lot @ 12,800 pcs/crate) | Op: ROSHAN | Sup: admin",
+      "stage": "Forming",
+      "shift": "DAY",
+      "worker": "ROSHAN",
+      "rawDate": "2026-10-05"
+    },
+    {
+      "action": "🛠️ Master Overwrite on Job [F-067]: Admin modified details (Reel: 5211, 5176, GSM: 125 GSM, In: 1128kg, Out: 1128kg, Scrap: 0kg)",
+      "product": "Fork",
+      "jobId": "F-067",
+      "worker": "ADMIN",
+      "rawDate": "2026-10-05",
+      "timestamp": "10/5/2026, 7:33:20 PM",
+      "machine": "MASTER-OVERWRITE",
+      "shift": "DAY",
+      "stage": "Admin Master",
+      "user": "admin"
+    },
+    {
+      "worker": "ADMIN",
+      "rawDate": "2026-10-05",
+      "stage": "Admin Master",
+      "machine": "MASTER-OVERWRITE",
+      "shift": "DAY",
+      "action": "🛠️ Master Overwrite on Job [F-067]: Admin modified details (Reel: 5211, 5176, GSM: 125 GSM, In: 1128kg, Out: 1128kg, Scrap: 0kg)",
+      "product": "Fork",
+      "user": "admin",
+      "timestamp": "10/5/2026, 7:33:18 PM",
+      "jobId": "F-067"
     }
   ],
-  "lastResetTimestamp": 1791141579161
+  "lastResetTimestamp": 1791141579161,
+  "lastUpdated": "2026-10-05T16:42:20.225Z"
 }
