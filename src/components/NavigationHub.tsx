@@ -214,6 +214,15 @@ export const NavigationHub: React.FC<NavigationHubProps> = ({
       borderColor: 'border-rose-600'
     },
     {
+      id: 'SUPERVISOR',
+      title: 'Post-Slitting Supervisor Control',
+      subtitle: 'Strict Gates: Scrap Overrides, Operator Returns, QC Defects & Gate Pass',
+      icon: <ShieldCheck className="w-8 h-8 text-indigo-700" />,
+      perm: 'Supervisor',
+      borderColor: 'border-indigo-700',
+      badge: 'Supervisor Suite'
+    },
+    {
       id: 'STOCK',
       title: 'Live Stock Matrix',
       subtitle: 'Real-time Rolls, Crates, WIP, and Scrap Balance',

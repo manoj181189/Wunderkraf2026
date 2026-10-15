@@ -89,6 +89,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     stock: '',
     status: '',
   });
+  const [tableTab, setTableTab] = useState<'PENDING' | 'COMPLETED' | 'ALL'>('PENDING');
   const [actualGlueConsumed, setActualGlueConsumed] = useState<string>('');
   const [glueIssueInput, setGlueIssueInput] = useState<string>('');
   const [glueSuccessMsg, setGlueSuccessMsg] = useState<string>('');
@@ -104,9 +105,6 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
   // Dialog states for Quick Actions (Replacing window.prompt)
   const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
   const [forwardQtyInput, setForwardQtyInput] = useState('');
-
-  const [isUnissueModalOpen, setIsUnissueModalOpen] = useState(false);
-  const [unissueQtyInput, setUnissueQtyInput] = useState('');
 
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
@@ -287,43 +285,49 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
 
   // Pending queue of slit rolls ready for Cutting
   let pendingSlitJobs = jobs.filter((j) => {
-    // Exclude jobs that have already moved past Cutting (e.g., in Forming, QC, Packing, or Dispatched)
-    if (j.stage === 'Forming' || j.stage === 'QC' || j.stage === 'Packing' || j.stage === 'Dispatched') {
+    // Exclude jobs that have already moved past Cutting (e.g., in Forming, QC, Packing, Dispatched, or Cutting Completed)
+    if (['Forming', 'QC', 'Packing', 'Dispatched', 'Cutting Completed'].includes(j.stage)) {
       return false;
     }
     // If cutting is already completely finished for this job
-    if (j.status === 'CUTTING_COMPLETED') {
+    if (j.status === 'CUTTING_COMPLETED' || j.status === 'Completed') {
+      return false;
+    }
+    if ((j.availableCuttingCrates || 0) > 0) {
+      return false;
+    }
+
+    // Check cutting batches
+    const cutBatches = (j.runningBatches || []).filter(b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
+    const hasCompletedCut = cutBatches.some(b => b.status === 'Completed');
+    const hasRunningCut = cutBatches.some(b => b.status === 'Running' || b.status === 'Held');
+
+    // If job has an active running cut batch or completed cutting, exclude it from pending queue
+    if (hasRunningCut || (hasCompletedCut && !hasRunningCut)) {
       return false;
     }
 
     const parentJob = j.parentJobId ? jobs.find(p => p.id === j.parentJobId) : null;
     const targetJobForSlit = parentJob || j;
 
-    const plannedLayers = targetJobForSlit.targetLayers || 8;
-    const completedReelsCount = targetJobForSlit.reelsList?.length || 0;
-    const hasAllLayersSlit = (completedReelsCount >= plannedLayers && plannedLayers > 0) || (targetJobForSlit.availableRolls !== undefined && targetJobForSlit.availableRolls >= plannedLayers);
-    const isSlitStageDone = targetJobForSlit.stage === 'Slitting Completed' || targetJobForSlit.status === 'READY_FOR_CUTTING';
+    const rollsCount = targetJobForSlit.availableRolls !== undefined ? targetJobForSlit.availableRolls : 0;
 
-    // Available rolls calculation with fallback to completed layers
-    const rollsCount = (targetJobForSlit.availableRolls !== undefined && targetJobForSlit.availableRolls > 0)
-      ? targetJobForSlit.availableRolls
-      : (hasAllLayersSlit ? plannedLayers : (completedReelsCount > 0 && isSlitStageDone ? completedReelsCount : 0));
-
-    const hasRolls = rollsCount > 0 || (targetJobForSlit.outputWeightKg || 0) > 0 || hasAllLayersSlit;
+    // Must have available slit rolls to cut (or an active running batch)
+    if (rollsCount <= 0 && !hasRunningCut) {
+      return false;
+    }
     
     // If it's a child job, it is ready for cutting if the parent is ready or in progress
     if (j.parentJobId) {
       const parentIsReady = parentJob && (
         parentJob.status === 'READY_FOR_CUTTING' || 
         parentJob.status === 'CUTTING_IN_PROGRESS' || 
-        parentJob.stage === 'Slitting Completed' ||
-        hasAllLayersSlit
+        parentJob.stage === 'Slitting Completed'
       );
-      return hasRolls && Boolean(parentIsReady);
+      return Boolean(parentIsReady);
     }
     
     // If it is a parent job, we only show it in cutting if it has no child jobs.
-    // If it has child jobs, we only want to show the child jobs in cutting so the user doesn't cut the parent directly!
     const hasChildren = jobs.some(child => child.parentJobId === j.id);
     if (hasChildren) {
       return false; // Hide the parent job, show its child jobs instead!
@@ -333,10 +337,9 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       j.status === 'READY_FOR_CUTTING' || 
       j.status === 'CUTTING_IN_PROGRESS' || 
       j.stage === 'Slitting Completed' ||
-      j.stage === 'Cutting' ||
-      hasAllLayersSlit;
+      j.stage === 'Cutting';
 
-    return hasRolls && isReadyOrInProgress;
+    return isReadyOrInProgress;
   });
   if (filterProduct) {
     pendingSlitJobs = pendingSlitJobs.filter((j) => j.product === filterProduct);
@@ -857,66 +860,6 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     alert(`✅ Forwarded ${qty} Cut Crates to Forming Queue! Machine remains RUNNING.`);
   };
 
-  const handleConfirmQuickUnissue = () => {
-    if (!activeBatchObj) return;
-    const qty = parseInt(unissueQtyInput, 10) || 0;
-    if (qty <= 0) {
-      alert('Please enter a valid quantity of slit rolls to return!');
-      return;
-    }
-
-    const { job, batch } = activeBatchObj;
-    const curIssued = batch.issuedQty || 0;
-    if (qty > curIssued) {
-      alert(`Cannot un-issue more than currently issued rolls count (${curIssued})!`);
-      return;
-    }
-
-    const remaining = curIssued - qty;
-
-    const updatedJobs = jobs.map((j) => {
-      if (j.id !== job.id) return j;
-      const updatedBatches = (j.runningBatches || [])
-        .map((b) => {
-          if (b.batchId !== batch.batchId) return b;
-          return { ...b, issuedQty: remaining };
-        })
-        .filter((b) => (b.issuedQty || 0) > 0 || (b.producedQty || 0) > 0);
-
-      return {
-        ...j,
-        availableRolls: (j.availableRolls || 0) + qty,
-        runningBatches: updatedBatches
-      };
-    });
-
-    const newLog = {
-      jobId: job.id,
-      product: job.product,
-      stage: 'Cutting Un-issue',
-      machine: selectedMachine,
-      shift: batch.shift,
-      action: `↩️ Quick Un-issue: ${qty} Slit Rolls returned to Slitting Stock (Remaining: ${remaining})`,
-      worker: batch.worker,
-      user: 'cut_user',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
-
-    onSaveState({
-      ...state,
-      jobs: updatedJobs,
-      logs: [...state.logs, newLog]
-    });
-
-    setIsUnissueModalOpen(false);
-    setUnissueQtyInput('');
-    if (remaining === 0) {
-      setSelectedActiveBatchId('');
-    }
-    alert(`✅ Returned ${qty} Slit Rolls back to Slitting Stock!`);
-  };
-
   const handleConfirmShiftHandover = (handoverData: {
     relievedByOperator: string;
     nextShift: 'DAY' | 'NIGHT' | string;
@@ -1299,10 +1242,20 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
 
       const updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
+        const nextAvailCrates = (j.availableCuttingCrates || 0) + cratesDone;
+        const rollSourceJob = j.parentJobId ? jobs.find(p => p.id === j.parentJobId) : j;
+        const currentAvailRolls = rollSourceJob?.availableRolls !== undefined ? rollSourceJob.availableRolls : 0;
+        const otherRunning = (j.runningBatches || []).some(b => b.batchId !== batch.batchId && (b.status === 'Running' || b.status === 'Held'));
+        const isCuttingFullyDone = !otherRunning;
+        const remainingAvailRolls = otherRunning ? currentAvailRolls : 0;
+
         return {
           ...j,
           pcsPerCrateCutting: effectiveCutPcs,
-          availableCuttingCrates: (j.availableCuttingCrates || 0) + cratesDone,
+          availableCuttingCrates: nextAvailCrates,
+          availableRolls: remainingAvailRolls,
+          stage: nextAvailCrates > 0 ? 'Forming' : (isCuttingFullyDone ? 'Cutting Completed' : (j.stage || 'Cutting')),
+          status: isCuttingFullyDone ? 'CUTTING_COMPLETED' : 'CUTTING_IN_PROGRESS',
           totalCutPieces: (j.totalCutPieces || 0) + totalCutPcs,
           cuttingLoosePcs: (j.cuttingLoosePcs || 0) + looseDone,
           cuttingScrapKg: (j.cuttingScrapKg || 0) + materialScrapKgVal,
@@ -1566,8 +1519,18 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       let updatedJ = { ...j };
       
       if (j.id === job.id) {
+        const nextAvailCrates = (j.availableCuttingCrates || 0) + currentJobCratesDelta;
+        const rollSourceJob = j.parentJobId ? jobs.find(p => p.id === j.parentJobId) : j;
+        const currentAvailRolls = rollSourceJob?.availableRolls !== undefined ? rollSourceJob.availableRolls : 0;
+        const otherRunning = (j.runningBatches || []).some(b => b.batchId !== batch.batchId && (b.status === 'Running' || b.status === 'Held'));
+        const isCuttingFullyDone = !otherRunning;
+        const remainingAvailRolls = otherRunning ? currentAvailRolls : 0;
+
         updatedJ.pcsPerCrateCutting = effectiveCutPcs;
-        updatedJ.availableCuttingCrates = (j.availableCuttingCrates || 0) + currentJobCratesDelta;
+        updatedJ.availableCuttingCrates = nextAvailCrates;
+        updatedJ.availableRolls = remainingAvailRolls;
+        updatedJ.stage = nextAvailCrates > 0 ? 'Forming' : (isCuttingFullyDone ? 'Cutting Completed' : (j.stage || 'Cutting'));
+        updatedJ.status = isCuttingFullyDone ? 'CUTTING_COMPLETED' : 'CUTTING_IN_PROGRESS';
         updatedJ.totalCutPieces = (j.totalCutPieces || 0) + currentJobPcsDelta;
         updatedJ.cuttingLoosePcs = (j.cuttingLoosePcs || 0) + looseDone;
         updatedJ.cuttingScrapKg = (j.cuttingScrapKg || 0) + materialScrapKgVal;
@@ -3180,6 +3143,12 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
             statusText = `Pending Forming (${stock} Crates)`;
           }
 
+          const isDoneInCutting = j.status === 'CUTTING_COMPLETED' || j.status === 'Completed' || ['Forming', 'QC', 'Packing', 'Dispatched', 'Cutting Completed'].includes(j.stage);
+          const hasActiveCutRun = cutBatches.some(b => b.status === 'Running' || b.status === 'Held');
+          const parentJ = j.parentJobId ? jobs.find(p => p.id === j.parentJobId) : j;
+          const currentAvailRolls = parentJ?.availableRolls || 0;
+          const isPending = !isDoneInCutting && (currentAvailRolls > 0 || hasActiveCutRun);
+
           return {
             job: j,
             id: j.id,
@@ -3200,11 +3169,19 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
             statusText,
             cutStageLedger,
             cutBatches,
+            isDoneInCutting,
+            isPending
           };
         });
 
-        // 1. Global Filter
+        // 1. Tab Filter
         let filtered = processedJobs;
+        if (tableTab === 'PENDING') {
+          filtered = filtered.filter(item => item.isPending);
+        } else if (tableTab === 'COMPLETED') {
+          filtered = filtered.filter(item => item.isDoneInCutting);
+        }
+
         if (tableSearch.trim()) {
           const q = tableSearch.toLowerCase();
           filtered = filtered.filter((item) => {
@@ -3295,6 +3272,9 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
           document.body.removeChild(link);
         };
 
+        const pendingCount = processedJobs.filter(i => i.isPending).length;
+        const completedCount = processedJobs.filter(i => i.isDoneInCutting).length;
+
         return (
           <div className="mt-8 pt-6 border-t-2 border-slate-200 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -3306,6 +3286,43 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
                 <p className="text-xs text-slate-500 m-0">
                   Reel number, GSM, and forward traceability status for each cutting job ID
                 </p>
+              </div>
+
+              {/* Table Filter Tabs */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setTableTab('PENDING')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                    tableTab === 'PENDING'
+                      ? 'bg-blue-600 text-white shadow-3xs'
+                      : 'text-slate-600 hover:text-slate-900 font-bold'
+                  }`}
+                >
+                  Pending Cutting ({pendingCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableTab('COMPLETED')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                    tableTab === 'COMPLETED'
+                      ? 'bg-emerald-600 text-white shadow-3xs'
+                      : 'text-slate-600 hover:text-slate-900 font-bold'
+                  }`}
+                >
+                  Cut Completed / Sent to Forming ({completedCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableTab('ALL')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                    tableTab === 'ALL'
+                      ? 'bg-slate-800 text-white shadow-3xs'
+                      : 'text-slate-600 hover:text-slate-900 font-bold'
+                  }`}
+                >
+                  All ({processedJobs.length})
+                </button>
               </div>
               <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                 <button

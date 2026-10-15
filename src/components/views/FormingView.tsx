@@ -32,11 +32,30 @@ export const FormingView: React.FC<FormingViewProps> = ({
   currentUser
 }) => {
   const { jobs, shiftConfig } = state;
-  const formFloorWorkers = (state.floorWorkers || []).filter(w => w.department === 'Forming');
-  const formOperators = formFloorWorkers.filter(w => w.role === 'OPERATOR').map(w => w.name);
-  const formWorkers = formOperators.length > 0
+  // Comprehensive list of all operators: Forming line first, then Cutting, Slitting & factory roster
+  const formFloorWorkers = (state.floorWorkers || []).filter(
+    (w) => w.department?.toLowerCase() === 'forming'
+  );
+  const formOperators = formFloorWorkers
+    .filter((w) => w.role === 'OPERATOR' || !w.role)
+    .map((w) => w.name);
+  const baseFormWorkers = formOperators.length > 0
     ? formOperators
     : (state.deptWorkers?.['Forming'] || DEPT_WORKERS['Forming'] || ['Operator']);
+
+  const allLineOperators = Array.from(
+    new Set([
+      ...baseFormWorkers,
+      ...(state.floorWorkers || [])
+        .filter((w) => w.status !== 'INACTIVE' && (w.role === 'OPERATOR' || w.role === 'TECHNICIAN' || !w.role))
+        .map((w) => w.name),
+      ...(state.deptWorkers?.['Cutting'] || []),
+      ...(state.deptWorkers?.['Slitting'] || []),
+      ...(state.deptWorkers?.['Forming'] || [])
+    ])
+  );
+
+  const formWorkers = allLineOperators.length > 0 ? allLineOperators : ['Operator'];
 
   const currentSupervisor = currentUser?.username || 'forming_supervisor';
 
@@ -106,18 +125,24 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
   // Pending queue of cut crates
   let pendingCutJobs = jobs.filter((j) => {
+    if (['QC', 'Packing', 'Dispatched', 'Completed'].includes(j.stage)) return false;
+
+    const formBatches = (j.runningBatches || []).filter(
+      (b) => b.stage === 'Forming' || b.machine?.startsWith('Forming')
+    );
+    // Exclude jobs that ALREADY have active running/held batches in forming (they are in active running menu)
+    const hasActiveForming = formBatches.some((b) => b.status === 'Running' || b.status === 'Held');
+    if (hasActiveForming) return false;
+
     const cutCrates = Number(j.availableCuttingCrates) || 0;
     const cutBatches = (j.runningBatches || []).filter(
       (b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
     );
     const totalCutProduced = cutBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
-    const formBatches = (j.runningBatches || []).filter(
-      (b) => b.stage === 'Forming' || b.machine?.startsWith('Forming')
-    );
     const totalFormIssued = formBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
-    const unformedCrates = Math.max(0, totalCutProduced - totalFormIssued);
+    const unformedCrates = totalCutProduced > 0 ? Math.max(0, totalCutProduced - totalFormIssued) : cutCrates;
 
-    return cutCrates > 0 || unformedCrates > 0 || ((Number(j.totalCutPieces) || 0) > 0 && j.stage === 'Cutting') || j.stage === 'Forming';
+    return unformedCrates > 0;
   });
   if (filterProduct) {
     pendingCutJobs = pendingCutJobs.filter((j) => j.product === filterProduct);
@@ -138,7 +163,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
   });
 
   const activeBatchObj =
-    activeBatches.find((item) => item.batch?.batchId === selectedActiveBatchId) || activeBatches[0];
+    activeBatches.find((item) => item.batch?.batchId === selectedActiveBatchId) ||
+    activeBatches.find((item) => item.batch?.status === 'Running') ||
+    activeBatches[0];
 
   useEffect(() => {
     if (activeBatchObj?.job) {
@@ -200,10 +227,18 @@ export const FormingView: React.FC<FormingViewProps> = ({
     const cuttingBatches = (j.runningBatches || []).filter(
       (b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
     );
+    const formBatches = (j.runningBatches || []).filter(
+      (b) => b.stage === 'Forming' || b.machine?.startsWith('Forming')
+    );
     const totalCutCrates = cuttingBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
+    const totalFormIssued = formBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
     const rawStdCutPcs = Number(j.pcsPerCrateCutting) || state.crateCapacityMaster?.[j.product]?.cuttingPcs || 10000;
     const cuttingRejectedPcs = Number(j.cuttingRejectedPcs) || Number(j.cuttingScrapPcs) || 0;
-    const availCrates = Number(j.availableCuttingCrates) || 0;
+    const availCrates = totalCutCrates > 0
+      ? Math.max(0, totalCutCrates - totalFormIssued)
+      : (totalFormIssued > 0
+          ? Math.max(0, (Number(j.totalCutCrates) || Number(j.availableCuttingCrates) || 0) - totalFormIssued)
+          : Number(j.availableCuttingCrates) || 0);
 
     // Net pieces per cutting crate: Calculate based on ACTUAL cut output if possible (strict whole integers)
     let netPcsPerCrate = rawStdCutPcs;
@@ -216,16 +251,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
     }
 
     // Total net flat blanks available:
-    let totalNetPieces = 0;
-    if (availCrates > 0) {
-      totalNetPieces = availCrates * netPcsPerCrate;
-    } else if (j.totalCutPieces !== undefined && Number(j.totalCutPieces) > 0) {
-      totalNetPieces = Number(j.totalCutPieces);
-    } else if (totalCutCrates > 0) {
-      totalNetPieces = Math.max(0, (totalCutCrates * rawStdCutPcs) - cuttingRejectedPcs);
-    } else {
-      totalNetPieces = availCrates * rawStdCutPcs;
-    }
+    const totalNetPieces = availCrates > 0 ? availCrates * netPcsPerCrate : 0;
 
     const hasRejectionDeduction = cuttingRejectedPcs > 0 && totalNetPieces < ((totalCutCrates || availCrates || 0) * rawStdCutPcs);
 
@@ -651,7 +677,18 @@ export const FormingView: React.FC<FormingViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
-    const { floorWorkers, deptWorkers } = autoRegisterWorker(state, operatorName, 'Forming', selectedMachine, shift);
+    const { floorWorkers, deptWorkers } = autoRegisterCrew(
+      state,
+      operatorName,
+      assignedHelpers,
+      'Forming',
+      selectedMachine,
+      shift
+    );
+
+    const updatedReadyAlerts = (state.machineReadyAlerts || []).filter(
+      (a) => a.machine !== selectedMachine
+    );
 
     onSaveState({
       ...state,
@@ -659,6 +696,7 @@ export const FormingView: React.FC<FormingViewProps> = ({
       wipLots: updatedWipLots,
       floorWorkers,
       deptWorkers,
+      machineReadyAlerts: updatedReadyAlerts,
       logs: [...state.logs, newLog]
     });
 
@@ -1036,10 +1074,21 @@ export const FormingView: React.FC<FormingViewProps> = ({
       timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
     };
 
+    const { floorWorkers: updatedFloorWorkers, deptWorkers: updatedDeptWorkers } = autoRegisterCrew(
+      state,
+      handoverData.relievedByOperator,
+      nextHelpers,
+      'Forming',
+      selectedMachine,
+      handoverData.nextShift
+    );
+
     onSaveState({
       ...state,
       jobs: updatedJobs,
       shiftHandovers: [handoverRecord, ...(state.shiftHandovers || [])],
+      floorWorkers: updatedFloorWorkers,
+      deptWorkers: updatedDeptWorkers,
       logs: [handoverLog, ...(state.logs || [])]
     });
 
@@ -1726,8 +1775,10 @@ export const FormingView: React.FC<FormingViewProps> = ({
             return (
               <button
                 key={mName}
-                type="button"
-                onClick={() => setSelectedMachine(mName)}
+                onClick={() => {
+                  setSelectedMachine(mName);
+                  setSelectedActiveBatchId('');
+                }}
                 className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
                   isSelected
                     ? isUnderRepair
@@ -1856,8 +1907,23 @@ export const FormingView: React.FC<FormingViewProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-700 bg-white/80 p-2.5 rounded-lg border border-slate-200">
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Operator:</span>
-                  <b>{activeBatchObj.batch.worker}</b> ({activeBatchObj.batch.shift || 'DAY'})
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Operator:</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCrewModalOpen(true)}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 font-extrabold flex items-center gap-0.5 cursor-pointer"
+                      title="Change / Assign Crew & Helper"
+                    >
+                      <Users className="w-3 h-3" /> Change Crew
+                    </button>
+                  </div>
+                  <b className="text-slate-900">{activeBatchObj.batch.worker}</b> ({activeBatchObj.batch.shift || 'DAY'})
+                  {activeBatchObj.batch.helpers && activeBatchObj.batch.helpers.length > 0 && (
+                    <div className="text-[10px] text-amber-800 font-bold mt-0.5">
+                      🤝 {activeBatchObj.batch.helpers.length} Helpers ({activeBatchObj.batch.helpers.join(', ')})
+                    </div>
+                  )}
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-bold block">Start Time:</span>
@@ -2226,6 +2292,14 @@ export const FormingView: React.FC<FormingViewProps> = ({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setIsCrewModalOpen(true)}
+                  className="py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                  title="Change Station Crew & Helpers"
+                >
+                  <Users className="w-3.5 h-3.5" /> Crew & Helper
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsShiftHandoverModalOpen(true)}
                   className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                   title="Handover machine to incoming shift operator without stopping the batch"
@@ -2281,24 +2355,52 @@ export const FormingView: React.FC<FormingViewProps> = ({
         <form onSubmit={handleStartOrTopup} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="block text-xs font-bold text-purple-700 uppercase">
-                Operator & Crew <span className="text-rose-600">*</span>:
-              </label>
-              <div className="flex items-center justify-between bg-white border border-purple-300 px-3 py-2 rounded-lg">
-                <div className="flex flex-col">
-                  <span className="font-bold text-slate-800">{operatorName || 'Select Operator'}</span>
-                  <span className="text-[10px] text-slate-500 font-medium">
-                    {assignedHelpers.length > 0 ? `${assignedHelpers.length} Helpers (${assignedHelpers.join(', ')})` : 'No Helpers Assigned'}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-purple-700 uppercase">
+                  Forming Operator Name <span className="text-rose-600">*Mandatory</span>:
+                </label>
                 <button
                   type="button"
                   onClick={() => setIsCrewModalOpen(true)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded transition cursor-pointer"
+                  className="text-[11px] font-extrabold text-blue-700 hover:text-blue-900 flex items-center gap-1 cursor-pointer"
+                  title="Open Crew & Helpers Modal"
                 >
-                  Change Crew
+                  <Users className="w-3.5 h-3.5 text-blue-600" />
+                  <span>👥 Crew & Helper Popup</span>
                 </button>
               </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  list="formWorkerList"
+                  value={operatorName}
+                  onChange={(e) => setOperatorName(e.target.value)}
+                  placeholder="ऑपरेटर का नाम लिखें या सूची से चुनें..."
+                  className="w-full px-3 py-2 bg-white border border-purple-300 rounded-lg text-xs font-bold uppercase text-slate-800 outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-500"
+                  required
+                />
+                <datalist id="formWorkerList">
+                  {formWorkers.map((w) => (
+                    <option key={w} value={w} />
+                  ))}
+                </datalist>
+              </div>
+              {assignedHelpers.length > 0 ? (
+                <div className="text-[10px] text-amber-900 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center justify-between">
+                  <span>🤝 हेल्पर्स ({assignedHelpers.length}): {assignedHelpers.join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsCrewModalOpen(true)}
+                    className="text-blue-700 underline hover:text-blue-900 text-[10px]"
+                  >
+                    बदलें
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[10px] text-slate-400 font-medium">
+                  कोई हेल्पर नहीं जुड़ा • जोड़ने के लिए ऊपर 👥 Crew & Helper दबाएं
+                </span>
+              )}
             </div>
 
             <div>
@@ -3531,9 +3633,9 @@ export const FormingView: React.FC<FormingViewProps> = ({
         onClose={() => setIsCrewModalOpen(false)}
         machine={selectedMachine}
         stage="Forming"
-        shift={activeBatchObj?.batch?.shift || 'DAY'}
-        currentOperator={activeBatchObj?.batch?.worker || ''}
-        currentHelpers={activeBatchObj?.batch?.helpers || []}
+        shift={activeBatchObj?.batch?.shift || shift || 'DAY'}
+        currentOperator={activeBatchObj?.batch?.worker || operatorName}
+        currentHelpers={activeBatchObj?.batch?.helpers || assignedHelpers}
         state={state}
         onConfirmCrew={handleConfirmCrew}
       />

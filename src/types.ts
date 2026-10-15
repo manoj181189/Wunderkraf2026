@@ -22,6 +22,7 @@ export type CurrentView =
   | 'MAINTENANCE'
   | 'PURCHASE'
   | 'OPENING_STOCK'
+  | 'SUPERVISOR'
   | 'WHATSAPP';
 
 export type MaterialUrgency = 'CRITICAL_BREAKDOWN' | 'URGENT' | 'NORMAL' | 'LOW';
@@ -661,6 +662,89 @@ export interface FactoryState {
   motherReelInventory?: MotherReelItem[];
   shiftHandovers?: ShiftHandoverRecord[];
   coordinationMatrix?: CoordinationMatrixItem[];
+  supervisorApprovals?: SupervisorGateApproval[];
+  qcDefectRecords?: QcDefectRecord[];
+  gatePassDispatches?: GatePassDispatch[];
+}
+
+export type SupervisorGateType =
+  | 'SCRAP_EXCESS'
+  | 'CRATE_RETURN'
+  | 'QC_DEFECT_ROUTING'
+  | 'GATE_PASS_DISPATCH'
+  | 'DIE_WEAR_ALERT'
+  | 'SPEED_OVERRIDE';
+
+export interface SupervisorGateApproval {
+  id: string;
+  timestamp: string;
+  stage: 'Slitting' | 'Cutting' | 'Forming' | 'QC' | 'Packing' | 'Dispatch';
+  type: SupervisorGateType;
+  jobId: string;
+  product?: string;
+  machine?: string;
+  operator: string;
+  supervisor: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reason: string;
+  metrics: {
+    crates?: number;
+    pieces?: number;
+    scrapKg?: number;
+    scrapPct?: number;
+    toleranceThreshold?: number;
+    speedSpm?: number;
+    sourceLotId?: string;
+    targetLotId?: string;
+    defectCategory?: string;
+    grossWeightKg?: number;
+  };
+  notes?: string;
+}
+
+export type QcDefectCategory =
+  | 'Bottom Leakage / Pinholes'
+  | 'Top Curl Deformity'
+  | 'Side Seam Glue Failure'
+  | 'Oil / Water Spots'
+  | 'Print Smear'
+  | 'Flute Delamination'
+  | 'Rim Wrinkle';
+
+export interface QcDefectRecord {
+  id: string;
+  timestamp: string;
+  jobId: string;
+  product: string;
+  formingBatchId?: string;
+  machine: string;
+  operator: string;
+  inspector: string;
+  defectCategory: QcDefectCategory | string;
+  rejectedPcs: number;
+  severity: 'CRITICAL' | 'MAJOR' | 'MINOR';
+  rootCauseNotes?: string;
+  actionTaken?: 'SCRAPPED' | 'REWORK_FORMING' | 'RETURNED_TO_OPERATOR';
+  supervisorSignedOff: boolean;
+  supervisorName?: string;
+}
+
+export interface GatePassDispatch {
+  id: string;
+  orderId?: string;
+  customerName: string;
+  product: string;
+  boxesCount: number;
+  totalPieces: number;
+  grossWeightKg: number;
+  vehicleNo?: string;
+  driverName?: string;
+  driverPhone?: string;
+  gs1Barcode: string;
+  lotGenealogySummary: string;
+  issuedBySupervisor: string;
+  dispatchTimestamp: string;
+  status: 'GENERATED' | 'DISPATCHED' | 'ACKNOWLEDGED';
 }
 
 export interface CoordinationMatrixItem {

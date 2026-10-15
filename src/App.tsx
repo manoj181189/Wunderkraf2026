@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { FactoryState, CurrentView, ProductType } from './types';
 import { INITIAL_STATE, LOCAL_STORAGE_KEY, DEFAULT_USERS, DEFAULT_FLOOR_WORKERS } from './lib/constants';
-import { initializeFactoryState, persistFactoryState, forceSyncWithCentral, subscribeToSyncEvents } from './lib/storage';
+import { initializeFactoryState, persistFactoryState, forceSyncWithCentral, subscribeToSyncEvents, fetchCentralState, saveToIndexedDB, reconcileJobStageTransitions } from './lib/storage';
 
 // Header & Navigation Hub
 import { Header } from './components/Header';
@@ -31,6 +31,7 @@ import { PurchaseView } from './components/views/PurchaseView';
 import { PlanningDeskView } from './components/views/PlanningDeskView';
 import { ExecutiveManpowerView } from './components/views/ExecutiveManpowerView';
 import { WhatsAppCommunicationView } from './components/views/WhatsAppCommunicationView';
+import { SupervisorControlView } from './components/views/SupervisorControlView';
 
 // Modals
 import { VoiceTranscriberModal } from './components/VoiceTranscriberModal';
@@ -121,43 +122,7 @@ export const App: React.FC = () => {
       .then((loadedState) => {
         if (isMounted && loadedState) {
           loadedState.users = sanitizeUsersState(loadedState.users);
-          
-          const wipeFlag = 'wunderkraf_force_wipe_v10';
-          if (!localStorage.getItem(wipeFlag)) {
-            const cleanRoster = (loadedState.floorWorkers || DEFAULT_FLOOR_WORKERS).map(w => ({
-              ...w,
-              isPresent: false,
-              assignedMachine: undefined,
-              pairedWithOperator: undefined,
-              shiftStatus: undefined,
-              inTime: undefined,
-              notes: undefined,
-              status: 'ACTIVE'
-            }));
-
-            const wipedState = {
-              ...loadedState,
-              jobs: [],
-              packJobs: [],
-              logs: [],
-              scrapSales: [],
-              productionPlans: [],
-              maintenanceIncidents: [],
-              glueUsageLogs: [],
-              shiftHandovers: [],
-              motherReelInventory: [],
-              materialRequisitions: [],
-              customerComplaints: [],
-              machineReadyAlerts: [],
-              floorWorkers: cleanRoster
-            };
-
-            localStorage.setItem(wipeFlag, 'true');
-            setState(wipedState);
-            persistFactoryState(wipedState, loadedState).catch(() => {});
-          } else {
-            setState(loadedState);
-          }
+          setState(loadedState);
         }
       })
       .catch((err) => {
@@ -169,6 +134,7 @@ export const App: React.FC = () => {
       if (isMounted && syncedState && Array.isArray(syncedState.jobs)) {
         setState((prev) => {
           syncedState.users = sanitizeUsersState(syncedState.users);
+          syncedState.lastResetTimestamp = Math.max(prev?.lastResetTimestamp || 0, syncedState.lastResetTimestamp || 0);
           return syncedState;
         });
       }
@@ -387,65 +353,58 @@ export const App: React.FC = () => {
     };
   }, [state]);
 
+  const snapshotTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Persistence effect: Writes to high-capacity IndexedDB and mirrors safely with auto-pruning to localStorage
   const handleSaveState = async (nextState: FactoryState) => {
-    let stampedState = nextState;
+    let stampedState: FactoryState = {
+      ...nextState,
+      lastResetTimestamp: Math.max(nextState.lastResetTimestamp || 0, state?.lastResetTimestamp || 0)
+    };
     const nowIso = new Date().toISOString();
 
-    // 1. Stamp modified jobs
-    if (state?.jobs && nextState?.jobs) {
-      const stampedJobs = nextState.jobs.map(nj => {
-        const ej = state.jobs.find(j => j.id === nj.id);
-        if (!ej) return { ...nj, updatedAt: nowIso };
-        const njCompare = { ...nj, updatedAt: undefined };
-        const ejCompare = { ...ej, updatedAt: undefined };
-        if (JSON.stringify(njCompare) !== JSON.stringify(ejCompare)) {
-          return { ...nj, updatedAt: nowIso };
-        }
+    // Fast shallow comparison instead of heavy synchronous JSON.stringify loops
+    if (state?.jobs && nextState?.jobs && state.jobs !== nextState.jobs) {
+      const stampedJobs = nextState.jobs.map((nj) => {
+        const ej = state.jobs.find((j) => j.id === nj.id);
+        if (!ej || ej !== nj) return { ...nj, updatedAt: nowIso };
         return nj;
       });
       stampedState = { ...stampedState, jobs: stampedJobs };
     }
 
-    // 2. Stamp modified productionPlans
-    if (state?.productionPlans && nextState?.productionPlans) {
-      const stampedPlans = nextState.productionPlans.map(np => {
-        const ep = state.productionPlans.find(p => p.id === np.id);
-        if (!ep) return { ...np, updatedAt: nowIso };
-        const npCompare = { ...np, updatedAt: undefined };
-        const epCompare = { ...ep, updatedAt: undefined };
-        if (JSON.stringify(npCompare) !== JSON.stringify(epCompare)) {
-          return { ...np, updatedAt: nowIso };
-        }
+    if (state?.productionPlans && nextState?.productionPlans && state.productionPlans !== nextState.productionPlans) {
+      const stampedPlans = nextState.productionPlans.map((np) => {
+        const ep = state.productionPlans.find((p) => p.id === np.id);
+        if (!ep || ep !== np) return { ...np, updatedAt: nowIso };
         return np;
       });
       stampedState = { ...stampedState, productionPlans: stampedPlans };
     }
 
-    // 3. Stamp modified packJobs
-    if (state?.packJobs && nextState?.packJobs) {
-      const stampedPackJobs = nextState.packJobs.map(npj => {
-        const epj = state.packJobs.find(pj => pj.id === npj.id);
-        if (!epj) return { ...npj, updatedAt: nowIso };
-        const npjCompare = { ...npj, updatedAt: undefined };
-        const epjCompare = { ...epj, updatedAt: undefined };
-        if (JSON.stringify(npjCompare) !== JSON.stringify(epjCompare)) {
-          return { ...npj, updatedAt: nowIso };
-        }
+    if (state?.packJobs && nextState?.packJobs && state.packJobs !== nextState.packJobs) {
+      const stampedPackJobs = nextState.packJobs.map((npj) => {
+        const epj = state.packJobs.find((pj) => pj.id === npj.id);
+        if (!epj || epj !== npj) return { ...npj, updatedAt: nowIso };
         return npj;
       });
       stampedState = { ...stampedState, packJobs: stampedPackJobs };
     }
 
-    try {
-      const historyStr = localStorage.getItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY');
-      const history = historyStr ? JSON.parse(historyStr) : [];
-      const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-      const description = `Snapshot - ${dateStr} at ${timestamp} (Jobs: ${stampedState.jobs?.length || 0}, Plans: ${stampedState.productionPlans?.length || 0})`;
-      
-      // Only push if different from last snapshot
-      if (history.length === 0 || JSON.stringify(history[0].state.jobs) !== JSON.stringify(stampedState.jobs) || JSON.stringify(history[0].state.productionPlans) !== JSON.stringify(stampedState.productionPlans)) {
+    // 1. Immediately update React state for instant 0ms latency UI response
+    setState(stampedState);
+
+    // 2. Debounced snapshot history saving (runs only every 15s instead of freezing on every keystroke)
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+    }
+    snapshotTimerRef.current = setTimeout(() => {
+      try {
+        const historyStr = localStorage.getItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY');
+        const history = historyStr ? JSON.parse(historyStr) : [];
+        const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const description = `Snapshot - ${dateStr} at ${timestamp} (Jobs: ${stampedState.jobs?.length || 0}, Plans: ${stampedState.productionPlans?.length || 0})`;
         history.unshift({
           id: Date.now().toString(),
           timestamp: `${dateStr}, ${timestamp}`,
@@ -453,34 +412,49 @@ export const App: React.FC = () => {
           state: stampedState
         });
         localStorage.setItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY', JSON.stringify(history.slice(0, 10)));
+      } catch (e) {
+        console.warn('[History] Failed to push snapshot:', e);
+      }
+    }, 15000);
+
+    // 3. Asynchronously persist to IndexedDB / central sync in background
+    try {
+      const result = await persistFactoryState(stampedState, state);
+      if (result.mergedState) {
+        setState(result.mergedState);
       }
     } catch (e) {
-      console.warn('[History] Failed to push snapshot:', e);
-    }
-
-    setState(stampedState);
-    const result = await persistFactoryState(stampedState, state);
-    if (result.mergedState) {
-      setState(result.mergedState);
+      console.warn('[Storage] Background persist error:', e);
     }
   };
 
-  // Re-hydrate and synchronize state across all devices via Central Sync Bridge & IndexedDB
+  // Re-hydrate and synchronize state directly from the authoritative Central Sync Bridge
   const handleRefreshState = async () => {
-    if (!confirm("⚠️ WARNING: This will sync with the Central Sync Bridge. If the server is empty, it may overwrite local data. Are you sure?")) return;
+    setIsRefreshingState(true);
     try {
-      const syncResult = await forceSyncWithCentral(state);
-      if (syncResult && syncResult.syncedState) {
-        if (syncResult.syncedState.users?.admin && !syncResult.syncedState.users.admin.perms?.includes('*')) {
-          syncResult.syncedState.users.admin.perms = ['*'];
+      const centralState = await fetchCentralState();
+      if (centralState && Array.isArray(centralState.jobs)) {
+        const reconciled = reconcileJobStageTransitions(centralState);
+        await saveToIndexedDB(reconciled);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reconciled));
+        } catch (e) {}
+        if (reconciled.users?.admin && !reconciled.users.admin.perms?.includes('*')) {
+          reconciled.users.admin.perms = ['*'];
         }
-        setState(syncResult.syncedState);
-        setRefreshToast(syncResult.message);
+        setState(reconciled);
+        setRefreshToast(`Live state synchronized: ${reconciled.jobs.length} jobs active`);
         setTimeout(() => setRefreshToast(null), 3500);
+      } else {
+        const localState = await initializeFactoryState();
+        if (localState) {
+          setState(localState);
+          setRefreshToast(`Refreshed (${localState.jobs?.length || 0} jobs)`);
+          setTimeout(() => setRefreshToast(null), 3500);
+        }
       }
     } catch (err) {
       console.warn('[Storage] Refresh error from Central Bridge:', err);
-      // Fallback local hydration
       const localState = await initializeFactoryState();
       if (localState) {
         setState(localState);
@@ -488,7 +462,7 @@ export const App: React.FC = () => {
     } finally {
       setTimeout(() => {
         setIsRefreshingState(false);
-      }, 600);
+      }, 500);
     }
   };
 
@@ -903,6 +877,15 @@ export const App: React.FC = () => {
             onSaveState={handleSaveState}
             onOpenHoldModal={(m) => setHoldModalStation(m)}
             onOpenOrderSpecModal={(ordId) => setOrderSpecId(ordId)}
+            currentUser={currentUser}
+          />
+        )}
+
+        {currentView === 'SUPERVISOR' && (
+          <SupervisorControlView
+            state={state}
+            onBackToHub={() => setCurrentView('HUB')}
+            onSaveState={handleSaveState}
             currentUser={currentUser}
           />
         )}

@@ -41,21 +41,26 @@ export const StationCrewModal: React.FC<StationCrewModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter available helpers matching this machine's stage / department first
+  // Helpers pool: matching stage first, then all helpers across all lines
   const deptHelpers = allWorkers
     .filter((w) => w.role === 'HELPER' && (!stage || w.department?.toLowerCase() === stage.toLowerCase()))
     .map((w) => w.name);
-  const helperPool = deptHelpers.length > 0
-    ? deptHelpers
-    : allWorkers.filter((w) => w.role === 'HELPER').map((w) => w.name);
-
-  // Filter available operators matching this machine's stage / department first
-  const deptOperators = allWorkers
-    .filter((w) => w.role === 'OPERATOR' && (!stage || w.department?.toLowerCase() === stage.toLowerCase()))
+  const otherHelpers = allWorkers
+    .filter((w) => w.role === 'HELPER' && (stage && w.department?.toLowerCase() !== stage.toLowerCase()))
     .map((w) => w.name);
-  const operatorPool = deptOperators.length > 0
-    ? deptOperators
-    : allWorkers.filter((w) => w.role === 'OPERATOR').map((w) => w.name);
+  const helperPool = Array.from(new Set([...deptHelpers, ...otherHelpers, ...allWorkers.map((w) => w.name)]));
+
+  // Operators pool: department operators first, then Cutting, Slitting and all other line operators
+  const deptOperators = allWorkers
+    .filter((w) => (w.role === 'OPERATOR' || !w.role) && (!stage || w.department?.toLowerCase() === stage.toLowerCase()))
+    .map((w) => w.name);
+  const otherOperators = allWorkers
+    .filter((w) => (w.role === 'OPERATOR' || !w.role) && (stage && w.department?.toLowerCase() !== stage.toLowerCase()))
+    .map((w) => w.name);
+  const allDeptWorkerNames = Object.values(state.deptWorkers || {}).flat();
+  const operatorPool = Array.from(
+    new Set([...deptOperators, ...otherOperators, ...allDeptWorkerNames, ...allWorkers.map((w) => w.name)])
+  );
 
   const toggleHelper = (name: string) => {
     if (selectedHelpers.includes(name)) {

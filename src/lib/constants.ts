@@ -476,6 +476,12 @@ export const DEFAULT_USERS: Record<string, { pass: string; perms: string[]; name
     perms: ['*'],
     name: 'Master Administrator',
     role: 'Administrator'
+  },
+  'supervisor': {
+    pass: 'WKF1811',
+    perms: ['Supervisor', 'Cutting', 'Forming', 'QC', 'Packing', 'Stock', 'Planning'],
+    name: 'Shift Supervisor',
+    role: 'Supervisor'
   }
 };
 

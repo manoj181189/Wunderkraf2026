@@ -406,9 +406,9 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     const master = getNumberingMaster(seriesConfig);
     const targetPlan = selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId) : null;
     
-    // Check if a job was already created for this plan during PPC Planning Desk step or previous partial slitting
+    // Check if a job was already created for this plan during PPC Planning Desk step
     const existingPlanJob = (baseJobsList || []).find(
-      (j) => (targetPlan?.jobId && j.id === targetPlan.jobId) || (selectedPlanId && j.planId === selectedPlanId && j.stage !== 'Cutting' && j.stage !== 'Forming' && j.stage !== 'QC' && j.stage !== 'Packing' && j.stage !== 'Dispatched')
+      (j) => (targetPlan?.jobId && j.id === targetPlan.jobId) || (selectedPlanId && j.planId === selectedPlanId && j.stage === 'Planning')
     );
 
     let newJobId: string;
@@ -555,22 +555,10 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     if (existingPlanJob) {
       updatedJobs = baseJobsList.map((j) => {
         if (j.id !== existingPlanJob.id) return j;
-        const prevReelsList = j.reelsList && j.reelsList.length > 0 ? j.reelsList : [];
-        const existingReels = getJobAllReels(j);
-        const updatedReelNumbers = Array.from(new Set([...existingReels, effectiveReelNo]));
-        const existingGsms = getJobAllGsms(j);
-        const updatedGsmList = Array.from(new Set([...existingGsms, formatGsmString(effectiveGsm)]));
         return {
           ...j,
-          reelNo: updatedReelNumbers.join(', '),
-          reelNumbers: updatedReelNumbers,
-          reelsList: [...prevReelsList, initialReelItem],
-          gsm: updatedGsmList.join(' + '),
-          gsmList: updatedGsmList,
-          gsmsSummary: updatedGsmList.join(' + '),
-          inputWeightKg: (j.inputWeightKg || 0) + parsedJumboWeight,
-          stage: 'Slitting',
-          status: 'SLITTING_IN_PROGRESS',
+          ...newJob,
+          id: existingPlanJob.id,
           plannedGsms: j.plannedGsms || newJob.plannedGsms,
           plannedLayers: j.plannedLayers || newJob.plannedLayers,
           runningBatches: [...(j.runningBatches || []), newBatch]
@@ -728,8 +716,6 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
         gsmsSummary: combinedGsmStr,
         customRemark: combinedRemarks,
         inputWeightKg: (j.inputWeightKg || 0) + parsedAddWeight,
-        stage: 'Slitting',
-        status: 'SLITTING_IN_PROGRESS',
         runningBatches: [...(j.runningBatches || []), newBatch],
         printedRollRequired: hasPrintedRoll || undefined,
         printedRollDesign: hasPrintedRoll ? (j.printedRollDesign || addReelPrintedRollDesign) : undefined,
@@ -1078,19 +1064,14 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
         return rItem;
       });
 
-      const targetPlanForJob = (j.planId ? productionPlans.find((p) => p.id === j.planId) : null) || (selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId) : null);
-      const plannedTargetRolls = targetPlanForJob?.targetLayers || j.targetLayers || 8;
-      const totalSlittedRolls = (j.availableRolls || 0) + rollsCount;
-      const isTargetCompleted = totalSlittedRolls >= plannedTargetRolls;
-
       return {
         ...j,
         reelNo: effectiveReelNumbers.join(', '),
         reelNumbers: effectiveReelNumbers,
         reelsList: updatedReelsList,
-        availableRolls: totalSlittedRolls,
-        stage: isTargetCompleted ? 'Slitting Completed' : 'Slitting',
-        status: isTargetCompleted ? 'READY_FOR_CUTTING' : 'IN_PROGRESS',
+        availableRolls: (j.availableRolls || 0) + rollsCount,
+        stage: 'Slitting Completed',
+        status: 'READY_FOR_CUTTING',
         outputWeightKg: newOutKg,
         scrapKg: newScrapKg,
         scrapPercent: totalScrapPct,
@@ -1146,17 +1127,13 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
 
     const finalJobObj = updatedJobs.find((j) => j.id === job.id);
     const effectiveAvailRolls = finalJobObj?.availableRolls || rollsCount;
-    const targetPlanForJob = (job.planId ? productionPlans.find((p) => p.id === job.planId) : null) || (selectedPlanId ? productionPlans.find(p => p.id === selectedPlanId) : null);
-    const plannedTargetRolls = targetPlanForJob?.targetLayers || job.targetLayers || 8;
-    const isTargetCompleted = effectiveAvailRolls >= plannedTargetRolls;
-
     // Propagate completed slit rolls & status to child jobs if this was a parent job
     updatedJobs = updatedJobs.map((cj) => {
       if (cj.parentJobId === job.id) {
         return {
           ...cj,
-          status: isTargetCompleted ? 'READY_FOR_CUTTING' : 'IN_PROGRESS',
-          stage: isTargetCompleted ? 'Slitting Completed' : 'Slitting',
+          status: 'READY_FOR_CUTTING',
+          stage: 'Slitting Completed',
           availableRolls: effectiveAvailRolls
         };
       }
@@ -1172,7 +1149,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
 
         return {
           ...p,
-          status: isTargetCompleted ? ('Completed' as const) : ('In-Progress' as const),
+          status: 'Completed' as const,
           actualLayersUsed: finalLayers,
           actualMetersSlit: Number(actualSlitLengthMeters) || p.targetLengthMeters,
           actualScrapKg: finalScrapKg,
@@ -1212,12 +1189,7 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     setShowManualTimeOverride(false);
     setShowManualStopTimeOverride(false);
     setSelectedActiveBatchId('');
-    if (isTargetCompleted) {
-      alert(`✅ Slitting Finished & Target Complete!\n• Total Output: ${effectiveAvailRolls}/${plannedTargetRolls} Rolls\n• Latest Batch: ${rollsCount} Rolls (${weightKg} KG)\n• Scrap Wastage: ${finalScrapKg} KG (${finalScrapPercent}%)\nJob is now Completed in Slitting and moved to Cutting!`);
-    } else {
-      const pendingRolls = Math.max(0, plannedTargetRolls - effectiveAvailRolls);
-      alert(`⏸ Batch Slitting Recorded (In Progress)!\n• Slit in this Batch: ${rollsCount} Rolls (${weightKg} KG)\n• Total Slit so far: ${effectiveAvailRolls}/${plannedTargetRolls} Rolls\n• Still Pending: ${pendingRolls} Rolls\nJob remains OPEN in Slitting Desk so you can continue/add remaining rolls!`);
-    }
+    alert(`✅ Slitting Finished!\n• Output: ${rollsCount} Rolls (${weightKg} KG)\n• Jumbo Loaded: ${inputWeight} KG\n• Scrap Wastage: ${finalScrapKg} KG (${finalScrapPercent}%)\nLogged to Total Traceability and Inventory!`);
   };
 
   const handleConfirmCancelRun = (targetOverride?: { job: Job; batch: RunningBatch }) => {
@@ -1943,19 +1915,20 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                     const linkedJob = jobs.find((j) => j.planId === p.id || j.id === p.jobId);
                     if (linkedJob) {
                       const targetLayers = p.targetLayers || linkedJob.targetLayers || 8;
-                      const completedRollsCount = Math.max(linkedJob.availableRolls || 0, linkedJob.reelsList?.length || 0);
-                      const hasAllLayers = completedRollsCount >= targetLayers && targetLayers > 0;
-                      const isPostCuttingStage = 
+                      const completedReelsCount = linkedJob.reelsList?.length || 0;
+                      const hasAllLayers = (completedReelsCount >= targetLayers && targetLayers > 0) || (linkedJob.availableRolls !== undefined && linkedJob.availableRolls >= targetLayers);
+                      const isStageDone = 
+                        linkedJob.stage === 'Slitting Completed' || 
                         linkedJob.stage === 'Cutting' || 
                         linkedJob.stage === 'Forming' || 
                         linkedJob.stage === 'QC' || 
                         linkedJob.stage === 'Packing' || 
                         linkedJob.stage === 'Dispatched' ||
+                        linkedJob.status === 'READY_FOR_CUTTING' || 
                         linkedJob.status === 'CUTTING_IN_PROGRESS' || 
                         linkedJob.status === 'CUTTING_COMPLETED' || 
                         linkedJob.status === 'Completed';
-                      // Only hide if target rolls (e.g. 8) are fully slit or job moved to cutting/later stages
-                      if (hasAllLayers || isPostCuttingStage) return false;
+                      if (hasAllLayers || isStageDone) return false;
                     }
                     return true;
                   })
@@ -1966,14 +1939,9 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                     const pfx = state.productPrefixMap?.[p.product] || p.product.slice(0, 3).toUpperCase();
                     const nextSeq = state.seriesConfig?.productSeqs?.[p.product] || 1;
                     const seriesBadge = seriesJobId ? `[Job Series: ${seriesJobId}]` : `[${pfx} #${nextSeq}]`;
-                    const targetLayers = p.targetLayers || linkedJob?.targetLayers || 8;
-                    const completedRollsCount = linkedJob ? Math.max(linkedJob.availableRolls || 0, linkedJob.reelsList?.length || 0) : 0;
-                    const partialBadge = (linkedJob && completedRollsCount > 0)
-                      ? ` • 🟡 ${completedRollsCount}/${targetLayers} Rolls Slit (${Math.max(0, targetLayers - completedRollsCount)} Pending)`
-                      : ` • ${targetLayers}L`;
                     return (
                       <option key={p.id} value={p.id}>
-                        [{p.id}] {seriesBadge} {p.product}{partialBadge} • {p.targetLengthMeters}M • {p.paperBrand || 'ITC'} ({p.status})
+                        [{p.id}] {seriesBadge} {p.product} • {p.targetLayers}L • {p.targetLengthMeters}M • {p.paperBrand || 'ITC'} ({p.status})
                       </option>
                     );
                   })}
@@ -2584,19 +2552,19 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
 
           const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
           const plannedLayers = targetPlan?.targetLayers || j.targetLayers || 8;
-          const completedReelsCount = Math.max(j.availableRolls || 0, j.reelsList?.length || 0);
-          const isTargetFullySlit = completedReelsCount >= plannedLayers && plannedLayers > 0;
+          const completedReelsCount = j.reelsList?.length || 0;
           const isCompletedSentToCutting = 
-            isTargetFullySlit || 
+            j.stage === 'Slitting Completed' || 
             j.stage === 'Cutting' || 
             j.stage === 'Forming' || 
             j.stage === 'QC' || 
             j.stage === 'Packing' || 
             j.stage === 'Dispatched' ||
+            j.status === 'READY_FOR_CUTTING' || 
             j.status === 'CUTTING_IN_PROGRESS' || 
             j.status === 'CUTTING_COMPLETED' || 
             j.status === 'Completed' ||
-            (j.stage === 'Slitting Completed' && isTargetFullySlit);
+            (completedReelsCount >= plannedLayers && plannedLayers > 0);
 
           const isSlittingActive = !isCompletedSentToCutting;
 
@@ -3023,10 +2991,6 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                             <span className="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded shadow-2xs whitespace-nowrap">
                               ✅ 100% Slit ➔ Cutting
                             </span>
-                          ) : item.stock > 0 ? (
-                            <span className="text-[10px] font-extrabold bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.5 rounded whitespace-nowrap">
-                              🟡 Partial ({item.stock}/{item.plannedLayers} Rolls)
-                            </span>
                           ) : (
                             <span className="text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded whitespace-nowrap">
                               ⚡ Slitting ({item.reels.length}/{item.plannedLayers}L)
@@ -3088,13 +3052,15 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                     const isRunningNow = currentRunningBatch?.job.id === j.id;
                     if (isRunningNow) return true;
 
-                    // Exclude jobs that have already moved to cutting or onward stages
+                    // Exclude jobs that have already finished slitting or moved to cutting/onward stages
                     if (
+                      j.stage === 'Slitting Completed' ||
                       j.stage === 'Cutting' ||
                       j.stage === 'Forming' ||
                       j.stage === 'QC' ||
                       j.stage === 'Packing' ||
                       j.stage === 'Dispatched' ||
+                      j.status === 'READY_FOR_CUTTING' ||
                       j.status === 'CUTTING_IN_PROGRESS' ||
                       j.status === 'CUTTING_COMPLETED' ||
                       j.status === 'Completed'
@@ -3111,12 +3077,11 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                     const isRunningNow = currentRunningBatch?.job.id === j.id;
                     const targetPlan = j.planId ? productionPlans.find((p) => p.id === j.planId) : null;
                     const plannedLimit = targetPlan?.targetLayers || j.targetLayers || 8;
-                    const completedLayers = Math.max(j.availableRolls || 0, j.reelsList?.length || 0, getJobAllReels(j).length || 0);
-                    const pending = Math.max(0, plannedLimit - completedLayers);
+                    const completedLayers = j.reelsList?.length || getJobAllReels(j).length || 0;
                     return (
                       <option key={j.id} value={j.id}>
                         {isRunningNow ? '⭐ [ACTIVE RUNNING] ' : ''}
-                        [Series: {j.id}] - {j.product} ({completedLayers}/${plannedLimit} Rolls Slit • {pending} Pending) [{j.paperBrand || 'ITC'}]
+                        [Series: {j.id}] - {j.product} ({completedLayers}/{plannedLimit} Layers) [{j.paperBrand || 'ITC'}]
                       </option>
                     );
                   })}

@@ -5,16 +5,37 @@ import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
-import { mergeFactoryStates } from './src/lib/syncMerge';
-import { processWhatsAppIncomingQuery, generateWhatsAppStockQueryReply, generateShiftChangeoverReportText } from './src/lib/whatsappReports';
+import { mergeFactoryStates } from './src/lib/syncMerge.ts';
+import { processWhatsAppIncomingQuery, generateWhatsAppStockQueryReply, generateShiftChangeoverReportText } from './src/lib/whatsappReports.ts';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const getFilename = () => {
+  try {
+    if (typeof __filename !== 'undefined' && __filename) return __filename;
+    if (typeof import.meta !== 'undefined' && import.meta?.url) {
+      return fileURLToPath(import.meta.url);
+    }
+  } catch (e) {}
+  return path.join(process.cwd(), 'server.ts');
+};
+
+const currentFilename = getFilename();
+const currentDirname = path.dirname(currentFilename);
 
 const app = express();
 const PORT = 3000;
+
+// CORS headers to allow cross-device and remote tablet sync
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Shared repository file path for Central Sync Bridge
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -95,22 +116,56 @@ app.post('/api/sync/state', (req, res) => {
   try {
     const incomingPayload = req.body;
     const incomingState = incomingPayload.state || incomingPayload;
+    const isForceOverwrite = 
+      incomingPayload.overwrite === true || 
+      incomingPayload.force === true || 
+      incomingPayload.reset === true ||
+      req.query.overwrite === 'true' || 
+      req.query.force === 'true';
 
     if (!incomingState || !Array.isArray(incomingState.jobs)) {
       return res.status(400).json({ success: false, error: 'Invalid state payload: jobs array required' });
     }
 
-    // Merge incoming client state with current central state on the server to prevent multi-device data overwrites
+    if (isForceOverwrite) {
+      incomingState.lastResetTimestamp = Date.now();
+    }
+
+    // If force overwrite requested (e.g., backup restore or factory reset), replace state on disk without merging old data
     const currentCentral = loadCentralStateFromDisk();
-    const mergedState = currentCentral ? mergeFactoryStates(currentCentral, incomingState) : incomingState;
-    const saved = saveCentralStateToDisk(mergedState);
+
+    // Protective Guard: If central database has active jobs, NEVER allow an ordinary unforced push with 0 jobs to wipe out the database
+    if (!isForceOverwrite && (!incomingState.jobs || incomingState.jobs.length === 0) && (currentCentral?.jobs && currentCentral.jobs.length > 0)) {
+      console.warn('[Sync Guard] Blocked empty client state push. Preserving existing central state with', currentCentral.jobs.length, 'jobs.');
+      return res.json({
+        success: true,
+        timestamp: Date.now(),
+        state: currentCentral,
+        overwritten: false,
+        jobCount: currentCentral.jobs.length,
+        logCount: currentCentral.logs?.length || 0
+      });
+    }
+
+    const finalState = (isForceOverwrite || !currentCentral)
+      ? incomingState
+      : mergeFactoryStates(currentCentral, incomingState);
+
+    if (isForceOverwrite) {
+      finalState.lastResetTimestamp = incomingState.lastResetTimestamp || Date.now();
+    } else {
+      finalState.lastResetTimestamp = Math.max(currentCentral?.lastResetTimestamp || 0, incomingState?.lastResetTimestamp || 0);
+    }
+
+    const saved = saveCentralStateToDisk(finalState);
 
     res.json({
       success: saved,
       timestamp: Date.now(),
-      state: mergedState,
-      jobCount: mergedState.jobs?.length || 0,
-      logCount: mergedState.logs?.length || 0
+      state: finalState,
+      overwritten: isForceOverwrite,
+      jobCount: finalState.jobs?.length || 0,
+      logCount: finalState.logs?.length || 0
     });
   } catch (err: any) {
     console.error('Central sync POST error:', err);
@@ -609,18 +664,21 @@ setInterval(async () => {
 
 // Vite Middleware & Static handling
 async function setupVite() {
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  const isBundled = typeof __filename !== 'undefined' && __filename.includes('server.cjs');
+  const isProduction = process.env.NODE_ENV === 'production' || isBundled;
+
+  if (isProduction && fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  } else {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {

@@ -63,16 +63,19 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white m-0 group-hover:text-blue-200 transition">
               Wünderkraf Paperware
             </h1>
             <span className="hidden sm:inline-block bg-[#2b6cb0] text-[11px] font-semibold px-2 py-0.5 rounded text-blue-100 uppercase tracking-wide">
               Enterprise v4.3
             </span>
+            <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
+              <span>🛡️</span> ISOLATED DEV LAB (LIVE FACTORY SAFE)
+            </span>
           </div>
           <p className="text-xs text-slate-300 mt-0.5">
-            Master Factory ERP & Production Management Suite
+            Master Factory ERP & Production Management Suite — Development & Staging Lab
           </p>
         </div>
       </div>

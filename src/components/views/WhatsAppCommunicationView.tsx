@@ -17,7 +17,6 @@ import {
 import { FactoryState, CurrentView } from '../../types';
 import {
   generateShiftChangeoverReportText,
-  generateMachineWiseDailyReportText,
   generateBreakdownAlertText,
   generateManpowerAttendanceReportText,
   generateQcDefectAlertText,
@@ -41,7 +40,6 @@ interface WhatsAppCommunicationViewProps {
 type MessageCategory =
   | 'SHIFT_DAY'
   | 'SHIFT_NIGHT'
-  | 'MACHINE_DAILY'
   | 'JOB_STATUS'
   | 'MAINTENANCE_BREAKDOWN'
   | 'MANPOWER_ATTENDANCE'
@@ -98,8 +96,6 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
 
   // States for advanced category selections
   const [shiftDateFilter, setShiftDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
-  const [machineReportDateFilter, setMachineReportDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
-  const [machineReportShiftFilter, setMachineReportShiftFilter] = useState<'DAY' | 'NIGHT' | 'ALL'>('DAY');
   const [attendanceDateFilter, setAttendanceDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
   const [scrapDateFilter, setScrapDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedQcLogId, setSelectedQcLogId] = useState<string>('');
@@ -127,9 +123,6 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
         break;
       case 'SHIFT_NIGHT':
         setMessageText(generateShiftChangeoverReportText(state, 'NIGHT', shiftDateFilter));
-        break;
-      case 'MACHINE_DAILY':
-        setMessageText(generateMachineWiseDailyReportText(state, machineReportShiftFilter, machineReportDateFilter));
         break;
       case 'JOB_STATUS':
         setMessageText(generateJobStatusReportText(state, selectedJobId));
@@ -178,8 +171,6 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
     dispatchDateFilter,
     selectedInvoiceNo,
     shiftDateFilter,
-    machineReportDateFilter,
-    machineReportShiftFilter,
     attendanceDateFilter,
     scrapDateFilter,
     selectedQcLogId,
@@ -293,6 +284,40 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
             </div>
           </div>
 
+          {/* Quick 1-Click Shift Selector Buttons */}
+          <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-xl">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('SHIFT_DAY');
+                setShiftDateFilter(new Date().toISOString().split('T')[0]);
+              }}
+              className={`py-2.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                selectedCategory === 'SHIFT_DAY'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span>☀️</span>
+              <span>डे शिफ्ट रिपोर्ट (Day Shift)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('SHIFT_NIGHT');
+                setShiftDateFilter(new Date().toISOString().split('T')[0]);
+              }}
+              className={`py-2.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                selectedCategory === 'SHIFT_NIGHT'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span>🌙</span>
+              <span>नाईट शिफ्ट रिपोर्ट (Night Shift)</span>
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
@@ -305,7 +330,6 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
               >
                 <option value="SHIFT_DAY">☀️ Day Shift Summary Report</option>
                 <option value="SHIFT_NIGHT">🌙 Night Shift Summary Report</option>
-                <option value="MACHINE_DAILY">⚙️ Machine-Wise Daily Production Report (मशीन वाइज दैनिक रिपोर्ट)</option>
                 <option value="JOB_STATUS">📋 Job WIP Status Report</option>
                 <option value="MAINTENANCE_BREAKDOWN">🛠️ Machine Breakdown Incident Report</option>
                 <option value="MANPOWER_ATTENDANCE">👥 Daily Workforce Attendance</option>
@@ -330,37 +354,6 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
               />
             </div>
           </div>
-
-          {/* Conditional Machine-Wise Report Controls */}
-          {selectedCategory === 'MACHINE_DAILY' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-              <div>
-                <label className="block text-[10px] font-black text-indigo-950 uppercase mb-1">
-                  📅 Report Date (रिपोर्ट की तारीख)
-                </label>
-                <input
-                  type="date"
-                  value={machineReportDateFilter}
-                  onChange={(e) => setMachineReportDateFilter(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-indigo-950 uppercase mb-1">
-                  ⏱️ Target Shift (शिफ्ट चुनें)
-                </label>
-                <select
-                  value={machineReportShiftFilter}
-                  onChange={(e) => setMachineReportShiftFilter(e.target.value as 'DAY' | 'NIGHT' | 'ALL')}
-                  className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="DAY">☀️ Day Shift Only (दिन की शिफ्ट)</option>
-                  <option value="NIGHT">🌙 Night Shift Only (रात की शिफ्ट)</option>
-                  <option value="ALL">🔄 Full Day - All Shifts (पूरा दिन / दोनों शिफ्ट)</option>
-                </select>
-              </div>
-            </div>
-          )}
 
           {/* Conditional Job Selection dropdown */}
           {selectedCategory === 'JOB_STATUS' && (
