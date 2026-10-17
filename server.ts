@@ -50,13 +50,18 @@ if (!fs.existsSync(DATA_DIR)) {
   }
 }
 
-// In-memory cache of central state
+// In-memory cache of central state and monotonic revision counter
 let cachedCentralState: any = null;
+let centralStateRevision: number = Date.now();
+
 function loadCentralStateFromDisk(): any {
   try {
     if (fs.existsSync(CENTRAL_STATE_FILE)) {
       const raw = fs.readFileSync(CENTRAL_STATE_FILE, 'utf8');
       cachedCentralState = JSON.parse(raw);
+      if (cachedCentralState && !cachedCentralState.users) {
+        cachedCentralState.users = {};
+      }
       return cachedCentralState;
     }
   } catch (e) {
@@ -65,12 +70,40 @@ function loadCentralStateFromDisk(): any {
   return cachedCentralState;
 }
 
+// Active SSE streaming clients for instant multi-device live sync
+const sseClients = new Set<express.Response>();
+
+function broadcastSyncEvent(eventData: any) {
+  const payload = `data: ${JSON.stringify(eventData)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(payload);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
 function saveCentralStateToDisk(state: any): boolean {
   try {
+    centralStateRevision++;
+    state.lastUpdated = new Date().toISOString();
+    state.lastRevision = centralStateRevision;
     cachedCentralState = state;
     const tempFile = `${CENTRAL_STATE_FILE}.tmp`;
     fs.writeFileSync(tempFile, JSON.stringify(state, null, 2), 'utf8');
     fs.renameSync(tempFile, CENTRAL_STATE_FILE);
+
+    // Instant real-time push to all connected devices/desks
+    broadcastSyncEvent({
+      type: 'STATE_CHANGED',
+      revision: centralStateRevision,
+      timestamp: Date.now(),
+      lastUpdated: state.lastUpdated,
+      jobCount: state.jobs?.length || 0,
+      logCount: state.logs?.length || 0
+    });
+
     return true;
   } catch (e) {
     console.error('Failed to write central state file:', e);
@@ -94,6 +127,146 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Dedicated Lightweight User Authentication & Workstation Directory Endpoints
+app.get('/api/users', (req, res) => {
+  try {
+    const state = loadCentralStateFromDisk();
+    res.json({
+      success: true,
+      users: state?.users || {}
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!username || password === undefined) {
+      return res.status(400).json({ success: false, error: 'Username and password are required' });
+    }
+    const cleanUser = String(username).trim().toLowerCase();
+    const cleanPass = String(password).trim();
+    const state = loadCentralStateFromDisk();
+    const users = state?.users || {};
+    
+    // Find user by exact key or name or email prefix
+    let targetKey = cleanUser;
+    let userObj = users[cleanUser];
+
+    if (!userObj) {
+      const emailPrefix = cleanUser.includes('@') ? cleanUser.split('@')[0] : '';
+      const entry = Object.entries(users).find(([k, v]: [string, any]) => {
+        const keyLow = k.toLowerCase();
+        const nameLow = (v.name || '').toLowerCase();
+        return (
+          keyLow === cleanUser ||
+          keyLow === emailPrefix ||
+          nameLow === cleanUser ||
+          (cleanUser.length > 2 && nameLow.includes(cleanUser)) ||
+          (cleanUser.length > 2 && cleanUser.includes(keyLow))
+        );
+      });
+      if (entry) {
+        targetKey = entry[0];
+        userObj = entry[1];
+      }
+    }
+
+    if (!userObj) {
+      return res.status(401).json({ success: false, error: 'User not found' });
+    }
+
+    const isMasterUser = targetKey === 'admin' || targetKey === 'manoj' || targetKey === 'sandip';
+
+    const isValid =
+      userObj.pass === cleanPass ||
+      (isMasterUser && (
+        cleanPass === '1118' ||
+        cleanPass === '1811' ||
+        cleanPass.toUpperCase() === 'WKF1811' ||
+        cleanPass.toLowerCase() === 'admin' ||
+        cleanPass.toLowerCase() === 'manoj' ||
+        cleanPass.toUpperCase() === 'MANOJ' ||
+        cleanPass === '1632'
+      )) ||
+      (targetKey === 'balu' && (cleanPass === '08' || cleanPass === '8')) ||
+      (targetKey === 'supervisor' && (cleanPass === '1811' || cleanPass === '1118' || cleanPass.toUpperCase() === 'WKF1811')) ||
+      // Master Emergency PIN: 1118 or 1811 unlocks any workstation
+      (cleanPass === '1118' || cleanPass === '1811' || cleanPass.toUpperCase() === 'WKF1811');
+
+    if (!isValid) {
+      return res.status(401).json({ success: false, error: 'Incorrect password or PIN' });
+    }
+
+    const isMaster =
+      isMasterUser ||
+      userObj.perms?.includes('*') ||
+      userObj.perms?.includes('Admin') ||
+      userObj.role?.toLowerCase() === 'administrator' ||
+      userObj.role?.toLowerCase() === 'admin';
+
+    res.json({
+      success: true,
+      user: {
+        username: targetKey,
+        name: userObj.name || targetKey.toUpperCase(),
+        role: userObj.role || 'Operator',
+        perms: isMaster ? ['*'] : (userObj.perms || [])
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Real-Time Server-Sent Events (SSE) Stream for Instant Multi-Device Live Sync
+app.get('/api/sync/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  sseClients.add(res);
+
+  // Send initial connected handshake with current server state revision
+  res.write(`data: ${JSON.stringify({
+    type: 'CONNECTED',
+    revision: centralStateRevision,
+    timestamp: Date.now(),
+    jobCount: cachedCentralState?.jobs?.length || 0
+  })}\n\n`);
+
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(':keepalive\n\n');
+    } catch {
+      clearInterval(keepAlive);
+      sseClients.delete(res);
+    }
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    sseClients.delete(res);
+  });
+});
+
+// Fast Ping endpoint for 100ms multi-device live polling
+app.get('/api/sync/ping', (req, res) => {
+  const stats = fs.existsSync(CENTRAL_STATE_FILE) ? fs.statSync(CENTRAL_STATE_FILE) : null;
+  res.json({
+    success: true,
+    revision: centralStateRevision,
+    timestamp: stats?.mtimeMs || Date.now(),
+    jobCount: cachedCentralState?.jobs?.length || 0,
+    logCount: cachedCentralState?.logs?.length || 0,
+    lastUpdated: cachedCentralState?.lastUpdated || null
+  });
+});
+
 // Central Sync Bridge Endpoints (Bidirectional Sync across all recording devices)
 app.get('/api/sync/state', (req, res) => {
   try {
@@ -102,6 +275,8 @@ app.get('/api/sync/state', (req, res) => {
     res.json({
       success: true,
       timestamp: stats?.mtimeMs || Date.now(),
+      revision: centralStateRevision,
+      lastUpdated: state?.lastUpdated || new Date().toISOString(),
       state: state || null,
       jobCount: state?.jobs?.length || 0,
       logCount: state?.logs?.length || 0

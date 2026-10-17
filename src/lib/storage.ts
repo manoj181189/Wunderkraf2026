@@ -287,7 +287,7 @@ export async function fetchCentralState(): Promise<FactoryState | null> {
   try {
     const endpoint = getCentralSyncEndpoint();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -561,7 +561,31 @@ export async function persistFactoryState(
     });
   }
 
-  // 6. Trigger non-blocking central sync flush
+  // 6. Direct instant push to Central Server Bridge (for 0ms multi-device live sync)
+  if (typeof window !== 'undefined') {
+    try {
+      const endpoint = getCentralSyncEndpoint();
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          state: stateToSave,
+          clientTimestamp: Date.now()
+        })
+      })
+      .then(async (res) => {
+        if (res.ok) {
+          const result = await res.json();
+          if (result && result.state) {
+            syncBus?.postMessage({ type: 'STATE_SYNCED', state: result.state });
+          }
+        }
+      })
+      .catch(() => {});
+    } catch (e) {}
+  }
+
+  // 7. Trigger non-blocking offline queue flush fallback
   flushOfflineSyncQueue().catch(() => {});
 
   return {
@@ -845,57 +869,106 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
     }
   }
 
-  // Continuous Central Sync Bridge polling (every 4s) to keep live devices & sidebars synchronized
+  // Real-Time Multi-Device Sync: Server-Sent Events (SSE) Stream + Lightweight Ping Polling
+  let eventSource: EventSource | null = null;
   let pollTimer: any = null;
-  let lastObservedTimestamp = 0;
-  let lastObservedJobCount = -1;
-  let lastObservedLogCount = -1;
+  let lastObservedRevision = 0;
+  let isFetchingState = false;
+
+  const pullLatestState = async () => {
+    if (isFetchingState) return;
+    isFetchingState = true;
+    try {
+      const endpoint = getCentralSyncEndpoint();
+      const res = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && data.state && Array.isArray(data.state.jobs)) {
+          lastObservedRevision = data.revision || Date.now();
+          const reconciled = reconcileJobStageTransitions(data.state);
+          await saveToIndexedDB(reconciled);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reconciled));
+          } catch (e) {}
+          onUpdate(reconciled);
+        }
+      }
+    } catch (e) {
+      // Ignore network hiccup
+    } finally {
+      isFetchingState = false;
+    }
+  };
 
   if (typeof window !== 'undefined') {
-    const pollServer = async () => {
+    // 1. Establish Real-Time SSE Stream for sub-100ms multi-device updates
+    try {
+      const origin = window.location.origin || '';
+      const streamUrl = `${origin}/api/sync/stream`;
+      eventSource = new EventSource(streamUrl);
+
+      eventSource.onmessage = (event) => {
+        try {
+          if (!event.data || event.data.startsWith(':')) return;
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'CONNECTED') {
+            lastObservedRevision = msg.revision || 0;
+          } else if (msg.type === 'STATE_CHANGED') {
+            if (msg.revision && msg.revision !== lastObservedRevision) {
+              lastObservedRevision = msg.revision;
+              pullLatestState();
+            }
+          }
+        } catch (e) {}
+      };
+
+      eventSource.onerror = () => {
+        // SSE reconnects automatically
+      };
+    } catch (e) {
+      console.warn('[Sync Bridge] SSE not supported, falling back to fast ping polling:', e);
+    }
+
+    // 2. Ultra-Lightweight Ping Polling (/api/sync/ping is ~100 bytes) every 2 seconds as robust backup
+    const checkPing = async () => {
       try {
-        const endpoint = getCentralSyncEndpoint();
-        const res = await fetch(endpoint, {
+        const origin = window.location.origin || '';
+        const pingUrl = `${origin}/api/sync/ping`;
+        const res = await fetch(pingUrl, {
           method: 'GET',
           headers: { 'Accept': 'application/json' },
           cache: 'no-store'
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.success && data.state && Array.isArray(data.state.jobs)) {
-            const serverTimestamp = data.timestamp || 0;
-            const serverJobCount = data.jobCount ?? data.state.jobs.length;
-            const serverLogCount = data.logCount ?? (data.state.logs?.length || 0);
-
-            if (
-              serverTimestamp !== lastObservedTimestamp ||
-              serverJobCount !== lastObservedJobCount ||
-              serverLogCount !== lastObservedLogCount
-            ) {
-              lastObservedTimestamp = serverTimestamp;
-              lastObservedJobCount = serverJobCount;
-              lastObservedLogCount = serverLogCount;
-
-              const reconciled = reconcileJobStageTransitions(data.state);
-              await saveToIndexedDB(reconciled);
-              try {
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reconciled));
-              } catch (e) {}
-              onUpdate(reconciled);
+          if (data && data.success && data.revision) {
+            if (lastObservedRevision === 0) {
+              lastObservedRevision = data.revision;
+            } else if (data.revision !== lastObservedRevision) {
+              lastObservedRevision = data.revision;
+              pullLatestState();
             }
           }
         }
-      } catch (e) {
-        // Silent retry on next interval
-      }
+      } catch (e) {}
     };
 
-    pollTimer = setInterval(pollServer, 4000);
+    pollTimer = setInterval(checkPing, 2000);
+
+    // Instant check when operator switches back to this tab/window
+    window.addEventListener('focus', checkPing);
   }
 
   return () => {
     if (pollTimer) {
       clearInterval(pollTimer);
+    }
+    if (eventSource) {
+      eventSource.close();
     }
     syncBus?.removeEventListener('message', handler);
     if (typeof window !== 'undefined') {

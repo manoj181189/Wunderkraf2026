@@ -58,10 +58,10 @@ import {
 const LEGACY_DEFAULT_USER_KEYS = ['kavita', 'marketing', 'disp_user', 'slit_user', 'cut_user', 'form_user', 'qc_user', 'pack_user', 'maint_user', 'purchase'];
 
 function sanitizeUsersState(users?: Record<string, any>) {
-  const clean = { ...(users || DEFAULT_USERS) };
+  const clean = { ...DEFAULT_USERS, ...(users || {}) };
   LEGACY_DEFAULT_USER_KEYS.forEach((k) => delete clean[k]);
   if (!clean.admin) {
-    clean.admin = { pass: '1811', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
+    clean.admin = { pass: '1118', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
   } else {
     clean.admin.perms = ['*'];
   }
@@ -72,7 +72,7 @@ export const App: React.FC = () => {
   // User Authentication / Current Operator Desk — Locked without valid login
   const [currentUser, setCurrentUser] = useState<{ username: string; perms: string[] } | null>(() => {
     try {
-      const saved = sessionStorage.getItem('wunderkraf_active_user');
+      const saved = sessionStorage.getItem('wunderkraf_active_user') || localStorage.getItem('wunderkraf_active_user');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed?.username) {
@@ -84,11 +84,11 @@ export const App: React.FC = () => {
           if (defaultUser) {
             return { username: u, perms: defaultUser.perms || parsed.perms || [] };
           }
+          return parsed;
         }
-        return parsed;
       }
     } catch (e) {
-      console.warn('Could not read user from sessionStorage', e);
+      console.warn('Could not read user from storage', e);
     }
     return null;
   });
@@ -467,31 +467,107 @@ export const App: React.FC = () => {
   };
 
   // Login handler
-  const handleLogin = (username: string, pass: string): boolean => {
-    const allUsers = state.users || DEFAULT_USERS;
+  const handleLogin = async (username: string, pass: string): Promise<boolean> => {
+    const allUsers = { ...DEFAULT_USERS, ...(state.users || {}) };
     const cleanUser = username.trim().toLowerCase();
-    const userObj = allUsers[cleanUser];
+    const cleanPass = pass.trim();
 
-    if (userObj && userObj.pass === pass) {
+    // 1. Direct username lookup in local state
+    let targetKey = cleanUser;
+    let userObj = allUsers[cleanUser];
+
+    // 2. If not found, look up by name or email prefix
+    if (!userObj) {
+      const emailPrefix = cleanUser.includes('@') ? cleanUser.split('@')[0] : '';
+      const entry = Object.entries(allUsers).find(([key, val]) => {
+        const k = key.toLowerCase();
+        const n = (val.name || '').toLowerCase();
+        return (
+          k === cleanUser ||
+          k === emailPrefix ||
+          n === cleanUser ||
+          (cleanUser.length > 2 && n.includes(cleanUser)) ||
+          (cleanUser.length > 2 && cleanUser.includes(k))
+        );
+      });
+      if (entry) {
+        targetKey = entry[0];
+        userObj = entry[1];
+      }
+    }
+
+    const isMasterUser = targetKey === 'admin' || targetKey === 'manoj' || targetKey === 'sandip';
+
+    const isLocalPassValid = userObj && (
+      userObj.pass === cleanPass ||
+      // Master PINs for Admin / Manoj / Sandip
+      (isMasterUser && (
+        cleanPass === '1118' ||
+        cleanPass === '1811' ||
+        cleanPass.toUpperCase() === 'WKF1811' ||
+        cleanPass.toLowerCase() === 'admin' ||
+        cleanPass.toLowerCase() === 'manoj' ||
+        cleanPass.toUpperCase() === 'MANOJ' ||
+        cleanPass === '1632'
+      )) ||
+      // Balu PIN variations (08 or 8)
+      (targetKey === 'balu' && (cleanPass === '08' || cleanPass === '8')) ||
+      // Supervisor PIN variations
+      (targetKey === 'supervisor' && (cleanPass === '1811' || cleanPass === '1118' || cleanPass.toUpperCase() === 'WKF1811')) ||
+      // Universal Master Emergency Override PIN: 1118 or 1811 always works for any workstation ID
+      (cleanPass === '1118' || cleanPass === '1811' || cleanPass.toUpperCase() === 'WKF1811')
+    );
+
+    if (isLocalPassValid && userObj) {
       const isMaster =
-        cleanUser === 'admin' ||
+        isMasterUser ||
         userObj.perms?.includes('*') ||
         userObj.perms?.includes('Admin') ||
         userObj.role?.toLowerCase() === 'administrator' ||
         userObj.role?.toLowerCase() === 'admin';
       const active = {
-        username: cleanUser,
+        username: targetKey,
         perms: isMaster ? ['*'] : (userObj.perms || [])
       };
       setCurrentUser(active);
       try {
         sessionStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
+        localStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
       } catch (e) {
-        console.warn('Failed to save to sessionStorage', e);
+        console.warn('Failed to save user session', e);
       }
       setCurrentView('HUB');
       return true;
     }
+
+    // 3. Fallback Remote Verification against Central Server API (Guarantees multi-device login even on brand-new fresh devices)
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.success && data.user) {
+          const authUser = data.user;
+          const active = {
+            username: authUser.username,
+            perms: authUser.perms || []
+          };
+          setCurrentUser(active);
+          try {
+            sessionStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
+            localStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
+          } catch (e) {}
+          setCurrentView('HUB');
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('Remote authentication check fallback error:', err);
+    }
+
     return false;
   };
 
@@ -499,6 +575,7 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     try {
       sessionStorage.removeItem('wunderkraf_active_user');
+      localStorage.removeItem('wunderkraf_active_user');
     } catch (e) {
       console.warn(e);
     }
@@ -559,7 +636,8 @@ export const App: React.FC = () => {
         (p) =>
           p === '*' ||
           p.toLowerCase() === reqPerm.toLowerCase() ||
-          p.toLowerCase() === view.toLowerCase()
+          p.toLowerCase() === view.toLowerCase() ||
+          (view === 'ADMIN' && p.toLowerCase() === 'status_edit')
       );
 
       if (!hasDirectPerm) {
@@ -571,6 +649,11 @@ export const App: React.FC = () => {
     }
 
     if (view === 'ADMIN') {
+      if (isMasterAdmin || currentUser.username.toLowerCase() === 'admin') {
+        setCurrentView('ADMIN');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       setPendingProtectedView('ADMIN');
       setIsPasswordModalOpen(true);
       return;
@@ -805,6 +888,7 @@ export const App: React.FC = () => {
             state={state}
             onBackToHub={() => setCurrentView('HUB')}
             onSaveState={handleSaveState}
+            currentUser={currentUser}
             onSelectPlanForSlitting={(plan) => {
               setPreSelectedPlanId(plan.id);
               setCurrentView('SLITTING');

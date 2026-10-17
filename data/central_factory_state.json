@@ -18199,6 +18199,15 @@
       "perms": [
         "*"
       ]
+    },
+    "manoj": {
+      "role": "Plant Head & Chief Engineer",
+      "name": "Manoj Kumar",
+      "phone": "+91 90339 12511",
+      "pass": "1118",
+      "perms": [
+        "*"
+      ]
     }
   },
   "machineReadyAlerts": [],

@@ -381,11 +381,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'ADMIN',
-      title: 'Master Settings',
+      title: 'Master Settings & Status Rights',
       shortTitle: 'Settings',
       icon: <Settings className="w-5 h-5" />,
       perm: 'Admin',
-      category: 'admin'
+      category: 'admin',
+      badge: (isMasterAdmin || currentUser?.perms.some(p => p === 'Status_Edit')) ? '⚡ Rights' : undefined,
+      badgeColor: 'bg-amber-500 text-slate-950 font-black'
     }
   ];
 
@@ -393,6 +395,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const authorizedNavItems = allNavItems.filter((item) => {
     if (isMasterAdmin) return true;
     if (item.id === 'HUB') return true;
+    if (item.id === 'ADMIN') {
+      return currentUser?.perms.some(p => p === '*' || p.toLowerCase() === 'admin' || p.toLowerCase() === 'status_edit');
+    }
     if (item.id === 'WHATSAPP') {
       return currentUser?.perms.some(
         (p) => p === '*' || p.toLowerCase() === 'whatsapp' || p.toLowerCase().startsWith('wa_')

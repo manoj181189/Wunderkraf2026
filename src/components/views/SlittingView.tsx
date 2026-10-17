@@ -1,6 +1,6 @@
 import { autoRegisterWorker, autoRegisterCrew } from '../../lib/workerUtils';
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, Play, Pause, Lock, Square, XCircle, Plus, AlertCircle, Check, Search, Tag, ShieldCheck, Layers, Eye, AlertTriangle, RotateCcw, Calendar, Clock, CheckCircle2, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, Cog } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Play, Pause, Lock, Square, XCircle, Plus, AlertCircle, Check, Search, Tag, ShieldCheck, Layers, Eye, AlertTriangle, RotateCcw, Calendar, Clock, CheckCircle2, Filter, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, Cog, Zap } from 'lucide-react';
 import { FactoryState, Job, JobReelItem, ProductType, RunningBatch, OperatorRunSlice, LogEntry, PlannedLayer, ShiftHandoverRecord } from '../../types';
 import { PRODUCTS, PAPER_BRANDS, DEPT_WORKERS, PRODUCT_PREFIX_MAP } from '../../lib/constants';
 import {
@@ -65,6 +65,122 @@ export const SlittingView: React.FC<SlittingViewProps> = ({
     : (state.deptWorkers?.['Slitting'] || DEPT_WORKERS['Slitting'] || ['SLIT_RAMESH', 'SLIT_SURESH']);
 
   const currentSupervisor = currentUser?.username || 'slit_supervisor';
+
+  const currentUserRole = currentUser ? (state.users[currentUser.username.toLowerCase()]?.role || '') : '';
+  const isAdmin = Boolean(currentUser && (
+    currentUser.perms.includes('*') ||
+    currentUser.perms.includes('Admin') ||
+    currentUser.username.toLowerCase() === 'admin' ||
+    currentUserRole.toLowerCase() === 'admin' ||
+    currentUserRole.toLowerCase() === 'administrator'
+  ));
+  const canEditStatus = isAdmin || Boolean(currentUser?.perms.some(p =>
+    p === '*' || p === 'Admin' || p === 'Status_Edit' || p === 'Slitting_Status_Edit' || p === 'Slitting'
+  ));
+
+  // Admin Status Rights Override Modal State
+  const [isAdminStatusModalOpen, setIsAdminStatusModalOpen] = useState(false);
+  const [adminSelectedPlanId, setAdminSelectedPlanId] = useState<string>(preSelectedPlanId || '');
+  const [adminSelectedJobId, setAdminSelectedJobId] = useState<string>('');
+  const [adminStatusSubTab, setAdminStatusSubTab] = useState<'plans' | 'jobs' | 'batches'>('plans');
+  const [adminJobStageInput, setAdminJobStageInput] = useState<string>('Slitting');
+  const [adminJobStatusInput, setAdminJobStatusInput] = useState<string>('PENDING');
+  const [adminJobRollsInput, setAdminJobRollsInput] = useState<number>(0);
+
+  const handleAdminUpdatePlanStatus = (planId: string, nextStatus: 'Scheduled' | 'In-Progress' | 'Completed' | 'Cancelled') => {
+    const targetPlan = (productionPlans || []).find(p => p.id === planId);
+    const prevStatus = targetPlan?.status || 'N/A';
+    const updatedPlans = (productionPlans || []).map(p => {
+      if (p.id !== planId) return p;
+      return { ...p, status: nextStatus };
+    });
+    const newLog: LogEntry = {
+      jobId: targetPlan?.jobId || planId,
+      product: targetPlan?.product || 'Spoon',
+      stage: 'Slitting',
+      machine: selectedMachine,
+      shift,
+      action: `⚡ Admin Status Edit on Slitting Plan [${planId}]: Status updated from ${prevStatus} to ${nextStatus}`,
+      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
+      user: currentUser?.username || 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
+    };
+    onSaveState({
+      ...state,
+      productionPlans: updatedPlans,
+      logs: [...(state.logs || []), newLog]
+    });
+    alert(`✅ Plan [${planId}] status set to ${nextStatus}! Sidebar & Slitting pending counts have been synchronized.`);
+  };
+
+  const handleAdminUpdateJobStatus = (jobId: string, nextStage: string, nextStatus: string, rolls: number) => {
+    const targetJob = (jobs || []).find(j => j.id === jobId);
+    const updatedJobs = (jobs || []).map(j => {
+      if (j.id !== jobId) return j;
+      return {
+        ...j,
+        stage: nextStage,
+        status: nextStatus,
+        availableRolls: Math.max(0, rolls)
+      };
+    });
+    const newLog: LogEntry = {
+      jobId,
+      product: targetJob?.product || 'Spoon',
+      stage: 'Slitting',
+      machine: selectedMachine,
+      shift,
+      action: `⚡ Admin Status Edit on Job [${jobId}]: Stage set to ${nextStage}, Status to ${nextStatus}, Available Rolls to ${rolls}`,
+      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
+      user: currentUser?.username || 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
+    };
+    onSaveState({
+      ...state,
+      jobs: updatedJobs,
+      logs: [...(state.logs || []), newLog]
+    });
+    alert(`✅ Job [${jobId}] stage and status updated! Sidebar & Desks synchronized.`);
+  };
+
+  const handleAdminClearMachineBatches = (machineName: string) => {
+    let clearedCount = 0;
+    const updatedJobs = (jobs || []).map(j => {
+      if (!j.runningBatches || j.runningBatches.length === 0) return j;
+      const filtered = j.runningBatches.filter(b => {
+        if (b.machine === machineName && (b.status === 'Running' || b.status === 'Held')) {
+          clearedCount++;
+          return false;
+        }
+        return true;
+      });
+      return { ...j, runningBatches: filtered };
+    });
+    if (clearedCount === 0) {
+      alert(`No running/held batches found on ${machineName}.`);
+      return;
+    }
+    const newLog: LogEntry = {
+      jobId: 'ALL-SLIT',
+      product: 'N/A',
+      stage: 'Slitting',
+      machine: machineName,
+      shift,
+      action: `⚡ Admin cleared ${clearedCount} active/held batches on machine [${machineName}]`,
+      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
+      user: currentUser?.username || 'admin',
+      rawDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
+    };
+    onSaveState({
+      ...state,
+      jobs: updatedJobs,
+      logs: [...(state.logs || []), newLog]
+    });
+    alert(`✅ Cleared ${clearedCount} active batches on ${machineName}! Sidebar live running indicator reset.`);
+  };
 
   // Daily Production Log Sheet Manual Time/Date Overrides (For delayed supervisor entry)
   const [logSheetStartTime, setLogSheetStartTime] = useState('');
@@ -1286,13 +1402,29 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-xs mb-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
-        <button
-          onClick={onBackToHub}
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Main Menu</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBackToHub}
+            className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Main Menu</span>
+          </button>
+          {canEditStatus && (
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedPlanId) setAdminSelectedPlanId(selectedPlanId);
+                setIsAdminStatusModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 text-xs font-black text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-lg transition cursor-pointer shadow-2xs active:scale-95"
+              title="Admin Status Rights: Edit Slitting Plan Status, Job Stage & Pending Counts"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-400" />
+              <span>⚡ Admin Status Rights (एडमिन स्टेटस एडिट)</span>
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
             <RefreshCw className="w-5 h-5" />
@@ -3585,6 +3717,331 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 className="px-5 py-2.5 text-xs font-black text-white bg-rose-600 hover:bg-rose-700 rounded-xl cursor-pointer shadow-md flex items-center gap-1.5 transition"
               >
                 <Check className="w-4 h-4" /> Authorize Deviation & Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Status Rights Correction Modal */}
+      {isAdminStatusModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-2xl border border-amber-300 animate-in fade-in max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shadow-xs">
+                  <Zap className="w-5 h-5 fill-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide m-0">
+                    ⚡ Admin Status Rights & Correction (एडमिन स्टेटस व पेंडिंग संपादन)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 m-0">
+                    स्लिटिंग व प्लानिंग में गलत पेंडिंग या स्टेटस को तुरंत ठीक करें
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAdminStatusModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Subtabs */}
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setAdminStatusSubTab('plans')}
+                className={`flex-1 py-1.5 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  adminStatusSubTab === 'plans' ? 'bg-white text-blue-900 shadow-xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                <span>PPC Plans Status (प्लान स्टेटस)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminStatusSubTab('jobs')}
+                className={`flex-1 py-1.5 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  adminStatusSubTab === 'jobs' ? 'bg-white text-indigo-900 shadow-xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Slitting Jobs & Rolls (जॉब स्टेज व रोल्स)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminStatusSubTab('batches')}
+                className={`flex-1 py-1.5 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  adminStatusSubTab === 'batches' ? 'bg-white text-amber-900 shadow-xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Cog className="w-3.5 h-3.5 text-amber-600" />
+                <span>Machine Runs (मशीन बैच रीसेट)</span>
+              </button>
+            </div>
+
+            {/* SubTab 1: PPC Plans Status */}
+            {adminStatusSubTab === 'plans' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Select PPC Production Plan to Correct Status:
+                  </label>
+                  <select
+                    value={adminSelectedPlanId || selectedPlanId || (productionPlans[0]?.id || '')}
+                    onChange={(e) => setAdminSelectedPlanId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                  >
+                    {productionPlans.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.id}] {p.product} • {p.targetLayers}L • {p.paperBrand || 'ITC'} — Current: [{p.status}]
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {(() => {
+                  const targetPlan = productionPlans.find(
+                    (p) => p.id === (adminSelectedPlanId || selectedPlanId || productionPlans[0]?.id)
+                  );
+                  if (!targetPlan) return <div className="text-xs text-slate-400 py-3 text-center">No plan selected.</div>;
+
+                  return (
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2 flex-wrap gap-2">
+                        <div className="font-extrabold text-slate-900">
+                          Plan: <span className="text-blue-700">{targetPlan.id}</span> ({targetPlan.product})
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-500 font-bold">Current Status:</span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              targetPlan.status === 'Completed'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : targetPlan.status === 'In-Progress'
+                                ? 'bg-blue-100 text-blue-800'
+                                : targetPlan.status === 'Cancelled'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {targetPlan.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-600">
+                        <div><span className="font-bold text-slate-400">Target Layers:</span> {targetPlan.targetLayers}L</div>
+                        <div><span className="font-bold text-slate-400">Target Length:</span> {targetPlan.targetLengthMeters}M</div>
+                        <div><span className="font-bold text-slate-400">Paper Mill:</span> {targetPlan.paperBrand || 'ITC'}</div>
+                        <div><span className="font-bold text-slate-400">Linked Job:</span> {targetPlan.jobId || 'None'}</div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200">
+                        <label className="block text-[11px] font-black text-slate-700 uppercase mb-2">
+                          ⚡ 1-Click Change Status (पेंडिंग ठीक करने हेतु स्टेटस बदलें):
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleAdminUpdatePlanStatus(targetPlan.id, 'Completed')}
+                            className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1 active:scale-95"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Mark Completed</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdminUpdatePlanStatus(targetPlan.id, 'Scheduled')}
+                            className="py-2 px-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1 active:scale-95"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Set Scheduled</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdminUpdatePlanStatus(targetPlan.id, 'In-Progress')}
+                            className="py-2 px-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1 active:scale-95"
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                            <span>Set In-Progress</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdminUpdatePlanStatus(targetPlan.id, 'Cancelled')}
+                            className="py-2 px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[11px] rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1 active:scale-95"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Cancel Plan</span>
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-2 m-0">
+                          💡 टिप: यदि स्लिटिंग पूरी हो चुकी है लेकिन साइडबार में पेंडिंग दिख रहा है, तो <strong>Mark Completed</strong> दबाएं।
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* SubTab 2: Slitting Jobs & Rolls */}
+            {adminStatusSubTab === 'jobs' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Select Production Job to Overwrite Stage / Status:
+                  </label>
+                  <select
+                    value={adminSelectedJobId || (jobs[0]?.id || '')}
+                    onChange={(e) => {
+                      setAdminSelectedJobId(e.target.value);
+                      const target = jobs.find(j => j.id === e.target.value);
+                      if (target) {
+                        setAdminJobStageInput(target.stage || 'Slitting');
+                        setAdminJobStatusInput(target.status || 'PENDING');
+                        setAdminJobRollsInput(target.availableRolls || 0);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                  >
+                    {jobs.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        [{j.id}] {j.product} [{j.paperBrand || 'ITC'}] — Stage: {j.stage} | Status: {j.status || 'PENDING'} (Rolls: {j.availableRolls || 0})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {(() => {
+                  const targetJob = jobs.find((j) => j.id === (adminSelectedJobId || jobs[0]?.id));
+                  if (!targetJob) return <div className="text-xs text-slate-400 py-3 text-center">No job found.</div>;
+
+                  return (
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            Production Stage:
+                          </label>
+                          <select
+                            value={adminJobStageInput}
+                            onChange={(e) => setAdminJobStageInput(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                          >
+                            <option value="Planning">Planning</option>
+                            <option value="Slitting">Slitting (स्लिटिंग चालू)</option>
+                            <option value="Slitting Completed">Slitting Completed (पूर्ण)</option>
+                            <option value="Cutting">Cutting</option>
+                            <option value="Cutting Completed">Cutting Completed</option>
+                            <option value="Forming">Forming</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            Queue Status:
+                          </label>
+                          <select
+                            value={adminJobStatusInput}
+                            onChange={(e) => setAdminJobStatusInput(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                          >
+                            <option value="PENDING">Pending (पेंडिंग)</option>
+                            <option value="SLITTING_IN_PROGRESS">Slitting In Progress</option>
+                            <option value="READY_FOR_CUTTING">Ready For Cutting</option>
+                            <option value="CUTTING_IN_PROGRESS">Cutting In Progress</option>
+                            <option value="CUTTING_COMPLETED">Cutting Completed</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            Available Slit Rolls:
+                          </label>
+                          <input
+                            type="number"
+                            value={adminJobRollsInput}
+                            onChange={(e) => setAdminJobRollsInput(Number(e.target.value) || 0)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAdminUpdateJobStatus(targetJob.id, adminJobStageInput, adminJobStatusInput, adminJobRollsInput)}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Save Status Overwrite for Job [{targetJob.id}]</span>
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* SubTab 3: Machine Active Batches */}
+            {adminStatusSubTab === 'batches' && (
+              <div className="space-y-3">
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700 uppercase">
+                      Current Machine: <strong>{selectedMachine}</strong>
+                    </span>
+                    <span className="font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full text-[10px]">
+                      {activeBatches.length} Running Batches
+                    </span>
+                  </div>
+
+                  {activeBatches.length === 0 ? (
+                    <div className="p-4 bg-white rounded-lg border border-dashed border-slate-200 text-slate-400 text-center">
+                      No active or held running batches on {selectedMachine}. Machine is clear.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {activeBatches.map(({ job, batch }) => (
+                        <div key={batch.batchId} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
+                          <div>
+                            <div className="font-bold text-slate-900">{job.id} • Batch #{batch.batchId}</div>
+                            <div className="text-[11px] text-slate-500">Op: {batch.worker} • Status: {batch.status}</div>
+                          </div>
+                          <span className="text-[10px] font-black uppercase text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
+                            {batch.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleAdminClearMachineBatches(selectedMachine)}
+                    className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    <span>Clear Stale / Orphan Batches on {selectedMachine}</span>
+                  </button>
+                  <p className="text-[10px] text-slate-400 m-0">
+                    यदि मशीन बंद हो चुकी है लेकिन साइडबार में "● LIVE" या रनिंग दिख रहा है, तो यह बटन दबाएं।
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsAdminStatusModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer transition"
+              >
+                Close (बंद करें)
               </button>
             </div>
           </div>
