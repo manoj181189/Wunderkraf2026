@@ -284,40 +284,6 @@ export const WhatsAppCommunicationView: React.FC<WhatsAppCommunicationViewProps>
             </div>
           </div>
 
-          {/* Quick 1-Click Shift Selector Buttons */}
-          <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-xl">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedCategory('SHIFT_DAY');
-                setShiftDateFilter(new Date().toISOString().split('T')[0]);
-              }}
-              className={`py-2.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                selectedCategory === 'SHIFT_DAY'
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span>☀️</span>
-              <span>डे शिफ्ट रिपोर्ट (Day Shift)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedCategory('SHIFT_NIGHT');
-                setShiftDateFilter(new Date().toISOString().split('T')[0]);
-              }}
-              className={`py-2.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                selectedCategory === 'SHIFT_NIGHT'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span>🌙</span>
-              <span>नाईट शिफ्ट रिपोर्ट (Night Shift)</span>
-            </button>
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">

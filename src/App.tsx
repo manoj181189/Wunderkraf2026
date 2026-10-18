@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { FactoryState, CurrentView, ProductType } from './types';
 import { INITIAL_STATE, LOCAL_STORAGE_KEY, DEFAULT_USERS, DEFAULT_FLOOR_WORKERS } from './lib/constants';
-import { initializeFactoryState, persistFactoryState, forceSyncWithCentral, subscribeToSyncEvents, fetchCentralState, saveToIndexedDB, reconcileJobStageTransitions } from './lib/storage';
+import { initializeFactoryState, persistFactoryState, forceSyncWithCentral, subscribeToSyncEvents } from './lib/storage';
 
 // Header & Navigation Hub
 import { Header } from './components/Header';
@@ -31,7 +31,6 @@ import { PurchaseView } from './components/views/PurchaseView';
 import { PlanningDeskView } from './components/views/PlanningDeskView';
 import { ExecutiveManpowerView } from './components/views/ExecutiveManpowerView';
 import { WhatsAppCommunicationView } from './components/views/WhatsAppCommunicationView';
-import { SupervisorControlView } from './components/views/SupervisorControlView';
 
 // Modals
 import { VoiceTranscriberModal } from './components/VoiceTranscriberModal';
@@ -58,10 +57,10 @@ import {
 const LEGACY_DEFAULT_USER_KEYS = ['kavita', 'marketing', 'disp_user', 'slit_user', 'cut_user', 'form_user', 'qc_user', 'pack_user', 'maint_user', 'purchase'];
 
 function sanitizeUsersState(users?: Record<string, any>) {
-  const clean = { ...DEFAULT_USERS, ...(users || {}) };
+  const clean = { ...(users || DEFAULT_USERS) };
   LEGACY_DEFAULT_USER_KEYS.forEach((k) => delete clean[k]);
   if (!clean.admin) {
-    clean.admin = { pass: '1118', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
+    clean.admin = { pass: '1811', perms: ['*'], name: 'Master Administrator', role: 'Administrator' };
   } else {
     clean.admin.perms = ['*'];
   }
@@ -72,7 +71,7 @@ export const App: React.FC = () => {
   // User Authentication / Current Operator Desk — Locked without valid login
   const [currentUser, setCurrentUser] = useState<{ username: string; perms: string[] } | null>(() => {
     try {
-      const saved = sessionStorage.getItem('wunderkraf_active_user') || localStorage.getItem('wunderkraf_active_user');
+      const saved = sessionStorage.getItem('wunderkraf_active_user');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed?.username) {
@@ -84,11 +83,11 @@ export const App: React.FC = () => {
           if (defaultUser) {
             return { username: u, perms: defaultUser.perms || parsed.perms || [] };
           }
-          return parsed;
         }
+        return parsed;
       }
     } catch (e) {
-      console.warn('Could not read user from storage', e);
+      console.warn('Could not read user from sessionStorage', e);
     }
     return null;
   });
@@ -122,6 +121,7 @@ export const App: React.FC = () => {
       .then((loadedState) => {
         if (isMounted && loadedState) {
           loadedState.users = sanitizeUsersState(loadedState.users);
+          
           setState(loadedState);
         }
       })
@@ -134,7 +134,6 @@ export const App: React.FC = () => {
       if (isMounted && syncedState && Array.isArray(syncedState.jobs)) {
         setState((prev) => {
           syncedState.users = sanitizeUsersState(syncedState.users);
-          syncedState.lastResetTimestamp = Math.max(prev?.lastResetTimestamp || 0, syncedState.lastResetTimestamp || 0);
           return syncedState;
         });
       }
@@ -353,58 +352,65 @@ export const App: React.FC = () => {
     };
   }, [state]);
 
-  const snapshotTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   // Persistence effect: Writes to high-capacity IndexedDB and mirrors safely with auto-pruning to localStorage
   const handleSaveState = async (nextState: FactoryState) => {
-    let stampedState: FactoryState = {
-      ...nextState,
-      lastResetTimestamp: Math.max(nextState.lastResetTimestamp || 0, state?.lastResetTimestamp || 0)
-    };
+    let stampedState = nextState;
     const nowIso = new Date().toISOString();
 
-    // Fast shallow comparison instead of heavy synchronous JSON.stringify loops
-    if (state?.jobs && nextState?.jobs && state.jobs !== nextState.jobs) {
-      const stampedJobs = nextState.jobs.map((nj) => {
-        const ej = state.jobs.find((j) => j.id === nj.id);
-        if (!ej || ej !== nj) return { ...nj, updatedAt: nowIso };
+    // 1. Stamp modified jobs
+    if (state?.jobs && nextState?.jobs) {
+      const stampedJobs = nextState.jobs.map(nj => {
+        const ej = state.jobs.find(j => j.id === nj.id);
+        if (!ej) return { ...nj, updatedAt: nowIso };
+        const njCompare = { ...nj, updatedAt: undefined };
+        const ejCompare = { ...ej, updatedAt: undefined };
+        if (JSON.stringify(njCompare) !== JSON.stringify(ejCompare)) {
+          return { ...nj, updatedAt: nowIso };
+        }
         return nj;
       });
       stampedState = { ...stampedState, jobs: stampedJobs };
     }
 
-    if (state?.productionPlans && nextState?.productionPlans && state.productionPlans !== nextState.productionPlans) {
-      const stampedPlans = nextState.productionPlans.map((np) => {
-        const ep = state.productionPlans.find((p) => p.id === np.id);
-        if (!ep || ep !== np) return { ...np, updatedAt: nowIso };
+    // 2. Stamp modified productionPlans
+    if (state?.productionPlans && nextState?.productionPlans) {
+      const stampedPlans = nextState.productionPlans.map(np => {
+        const ep = state.productionPlans.find(p => p.id === np.id);
+        if (!ep) return { ...np, updatedAt: nowIso };
+        const npCompare = { ...np, updatedAt: undefined };
+        const epCompare = { ...ep, updatedAt: undefined };
+        if (JSON.stringify(npCompare) !== JSON.stringify(epCompare)) {
+          return { ...np, updatedAt: nowIso };
+        }
         return np;
       });
       stampedState = { ...stampedState, productionPlans: stampedPlans };
     }
 
-    if (state?.packJobs && nextState?.packJobs && state.packJobs !== nextState.packJobs) {
-      const stampedPackJobs = nextState.packJobs.map((npj) => {
-        const epj = state.packJobs.find((pj) => pj.id === npj.id);
-        if (!epj || epj !== npj) return { ...npj, updatedAt: nowIso };
+    // 3. Stamp modified packJobs
+    if (state?.packJobs && nextState?.packJobs) {
+      const stampedPackJobs = nextState.packJobs.map(npj => {
+        const epj = state.packJobs.find(pj => pj.id === npj.id);
+        if (!epj) return { ...npj, updatedAt: nowIso };
+        const npjCompare = { ...npj, updatedAt: undefined };
+        const epjCompare = { ...epj, updatedAt: undefined };
+        if (JSON.stringify(npjCompare) !== JSON.stringify(epjCompare)) {
+          return { ...npj, updatedAt: nowIso };
+        }
         return npj;
       });
       stampedState = { ...stampedState, packJobs: stampedPackJobs };
     }
 
-    // 1. Immediately update React state for instant 0ms latency UI response
-    setState(stampedState);
-
-    // 2. Debounced snapshot history saving (runs only every 15s instead of freezing on every keystroke)
-    if (snapshotTimerRef.current) {
-      clearTimeout(snapshotTimerRef.current);
-    }
-    snapshotTimerRef.current = setTimeout(() => {
-      try {
-        const historyStr = localStorage.getItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY');
-        const history = historyStr ? JSON.parse(historyStr) : [];
-        const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const description = `Snapshot - ${dateStr} at ${timestamp} (Jobs: ${stampedState.jobs?.length || 0}, Plans: ${stampedState.productionPlans?.length || 0})`;
+    try {
+      const historyStr = localStorage.getItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY');
+      const history = historyStr ? JSON.parse(historyStr) : [];
+      const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const description = `Snapshot - ${dateStr} at ${timestamp} (Jobs: ${stampedState.jobs?.length || 0}, Plans: ${stampedState.productionPlans?.length || 0})`;
+      
+      // Only push if different from last snapshot
+      if (history.length === 0 || JSON.stringify(history[0].state.jobs) !== JSON.stringify(stampedState.jobs) || JSON.stringify(history[0].state.productionPlans) !== JSON.stringify(stampedState.productionPlans)) {
         history.unshift({
           id: Date.now().toString(),
           timestamp: `${dateStr}, ${timestamp}`,
@@ -412,49 +418,34 @@ export const App: React.FC = () => {
           state: stampedState
         });
         localStorage.setItem('WUNDERKRAF_STATE_SNAPSHOT_HISTORY', JSON.stringify(history.slice(0, 10)));
-      } catch (e) {
-        console.warn('[History] Failed to push snapshot:', e);
-      }
-    }, 15000);
-
-    // 3. Asynchronously persist to IndexedDB / central sync in background
-    try {
-      const result = await persistFactoryState(stampedState, state);
-      if (result.mergedState) {
-        setState(result.mergedState);
       }
     } catch (e) {
-      console.warn('[Storage] Background persist error:', e);
+      console.warn('[History] Failed to push snapshot:', e);
+    }
+
+    setState(stampedState);
+    const result = await persistFactoryState(stampedState, state);
+    if (result.mergedState) {
+      setState(result.mergedState);
     }
   };
 
-  // Re-hydrate and synchronize state directly from the authoritative Central Sync Bridge
+  // Re-hydrate and synchronize state across all devices via Central Sync Bridge & IndexedDB
   const handleRefreshState = async () => {
-    setIsRefreshingState(true);
+    if (!confirm("⚠️ WARNING: This will sync with the Central Sync Bridge. If the server is empty, it may overwrite local data. Are you sure?")) return;
     try {
-      const centralState = await fetchCentralState();
-      if (centralState && Array.isArray(centralState.jobs)) {
-        const reconciled = reconcileJobStageTransitions(centralState);
-        await saveToIndexedDB(reconciled);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reconciled));
-        } catch (e) {}
-        if (reconciled.users?.admin && !reconciled.users.admin.perms?.includes('*')) {
-          reconciled.users.admin.perms = ['*'];
+      const syncResult = await forceSyncWithCentral(state);
+      if (syncResult && syncResult.syncedState) {
+        if (syncResult.syncedState.users?.admin && !syncResult.syncedState.users.admin.perms?.includes('*')) {
+          syncResult.syncedState.users.admin.perms = ['*'];
         }
-        setState(reconciled);
-        setRefreshToast(`Live state synchronized: ${reconciled.jobs.length} jobs active`);
+        setState(syncResult.syncedState);
+        setRefreshToast(syncResult.message);
         setTimeout(() => setRefreshToast(null), 3500);
-      } else {
-        const localState = await initializeFactoryState();
-        if (localState) {
-          setState(localState);
-          setRefreshToast(`Refreshed (${localState.jobs?.length || 0} jobs)`);
-          setTimeout(() => setRefreshToast(null), 3500);
-        }
       }
     } catch (err) {
       console.warn('[Storage] Refresh error from Central Bridge:', err);
+      // Fallback local hydration
       const localState = await initializeFactoryState();
       if (localState) {
         setState(localState);
@@ -462,124 +453,36 @@ export const App: React.FC = () => {
     } finally {
       setTimeout(() => {
         setIsRefreshingState(false);
-      }, 500);
+      }, 600);
     }
   };
 
   // Login handler
-  const handleLogin = async (username: string, pass: string): Promise<boolean> => {
-    const allUsers = { ...DEFAULT_USERS, ...(state.users || {}) };
+  const handleLogin = (username: string, pass: string): boolean => {
+    const allUsers = state.users || DEFAULT_USERS;
     const cleanUser = username.trim().toLowerCase();
-    const cleanPass = pass.trim();
+    const userObj = allUsers[cleanUser];
 
-    // 1. Direct username lookup in local state
-    let targetKey = cleanUser;
-    let userObj = allUsers[cleanUser];
-
-    // 2. If not found, look up by name or email prefix
-    if (!userObj) {
-      const emailPrefix = cleanUser.includes('@') ? cleanUser.split('@')[0] : '';
-      const entry = Object.entries(allUsers).find(([key, val]) => {
-        const k = key.toLowerCase();
-        const n = (val.name || '').toLowerCase();
-        return (
-          k === cleanUser ||
-          k === emailPrefix ||
-          n === cleanUser ||
-          (cleanUser.length > 2 && n.includes(cleanUser)) ||
-          (cleanUser.length > 2 && cleanUser.includes(k))
-        );
-      });
-      if (entry) {
-        targetKey = entry[0];
-        userObj = entry[1];
-      }
-    }
-
-    const isMasterUser = targetKey === 'admin' || targetKey === 'manoj' || targetKey === 'sandip';
-
-    const isLocalPassValid = userObj && (
-      userObj.pass === cleanPass ||
-      // Master PINs for Admin / Manoj / Sandip
-      (isMasterUser && (
-        cleanPass === '1118' ||
-        cleanPass === '1811' ||
-        cleanPass.toUpperCase() === 'WKF1811' ||
-        cleanPass.toLowerCase() === 'admin' ||
-        cleanPass.toLowerCase() === 'manoj' ||
-        cleanPass.toUpperCase() === 'MANOJ' ||
-        cleanPass === '1632'
-      )) ||
-      // Balu PIN variations (08 or 8)
-      (targetKey === 'balu' && (cleanPass === '08' || cleanPass === '8')) ||
-      // Supervisor PIN variations
-      (targetKey === 'supervisor' && (cleanPass === '1811' || cleanPass === '1118' || cleanPass.toUpperCase() === 'WKF1811')) ||
-      // Universal Master Emergency Override PIN: 1118 or 1811 always works for any workstation ID
-      (cleanPass === '1118' || cleanPass === '1811' || cleanPass.toUpperCase() === 'WKF1811')
-    );
-
-    if (isLocalPassValid && userObj) {
+    if (userObj && userObj.pass === pass) {
       const isMaster =
-        isMasterUser ||
+        cleanUser === 'admin' ||
         userObj.perms?.includes('*') ||
         userObj.perms?.includes('Admin') ||
         userObj.role?.toLowerCase() === 'administrator' ||
         userObj.role?.toLowerCase() === 'admin';
       const active = {
-        username: targetKey,
+        username: cleanUser,
         perms: isMaster ? ['*'] : (userObj.perms || [])
       };
       setCurrentUser(active);
       try {
         sessionStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
-        localStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
       } catch (e) {
-        console.warn('Failed to save user session', e);
+        console.warn('Failed to save to sessionStorage', e);
       }
       setCurrentView('HUB');
-      fetchCentralState().then((latest) => {
-        if (latest && Array.isArray(latest.jobs)) {
-          const reconciled = reconcileJobStageTransitions(latest);
-          setState(reconciled);
-        }
-      }).catch(() => {});
       return true;
     }
-
-    // 3. Fallback Remote Verification against Central Server API (Guarantees multi-device login even on brand-new fresh devices)
-    try {
-      const resp = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUser, password: cleanPass })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data && data.success && data.user) {
-          const authUser = data.user;
-          const active = {
-            username: authUser.username,
-            perms: authUser.perms || []
-          };
-          setCurrentUser(active);
-          try {
-            sessionStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
-            localStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
-          } catch (e) {}
-          setCurrentView('HUB');
-          fetchCentralState().then((latest) => {
-            if (latest && Array.isArray(latest.jobs)) {
-              const reconciled = reconcileJobStageTransitions(latest);
-              setState(reconciled);
-            }
-          }).catch(() => {});
-          return true;
-        }
-      }
-    } catch (err) {
-      console.warn('Remote authentication check fallback error:', err);
-    }
-
     return false;
   };
 
@@ -587,7 +490,6 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     try {
       sessionStorage.removeItem('wunderkraf_active_user');
-      localStorage.removeItem('wunderkraf_active_user');
     } catch (e) {
       console.warn(e);
     }
@@ -648,8 +550,7 @@ export const App: React.FC = () => {
         (p) =>
           p === '*' ||
           p.toLowerCase() === reqPerm.toLowerCase() ||
-          p.toLowerCase() === view.toLowerCase() ||
-          (view === 'ADMIN' && p.toLowerCase() === 'status_edit')
+          p.toLowerCase() === view.toLowerCase()
       );
 
       if (!hasDirectPerm) {
@@ -661,11 +562,6 @@ export const App: React.FC = () => {
     }
 
     if (view === 'ADMIN') {
-      if (isMasterAdmin || currentUser.username.toLowerCase() === 'admin') {
-        setCurrentView('ADMIN');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
       setPendingProtectedView('ADMIN');
       setIsPasswordModalOpen(true);
       return;
@@ -900,7 +796,6 @@ export const App: React.FC = () => {
             state={state}
             onBackToHub={() => setCurrentView('HUB')}
             onSaveState={handleSaveState}
-            currentUser={currentUser}
             onSelectPlanForSlitting={(plan) => {
               setPreSelectedPlanId(plan.id);
               setCurrentView('SLITTING');
@@ -973,15 +868,6 @@ export const App: React.FC = () => {
             onSaveState={handleSaveState}
             onOpenHoldModal={(m) => setHoldModalStation(m)}
             onOpenOrderSpecModal={(ordId) => setOrderSpecId(ordId)}
-            currentUser={currentUser}
-          />
-        )}
-
-        {currentView === 'SUPERVISOR' && (
-          <SupervisorControlView
-            state={state}
-            onBackToHub={() => setCurrentView('HUB')}
-            onSaveState={handleSaveState}
             currentUser={currentUser}
           />
         )}

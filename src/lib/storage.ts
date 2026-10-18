@@ -287,7 +287,7 @@ export async function fetchCentralState(): Promise<FactoryState | null> {
   try {
     const endpoint = getCentralSyncEndpoint();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -329,140 +329,44 @@ export function reconcileJobStageTransitions(state: FactoryState): FactoryState 
   const plans = state.productionPlans || [];
 
   const updatedJobs = state.jobs.map((job) => {
-    let updatedJob = { ...job };
     const linkedPlan = job.planId ? plans.find(p => p.id === job.planId) : null;
     const targetLayers = linkedPlan?.targetLayers || job.targetLayers || 8;
     const completedReelsCount = job.reelsList?.length || 0;
-    const allBatches = job.runningBatches || [];
+    const hasBatches = (job.runningBatches || []).length > 0;
+    const allBatchesCompleted = hasBatches && (job.runningBatches || []).every(b => b.status === 'Completed');
     
-    // Slitting batches
-    const slitBatches = allBatches.filter(b => b.stage === 'Slitting' || b.machine?.startsWith('Slitting'));
-    const totalSlitRollsProduced = slitBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0) ||
-      (job.reelsList || []).reduce((sum, r) => sum + (r.rolls || 0), 0) ||
-      targetLayers;
-
-    // Cutting batches
-    const cutBatches = allBatches.filter(b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
-    const hasCompletedCut = cutBatches.some(b => b.status === 'Completed');
-    const hasRunningCut = cutBatches.some(b => b.status === 'Running' || b.status === 'Held');
-    const totalCutRollsConsumed = cutBatches.reduce((sum, b) => sum + (b.issuedQty || b.consumedQty || 0), 0);
-
-    // Downstream batches
-    const formBatches = allBatches.filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'));
-    const qcBatches = allBatches.filter(b => b.stage === 'QC');
-    const packBatches = allBatches.filter(b => b.stage === 'Packing');
-
-    // Crate quantities per stage
-    const totalCutCratesProduced = cutBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
-    const totalFormCratesIssued = formBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
-    const totalFormCratesProduced = formBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
-    const totalQcCratesIssued = qcBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
-    const totalQcCratesApproved = qcBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
-    const totalPackCratesIssued = packBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
-
-    // Dynamic Crate Reconciliation
-    const calcAvailCutCrates = totalCutCratesProduced > 0
-      ? Math.max(0, totalCutCratesProduced - totalFormCratesIssued)
-      : (totalFormCratesIssued > 0
-          ? Math.max(0, (Number(job.totalCutCrates) || Number(job.availableCuttingCrates) || 0) - totalFormCratesIssued)
-          : Number(job.availableCuttingCrates) || 0);
-
-    const calcAvailFormCrates = totalFormCratesProduced > 0
-      ? Math.max(0, totalFormCratesProduced - totalQcCratesIssued)
-      : (totalQcCratesIssued > 0
-          ? Math.max(0, (Number(job.availableFormingCrates) || 0) - totalQcCratesIssued)
-          : Number(job.availableFormingCrates) || 0);
-
-    const calcAvailQcCrates = totalQcCratesApproved > 0
-      ? Math.max(0, totalQcCratesApproved - totalPackCratesIssued)
-      : (totalPackCratesIssued > 0
-          ? Math.max(0, (Number(job.availableQcCrates) || 0) - totalPackCratesIssued)
-          : Number(job.availableQcCrates) || 0);
-
-    if (updatedJob.availableCuttingCrates !== calcAvailCutCrates) {
-      updatedJob.availableCuttingCrates = calcAvailCutCrates;
-      hasChanges = true;
-    }
-    if (updatedJob.availableFormingCrates !== calcAvailFormCrates) {
-      updatedJob.availableFormingCrates = calcAvailFormCrates;
-      hasChanges = true;
-    }
-    if (updatedJob.availableQcCrates !== calcAvailQcCrates) {
-      updatedJob.availableQcCrates = calcAvailQcCrates;
-      hasChanges = true;
-    }
-
-    // Dynamic Stage & Status Progression across all production desks
-    const hasRunningSlitting = slitBatches.some(b => b.status === 'Running' || b.status === 'Held');
-    const hasRunningCutting = cutBatches.some(b => b.status === 'Running' || b.status === 'Held');
-    const hasRunningForming = formBatches.some(b => b.status === 'Running' || b.status === 'Held');
-    const hasRunningQc = qcBatches.some(b => b.status === 'Running' || b.status === 'Held');
-    const hasRunningPacking = packBatches.some(b => b.status === 'Running' || b.status === 'Held');
-
-    const hasCompletedSlitting = slitBatches.some(b => b.status === 'Completed');
-    const hasCompletedCutting = cutBatches.some(b => b.status === 'Completed');
-    const hasCompletedForming = formBatches.some(b => b.status === 'Completed');
-    const hasCompletedQc = qcBatches.some(b => b.status === 'Completed');
-
-    if (updatedJob.stage === 'Completed' || updatedJob.status === 'Completed') {
-      // Retain completed state
-    } else if (hasRunningPacking) {
-      if (updatedJob.stage !== 'Packing') { updatedJob.stage = 'Packing'; hasChanges = true; }
-      if (updatedJob.status !== 'PACKING_IN_PROGRESS') { updatedJob.status = 'PACKING_IN_PROGRESS'; hasChanges = true; }
-    } else if (calcAvailQcCrates > 0 && calcAvailFormCrates === 0 && calcAvailCutCrates === 0 && !hasRunningForming && !hasRunningQc) {
-      if (updatedJob.stage !== 'Packing') { updatedJob.stage = 'Packing'; hasChanges = true; }
-      if (updatedJob.status !== 'READY_FOR_PACKING') { updatedJob.status = 'READY_FOR_PACKING'; hasChanges = true; }
-    } else if (hasRunningQc) {
-      if (updatedJob.stage !== 'QC') { updatedJob.stage = 'QC'; hasChanges = true; }
-      if (updatedJob.status !== 'QC_IN_PROGRESS') { updatedJob.status = 'QC_IN_PROGRESS'; hasChanges = true; }
-    } else if ((calcAvailFormCrates > 0 || updatedJob.stage === 'QC') && !hasRunningForming) {
-      if (updatedJob.stage !== 'QC') { updatedJob.stage = 'QC'; hasChanges = true; }
-      if (updatedJob.status !== 'READY_FOR_QC') { updatedJob.status = 'READY_FOR_QC'; hasChanges = true; }
-    } else if (hasRunningForming) {
-      if (updatedJob.stage !== 'Forming') { updatedJob.stage = 'Forming'; hasChanges = true; }
-      if (updatedJob.status !== 'FORMING_IN_PROGRESS') { updatedJob.status = 'FORMING_IN_PROGRESS'; hasChanges = true; }
-    } else if ((calcAvailCutCrates > 0 || updatedJob.stage === 'Forming') && (hasCompletedCutting || updatedJob.status === 'CUTTING_COMPLETED')) {
-      if (updatedJob.stage !== 'Forming') { updatedJob.stage = 'Forming'; hasChanges = true; }
-      if (updatedJob.status !== 'READY_FOR_FORMING') { updatedJob.status = 'READY_FOR_FORMING'; hasChanges = true; }
-    } else if (hasRunningCutting) {
-      if (updatedJob.stage !== 'Cutting') { updatedJob.stage = 'Cutting'; hasChanges = true; }
-      if (updatedJob.status !== 'CUTTING_IN_PROGRESS') { updatedJob.status = 'CUTTING_IN_PROGRESS'; hasChanges = true; }
-    }
-
-    if (totalCutRollsConsumed >= totalSlitRollsProduced && totalSlitRollsProduced > 0 && updatedJob.availableRolls !== 0) {
-      updatedJob.availableRolls = 0;
-      hasChanges = true;
-    }
-
-    // 2. Reconciliation for jobs that have COMPLETED SLITTING and ready for Cutting
+    // Check if 8 or 9 layers slitting is 100% completed
     const isSlitting100PercentDone = 
       (completedReelsCount >= targetLayers && targetLayers > 0) ||
       (job.stage === 'Slitting Completed') ||
-      (slitBatches.length > 0 && slitBatches.every(b => b.status === 'Completed') && (job.outputWeightKg || 0) > 0);
+      (allBatchesCompleted && (job.outputWeightKg || 0) > 0);
 
-    if (isSlitting100PercentDone && cutBatches.length === 0 && formBatches.length === 0 && qcBatches.length === 0 && packBatches.length === 0) {
-      const isPastSlitting = 
-        ['Cutting', 'Forming', 'QC', 'Packing', 'Dispatched', 'Cutting Completed'].includes(updatedJob.stage) ||
-        ['CUTTING_IN_PROGRESS', 'CUTTING_COMPLETED', 'Completed'].includes(updatedJob.status) ||
-        calcAvailCutCrates > 0 ||
-        (updatedJob.totalCutPieces || 0) > 0;
-
-      const effectiveRolls = (updatedJob.availableRolls !== undefined && updatedJob.availableRolls > 0) 
-        ? updatedJob.availableRolls 
+    if (isSlitting100PercentDone) {
+      const isPastSlitting = job.stage === 'Cutting' || job.stage === 'Forming' || job.stage === 'QC' || job.stage === 'Packing' || job.stage === 'Dispatched';
+      const isCuttingOrDone = job.status === 'READY_FOR_CUTTING' || job.status === 'CUTTING_IN_PROGRESS' || job.status === 'CUTTING_COMPLETED' || job.status === 'Completed';
+      
+      const effectiveRolls = (job.availableRolls !== undefined && job.availableRolls > 0) 
+        ? job.availableRolls 
         : Math.max(completedReelsCount, targetLayers);
 
-      if (!isPastSlitting && updatedJob.status !== 'READY_FOR_CUTTING') {
-        updatedJob.stage = 'Slitting Completed';
-        updatedJob.status = 'READY_FOR_CUTTING';
-        updatedJob.availableRolls = effectiveRolls;
+      if (!isPastSlitting && !isCuttingOrDone) {
         hasChanges = true;
-      } else if (!isPastSlitting && updatedJob.availableRolls === undefined) {
-        updatedJob.availableRolls = effectiveRolls;
+        return {
+          ...job,
+          stage: 'Slitting Completed',
+          status: 'READY_FOR_CUTTING',
+          availableRolls: effectiveRolls
+        };
+      } else if (!isPastSlitting && job.availableRolls === undefined) {
         hasChanges = true;
+        return {
+          ...job,
+          availableRolls: effectiveRolls
+        };
       }
     }
 
-    return updatedJob;
+    return job;
   });
 
   const updatedPlans = plans.map((plan) => {
@@ -518,7 +422,6 @@ export async function persistFactoryState(
   // Use nextState directly as the authoritative state to persist (do not merge old deleted items back)
   const stateToSave: FactoryState = {
     ...reconciled,
-    lastResetTimestamp: Math.max(reconciled.lastResetTimestamp || 0, _currentState?.lastResetTimestamp || 0),
     lastUpdated: reconciled.lastUpdated || new Date().toISOString()
   };
 
@@ -547,67 +450,67 @@ export async function persistFactoryState(
     }
   }
 
-  // 3. Enqueue to offline write-queue for central sync
-  await enqueueOfflineSync(stateToSave);
+  // 3. Immediately push to Central Sync Bridge endpoint for instant live multi-device broadcast
+  let serverMergedState: FactoryState | null = null;
+  try {
+    const endpoint = getCentralSyncEndpoint();
+    const pushRes = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        state: stateToSave,
+        clientTimestamp: Date.now()
+      })
+    });
+
+    if (pushRes.ok) {
+      const result = await pushRes.json();
+      if (result && result.success && result.state) {
+        serverMergedState = result.state;
+        await saveToIndexedDB(result.state).catch(() => {});
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(result.state));
+        } catch (e) {}
+      }
+    } else {
+      await enqueueOfflineSync(stateToSave);
+    }
+  } catch (syncErr) {
+    console.warn('[Sync Bridge] Direct HTTP push deferred to offline queue:', syncErr);
+    await enqueueOfflineSync(stateToSave);
+  }
 
   // 4. Notify all local tabs on same browser
-  syncBus?.postMessage({ type: 'STATE_CHANGED', state: stateToSave });
+  const broadcastPayload = serverMergedState || stateToSave;
+  syncBus?.postMessage({ type: 'STATE_CHANGED', state: broadcastPayload });
 
-  // 5. Real-time Multi-Device Cloud Sync (Firestore: Works on GitHub Pages worldwide)
-  // In Manual Mode (AI Studio / Dev), auto-push is skipped to prevent accidental live overwrites
+  // 5. Real-time Multi-Device Cloud Sync (Firestore: Works on GitHub Pages worldwide if configured)
   if (isFirebaseConfigured() && getCloudSyncMode() === 'auto') {
-    syncStateToCloud(stateToSave, false).catch((err) => {
+    syncStateToCloud(broadcastPayload, false).catch((err) => {
       console.warn('[FirebaseSync] Background cloud sync deferred:', err);
     });
   }
 
-  // 6. Direct instant push to Central Server Bridge (for 0ms multi-device live sync)
-  let serverMergedState = stateToSave;
-  if (typeof window !== 'undefined') {
-    try {
-      const endpoint = getCentralSyncEndpoint();
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          state: stateToSave,
-          clientTimestamp: Date.now()
-        })
-      });
-      if (res.ok) {
-        const result = await res.json();
-        if (result && result.state && Array.isArray(result.state.jobs)) {
-          serverMergedState = result.state;
-          await saveToIndexedDB(serverMergedState);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serverMergedState));
-          } catch (e) {}
-          syncBus?.postMessage({ type: 'STATE_SYNCED', state: serverMergedState });
-        }
-      }
-    } catch (pushErr) {
-      console.warn('[Sync Bridge] Direct push deferred, state queued for retry:', pushErr);
-    }
-  }
-
-  // 7. Trigger non-blocking offline queue flush fallback
+  // 6. Trigger non-blocking central sync queue flush for any historical offline backlog
   flushOfflineSyncQueue().catch(() => {});
 
   return {
     success: savedToIndexedDB || savedToLocalStorage,
     savedToIndexedDB,
     savedToLocalStorage,
-    mergedState: serverMergedState
+    mergedState: broadcastPayload
   };
 }
 
 /**
  * Initialize factory state on startup:
  * 1. Loads local cached state from IndexedDB (or localStorage fallback).
- * 2. Fetches authoritative shared state from Central Sync Bridge (/api/sync/state).
- *    If local is fresh/empty, adopts central state without wiping data.
- * 3. Converges with Firestore Cloud if configured and in Auto mode.
- * 4. Fallback to local offline state or INITIAL_STATE.
+ * 2. Unconditionally checks Central Sync Bridge HTTP endpoint to converge with latest factory data.
+ * 3. Checks Firestore Cloud if configured.
+ * 4. Falls back gracefully to local state or default state if offline.
  */
 export async function initializeFactoryState(): Promise<FactoryState> {
   const syncMode = getCloudSyncMode();
@@ -634,28 +537,19 @@ export async function initializeFactoryState(): Promise<FactoryState> {
     }
   }
 
-  // Step 2: Query the Central Sync Bridge HTTP endpoint (/api/sync/state)
-  // The central server holds the shared production database across all factory devices.
+  // Step 2: Unconditionally fetch Central Sync Bridge HTTP endpoint (Primary multi-device server)
   try {
     const centralState = await fetchCentralState();
     if (centralState && Array.isArray(centralState.jobs)) {
-      // Adopt central state, but safely preserve any new local jobs or plans that were entered locally!
-      const merged = (localState && localState.jobs && localState.jobs.length > 0)
-        ? reconcileJobStageTransitions(mergeFactoryStates(centralState, localState))
-        : reconcileJobStageTransitions(centralState);
-
+      console.info('[Sync Bridge] Central factory state loaded successfully. Converging with local device...');
+      const merged = reconcileJobStageTransitions(mergeFactoryStates(centralState, localState || INITIAL_STATE));
       merged.glueBrands = ['Pidilite FS35'];
 
       // Save converged authoritative state to local storage
-      await saveToIndexedDB(merged);
+      await saveToIndexedDB(merged).catch(() => {});
       try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
       } catch (e) {}
-
-      // If local state had additional jobs not on server, push merged state up to server immediately
-      if (localState && localState.jobs && localState.jobs.some(lj => !centralState.jobs.some(cj => cj.id === lj.id))) {
-        persistFactoryState(merged).catch(() => {});
-      }
 
       // Flush any pending offline queue items
       flushOfflineSyncQueue().catch(() => {});
@@ -666,7 +560,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
     console.warn('[Sync Bridge] Central sync failed on boot. Using local cached state:', syncErr);
   }
 
-  // Step 3: Attempt to pull latest shared state from Firestore Cloud (Primary for GitHub Pages / Multi-Device Fleet in Auto Mode)
+  // Step 3: Attempt to pull latest shared state from Firestore Cloud if configured
   if (isFirebaseConfigured() && syncMode === 'auto') {
     try {
       const cloudState = await fetchStateFromCloud();
@@ -687,7 +581,7 @@ export async function initializeFactoryState(): Promise<FactoryState> {
     }
   }
 
-  // Step 4: Fallback to local state if server was unreachable
+  // Step 4: Fallback to local state or INITIAL_STATE if offline
   if (localState && localState.jobs && Array.isArray(localState.jobs)) {
     console.info('[Storage] Initialized with local offline state.');
     localState.glueBrands = ['Pidilite FS35'];
@@ -704,35 +598,17 @@ export async function initializeFactoryState(): Promise<FactoryState> {
  * Explicit manual synchronization with Cloud and Central Sync Bridge.
  * When called explicitly by user, forces cloud push even in Manual Mode.
  */
-export async function forceSyncWithCentral(
-  currentState: FactoryState,
-  overwriteServer: boolean = true
-): Promise<{
+export async function forceSyncWithCentral(currentState: FactoryState): Promise<{
   success: boolean;
   syncedState: FactoryState;
   message: string;
 }> {
   let cloudSuccess = false;
-  let httpSuccess = false;
 
-  if (overwriteServer) {
-    currentState.lastResetTimestamp = Date.now();
-    // Clear offline write queue to remove old stale operations
-    try {
-      const db = await openIndexedDB();
-      const tx = db.transaction(QUEUE_STORE_NAME, 'readwrite');
-      tx.objectStore(QUEUE_STORE_NAME).clear();
-    } catch (e) {}
-  }
+  // 1. Flush offline queue first
+  await flushOfflineSyncQueue().catch(() => {});
 
-  let serverState = currentState;
-
-  // 1. Flush offline queue if not an overwrite reset
-  if (!overwriteServer) {
-    await flushOfflineSyncQueue().catch(() => {});
-  }
-
-  // 2. Push current local state to Firestore Cloud
+  // 2. Push current local state (authoritative when user explicitly clicks Sync) to Firestore Cloud (force = true)
   if (isFirebaseConfigured()) {
     try {
       const pushed = await syncStateToCloud(currentState, true);
@@ -742,52 +618,35 @@ export async function forceSyncWithCentral(
     }
   }
 
-  // 3. Push to local/custom HTTP endpoint with overwrite flag
+  // 3. Push to local/custom HTTP endpoint
   try {
     const endpoint = getCentralSyncEndpoint();
-    const res = await fetch(endpoint, {
+    await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state: currentState, overwrite: overwriteServer, force: overwriteServer, reset: overwriteServer, clientTimestamp: Date.now() })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.state && Array.isArray(data.state.jobs)) {
-        httpSuccess = true;
-        serverState = data.state;
-      }
-    }
+      body: JSON.stringify({ state: currentState, clientTimestamp: Date.now() })
+    }).catch(() => {});
   } catch (err: any) {
     console.warn('[Sync Bridge] HTTP Force sync push error:', err);
   }
 
   // 4. Persist locally
-  await saveToIndexedDB(serverState);
+  await saveToIndexedDB(currentState);
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serverState));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentState));
   } catch (e) {}
 
-  // Broadcast event locally to all open components and tabs
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('wunderkraf-state-synced', { detail: serverState }));
-  }
-  try {
-    syncBus?.postMessage({ type: 'STATE_SYNCED', state: serverState });
-  } catch (e) {}
-
-  if (cloudSuccess || httpSuccess) {
+  if (cloudSuccess) {
     return {
       success: true,
-      syncedState: serverState,
-      message: overwriteServer
-        ? `⚡ Live Sync Overwrite Complete: Server database replaced & synchronized across all live connected devices (${serverState.jobs?.length || 0} jobs).`
-        : 'Cloud Sync Successful: Studio state pushed to Firestore Cloud & Central Server.'
+      syncedState: currentState,
+      message: 'Cloud Sync Successful: Studio state pushed to Firestore Cloud! Live devices/GitHub Pages are now updated.'
     };
   }
 
   return {
     success: true,
-    syncedState: serverState,
+    syncedState: currentState,
     message: 'Local state saved and persisted successfully.'
   };
 }
@@ -823,9 +682,32 @@ export async function pullStateFromCloudExplicit(currentState: FactoryState): Pr
 }
 
 /**
- * Subscribes to cross-device Cloud Firestore events and local cross-tab events.
+ * Subscribes to live cross-device sync events via Server-Sent Events (SSE),
+ * fallback periodic polling, tab-focus triggers, Cloud Firestore, and cross-tab BroadcastChannel.
  */
 export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void): () => void {
+  let isCleanedUp = false;
+  let lastObservedRevision = 0;
+  let lastObservedTimestamp = 0;
+
+  const applyRemoteState = async (remoteState: FactoryState) => {
+    if (!remoteState || !Array.isArray(remoteState.jobs)) return;
+    try {
+      const currentLocal = await loadFromIndexedDB().catch(() => null);
+      const reconciled = reconcileJobStageTransitions(
+        currentLocal ? mergeFactoryStates(currentLocal, remoteState) : remoteState
+      );
+      await saveToIndexedDB(reconciled).catch(() => {});
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reconciled));
+      } catch (e) {}
+      onUpdate(reconciled);
+    } catch {
+      onUpdate(remoteState);
+    }
+  };
+
+  // 1. Cross-tab BroadcastChannel listener
   const handler = (event: MessageEvent) => {
     if (event.data && (event.data.type === 'STATE_SYNCED' || event.data.type === 'STATE_CHANGED')) {
       if (event.data.state && Array.isArray(event.data.state.jobs)) {
@@ -834,6 +716,7 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
     }
   };
 
+  // 2. Window CustomEvent listener
   const windowHandler = (event: Event) => {
     const customEv = event as CustomEvent;
     if (customEv.detail && Array.isArray(customEv.detail.jobs)) {
@@ -846,7 +729,90 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
     window.addEventListener('wunderkraf-state-synced', windowHandler);
   }
 
-  // Live Cloud Real-Time Listener (Firestore: Crucial for GitHub Pages multi-device sync)
+  // 3. Central Sync Bridge Real-Time SSE Stream Listener (/api/sync/stream)
+  let eventSource: EventSource | null = null;
+  const connectSSE = () => {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined' || isCleanedUp) return;
+    try {
+      const endpoint = getCentralSyncEndpoint();
+      const streamUrl = endpoint.replace(/\/api\/sync\/state.*$/, '/api/sync/stream');
+      eventSource = new EventSource(streamUrl);
+
+      eventSource.addEventListener('state_updated', (e: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          if (parsed && parsed.state && Array.isArray(parsed.state.jobs)) {
+            if (parsed.revision) lastObservedRevision = parsed.revision;
+            if (parsed.timestamp) lastObservedTimestamp = parsed.timestamp;
+            applyRemoteState(parsed.state);
+          }
+        } catch (err) {
+          console.warn('[Sync Bridge SSE] Parse error:', err);
+        }
+      });
+
+      eventSource.addEventListener('connected', (e: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          if (parsed?.revision) lastObservedRevision = parsed.revision;
+        } catch {}
+      });
+
+      eventSource.onerror = () => {
+        eventSource?.close();
+        eventSource = null;
+        if (!isCleanedUp) {
+          setTimeout(connectSSE, 3000);
+        }
+      };
+    } catch (err) {
+      console.warn('[Sync Bridge SSE] Connection init error:', err);
+    }
+  };
+  connectSSE();
+
+  // 4. Background Fallback Poller (Checks every 3 seconds for revisions or timestamp advances)
+  const pollTimer = setInterval(async () => {
+    if (isCleanedUp) return;
+    try {
+      const endpoint = getCentralSyncEndpoint();
+      const statusUrl = endpoint.replace(/\/api\/sync\/state.*$/, '/api/sync/status');
+      const res = await fetch(statusUrl, {
+        method: 'GET',
+        headers: { Accept: 'application/json' }
+      });
+      if (res.ok) {
+        const info = await res.json();
+        const serverRev = info.revision || 0;
+        const serverMtime = info.lastModified ? new Date(info.lastModified).getTime() : 0;
+        if (serverRev > lastObservedRevision || serverMtime > lastObservedTimestamp) {
+          lastObservedRevision = serverRev;
+          lastObservedTimestamp = serverMtime;
+          const fresh = await fetchCentralState();
+          if (fresh && Array.isArray(fresh.jobs)) {
+            applyRemoteState(fresh);
+          }
+        }
+      }
+    } catch {}
+  }, 3000);
+
+  // 5. Browser Tab Focus & Network Online Trigger: Instantly pulls newest data when operator looks at screen
+  const onFocusOrOnline = async () => {
+    try {
+      const fresh = await fetchCentralState();
+      if (fresh && Array.isArray(fresh.jobs)) {
+        applyRemoteState(fresh);
+      }
+    } catch {}
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', onFocusOrOnline);
+    window.addEventListener('online', onFocusOrOnline);
+  }
+
+  // 6. Live Cloud Real-Time Listener (Firestore: For GitHub Pages multi-device sync if configured)
   let unsubscribeCloud: (() => void) | null = null;
   if (isFirebaseConfigured()) {
     try {
@@ -872,127 +838,16 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
     }
   }
 
-  // Real-Time Multi-Device Sync: Server-Sent Events (SSE) Stream + Lightweight Ping Polling
-  let eventSource: EventSource | null = null;
-  let pollTimer: any = null;
-  let lastObservedRevision = 0;
-  let isFetchingState = false;
-  let hasPendingFetch = false;
-
-  const pullLatestState = async () => {
-    if (isFetchingState) {
-      hasPendingFetch = true;
-      return;
-    }
-    isFetchingState = true;
-    try {
-      const endpoint = getCentralSyncEndpoint();
-      const res = await fetch(endpoint, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        cache: 'no-store'
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success && data.state && Array.isArray(data.state.jobs)) {
-          lastObservedRevision = data.revision || Date.now();
-          const reconciled = reconcileJobStageTransitions(data.state);
-          await saveToIndexedDB(reconciled);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reconciled));
-          } catch (e) {}
-          onUpdate(reconciled);
-        }
-      }
-    } catch (e) {
-      // Ignore network hiccup
-    } finally {
-      isFetchingState = false;
-      if (hasPendingFetch) {
-        hasPendingFetch = false;
-        pullLatestState();
-      }
-    }
-  };
-
-  if (typeof window !== 'undefined') {
-    // Immediately pull latest state on mount so device is 100% in sync right away!
-    pullLatestState();
-
-    // 1. Establish Real-Time SSE Stream for instant sub-50ms multi-device updates
-    try {
-      const origin = window.location.origin || '';
-      const streamUrl = `${origin}/api/sync/stream`;
-      eventSource = new EventSource(streamUrl);
-
-      eventSource.onmessage = (event) => {
-        try {
-          if (!event.data || event.data.startsWith(':')) return;
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'CONNECTED' || msg.type === 'STATE_CHANGED') {
-            if (msg.state && Array.isArray(msg.state.jobs)) {
-              lastObservedRevision = msg.revision || Date.now();
-              const reconciled = reconcileJobStageTransitions(msg.state);
-              saveToIndexedDB(reconciled).catch(() => {});
-              try {
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reconciled));
-              } catch (e) {}
-              onUpdate(reconciled);
-              return;
-            }
-            if (msg.revision && msg.revision !== lastObservedRevision) {
-              lastObservedRevision = msg.revision;
-              pullLatestState();
-            }
-          }
-        } catch (e) {}
-      };
-
-      eventSource.onerror = () => {
-        // SSE reconnects automatically
-      };
-    } catch (e) {
-      console.warn('[Sync Bridge] SSE not supported, falling back to fast ping polling:', e);
-    }
-
-    // 2. Ultra-Lightweight Ping Polling (/api/sync/ping is ~100 bytes) every 1.5 seconds as robust backup
-    const checkPing = async () => {
-      try {
-        const origin = window.location.origin || '';
-        const pingUrl = `${origin}/api/sync/ping`;
-        const res = await fetch(pingUrl, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          cache: 'no-store'
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.success && data.revision) {
-            if (data.revision !== lastObservedRevision) {
-              lastObservedRevision = data.revision;
-              pullLatestState();
-            }
-          }
-        }
-      } catch (e) {}
-    };
-
-    pollTimer = setInterval(checkPing, 1500);
-
-    // Instant check when operator switches back to this tab/window
-    window.addEventListener('focus', checkPing);
-  }
-
   return () => {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-    }
-    if (eventSource) {
-      eventSource.close();
-    }
+    isCleanedUp = true;
+    clearInterval(pollTimer);
+    eventSource?.close();
+    eventSource = null;
     syncBus?.removeEventListener('message', handler);
     if (typeof window !== 'undefined') {
       window.removeEventListener('wunderkraf-state-synced', windowHandler);
+      window.removeEventListener('focus', onFocusOrOnline);
+      window.removeEventListener('online', onFocusOrOnline);
     }
     if (unsubscribeCloud) {
       unsubscribeCloud();
@@ -1057,22 +912,7 @@ export function importDatabaseBackup(file: File): Promise<FactoryState> {
           throw new Error('Backup file is missing required "jobs" array');
         }
 
-        stateCandidate.lastResetTimestamp = Date.now();
-
-        await saveToIndexedDB(stateCandidate);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateCandidate));
-        } catch (e) {}
-
-        try {
-          const syncRes = await forceSyncWithCentral(stateCandidate, true);
-          if (syncRes && syncRes.syncedState) {
-            resolve(syncRes.syncedState);
-            return;
-          }
-        } catch (syncErr) {
-          console.warn('[Backup Restore] Force server sync deferred:', syncErr);
-        }
+        await persistFactoryState(stateCandidate, stateCandidate);
         resolve(stateCandidate);
       } catch (err: any) {
         reject(new Error(err.message || 'Failed to parse database backup JSON'));

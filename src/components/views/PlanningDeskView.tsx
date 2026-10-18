@@ -26,11 +26,9 @@ import {
   Gauge,
   Download,
   ArrowUp,
-  ArrowDown,
-  Zap,
-  ShieldCheck
+  ArrowDown
 } from 'lucide-react';
-import { FactoryState, ProductionPlan, ProductType, MotherReelItem, PlannedLayer, Job, LogEntry } from '../../types';
+import { FactoryState, ProductionPlan, ProductType, MotherReelItem, PlannedLayer, Job } from '../../types';
 import { PRODUCTS, PAPER_BRANDS, GLUE_BRANDS, PRODUCT_PREFIX_MAP, TARGET_GSM_DEFAULT, TARGET_LAYERS_DEFAULT } from '../../lib/constants';
 import { getNumberingMaster, generateUnifiedJobId } from '../../lib/numberingMaster';
 import { getJobPlannedLayers, parseNumericGsm, normalizeGsmLabel, exportToCSV, getJobDeletionWarningInfo, performCascadeDeleteAndBackup } from '../../lib/utils';
@@ -41,7 +39,6 @@ interface PlanningDeskViewProps {
   onSaveState: (nextState: FactoryState) => void;
   onNavigateToSlittingWithPlan?: (plan: ProductionPlan) => void;
   onSelectPlanForSlitting?: (plan: ProductionPlan) => void;
-  currentUser?: { username: string; perms: string[] } | null;
 }
 
 export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
@@ -49,20 +46,8 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
   onBackToHub,
   onSaveState,
   onNavigateToSlittingWithPlan,
-  onSelectPlanForSlitting,
-  currentUser
+  onSelectPlanForSlitting
 }) => {
-  const currentUserRole = currentUser ? (state.users[currentUser.username.toLowerCase()]?.role || '') : '';
-  const isAdmin = Boolean(currentUser && (
-    currentUser.perms.includes('*') ||
-    currentUser.perms.includes('Admin') ||
-    currentUser.username.toLowerCase() === 'admin' ||
-    currentUserRole.toLowerCase() === 'admin' ||
-    currentUserRole.toLowerCase() === 'administrator'
-  ));
-  const canEditStatus = isAdmin || Boolean(currentUser?.perms.some(p =>
-    p === '*' || p === 'Admin' || p === 'Status_Edit' || p === 'Planning_Status_Edit' || p === 'Planning'
-  ));
   const slittingNavigationHandler = onSelectPlanForSlitting || onNavigateToSlittingWithPlan;
   const { productionPlans = [], motherReelInventory = [], jobs = [] } = state;
   const productList = state.products && state.products.length > 0 ? state.products : PRODUCTS;
@@ -493,8 +478,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
         formProduct,
         state.seriesConfig,
         state.productPrefixMap,
-        state.jobs || [],
-        state.deletedJobIds || []
+        state.jobs || []
       );
 
       const updatedSeriesConfig = {
@@ -707,31 +691,14 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
     exportToCSV(`Production_Plans_${new Date().toISOString().split('T')[0]}.csv`, data);
   };
 
-  const handleToggleStatus = (planId: string, nextStatus: 'Scheduled' | 'In-Progress' | 'Completed' | 'Cancelled') => {
-    const targetPlan = productionPlans.find((p) => p.id === planId);
-    const prevStatus = targetPlan?.status || 'N/A';
+  const handleToggleStatus = (planId: string, nextStatus: 'Scheduled' | 'In-Progress' | 'Completed') => {
     const updated = productionPlans.map((p) => {
       if (p.id !== planId) return p;
       return { ...p, status: nextStatus };
     });
-
-    const newLog: LogEntry = {
-      jobId: targetPlan?.jobId || planId,
-      product: targetPlan?.product || 'Spoon',
-      stage: 'Planning',
-      machine: 'PPC-STATUS',
-      shift: 'DAY',
-      action: `⚡ Admin Status Edit on Plan [${planId}]: Status updated from ${prevStatus} to ${nextStatus}`,
-      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
-      user: currentUser?.username || 'admin',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
-
     onSaveState({
       ...state,
-      productionPlans: updated,
-      logs: [...(state.logs || []), newLog]
+      productionPlans: updated
     });
   };
 
@@ -812,34 +779,7 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4">
-        {/* Admin Status Rights Banner */}
-        {canEditStatus && (
-          <div className="bg-gradient-to-r from-amber-50 via-blue-50 to-amber-50 border border-amber-200/90 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shadow-xs">
-                <Zap className="w-4 h-4 fill-white" />
-              </div>
-              <div>
-                <div className="text-xs font-black text-slate-900 flex items-center gap-2">
-                  <span>⚡ Admin Status Rights Active (एडमिन स्टेटस व पेंडिंग संपादन अधिकार)</span>
-                  <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
-                    Rights Enabled
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-600 m-0">
-                  यदि स्लिटिंग या प्लानिंग में पेंडिंग संख्या गलत दिख रही है, तो आप किसी भी प्लान का स्टेटस सीधे <strong>Completed</strong> या <strong>Cancelled</strong> में बदल सकते हैं। इससे साइडबार व डेस्क का पेंडिंग तुरंत अपडेट हो जाएगा।
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-500">
-                PPC Queue: {productionPlans.filter(p => p.status === 'Scheduled' || p.status === 'In-Progress').length} Pending
-              </span>
-            </div>
-          </div>
-        )}
-
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
         {/* Metric Cards Banner */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
@@ -1094,52 +1034,28 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                         </td>
 
                         <td className="py-3 px-3">
-                          <div className="flex flex-col gap-1">
-                            {canEditStatus ? (
-                              <select
-                                value={plan.status}
-                                onChange={(e) => handleToggleStatus(plan.id, e.target.value as any)}
-                                className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border outline-none cursor-pointer transition shadow-2xs ${
-                                  plan.status === 'Completed'
-                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                    : plan.status === 'In-Progress'
-                                    ? 'bg-blue-50 text-blue-800 border-blue-300'
-                                    : plan.status === 'Cancelled'
-                                    ? 'bg-rose-50 text-rose-800 border-rose-300'
-                                    : 'bg-amber-50 text-amber-800 border-amber-300'
-                                }`}
-                                title="Admin Status Rights: Click to edit plan status directly"
-                              >
-                                <option value="Scheduled">Scheduled (पेंडिंग)</option>
-                                <option value="In-Progress">In-Progress (प्रगति)</option>
-                                <option value="Completed">Completed (पूर्ण)</option>
-                                <option value="Cancelled">Cancelled (रद्द)</option>
-                              </select>
-                            ) : (
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                                  plan.status === 'Completed'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : plan.status === 'In-Progress'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : plan.status === 'Cancelled'
-                                    ? 'bg-rose-100 text-rose-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}
-                              >
-                                {plan.status}
-                              </span>
-                            )}
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                                plan.status === 'Completed'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : plan.status === 'In-Progress'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {plan.status}
+                            </span>
                           </div>
                         </td>
 
                         <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          <div className="flex items-center justify-end gap-1.5">
                             {plan.status === 'Scheduled' && slittingNavigationHandler && (
                               <button
                                 type="button"
                                 onClick={() => slittingNavigationHandler(plan)}
-                                className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-extrabold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-extrabold transition cursor-pointer flex items-center gap-1"
                                 title="Load Plan onto Slitting Desk"
                               >
                                 <Play className="w-3 h-3" />
@@ -1147,27 +1063,23 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
                               </button>
                             )}
 
-                            {canEditStatus && (plan.status === 'Scheduled' || plan.status === 'In-Progress') && (
+                            {plan.status !== 'Completed' ? (
                               <button
                                 type="button"
                                 onClick={() => handleToggleStatus(plan.id, 'Completed')}
-                                className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                                title="Admin Rights: Mark completed to immediately remove from pending"
+                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                                title="Mark as Completed"
                               >
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>Done</span>
+                                <CheckCircle2 className="w-4 h-4" />
                               </button>
-                            )}
-
-                            {canEditStatus && plan.status === 'Completed' && (
+                            ) : (
                               <button
                                 type="button"
-                                onClick={() => handleToggleStatus(plan.id, 'Scheduled')}
-                                className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                                title="Admin Rights: Re-open as Scheduled"
+                                onClick={() => handleToggleStatus(plan.id, 'In-Progress')}
+                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                title="Re-open to In-Progress"
                               >
-                                <Clock className="w-3 h-3 text-amber-600" />
-                                <span>Re-open</span>
+                                <Clock className="w-4 h-4" />
                               </button>
                             )}
 

@@ -44,9 +44,7 @@ import {
   Undo2,
   History,
   Coffee,
-  MessageSquare,
-  Zap,
-  XCircle
+  MessageSquare
 } from 'lucide-react';
 import {
   FactoryState,
@@ -97,7 +95,7 @@ import {
   isStudioOrDevEnvironment,
   CloudSyncMode
 } from '../../lib/storage';
-import { syncStateToCloud, isFirebaseConfigured, IS_LIVE_SYNC_DISCONNECTED } from '../../lib/firebaseSync';
+import { syncStateToCloud, isFirebaseConfigured } from '../../lib/firebaseSync';
 import { getNumberingMaster, repairAndSyncAllSequences } from '../../lib/numberingMaster';
 import { OpeningStockModal } from '../OpeningStockModal';
 import { EmployeeMasterView } from './EmployeeMasterView';
@@ -111,8 +109,8 @@ interface AdminSettingsViewProps {
   onNavigateToView?: (view: CurrentView) => void;
 }
 
-type AdminTab = 'brand_items_paper' | 'crate_master' | 'machines' | 'scrap_yield' | 'users' | 'master_data' | 'status_rights_manager' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward' | 'employee_master';
-type MasterDataSubTab = 'status_rights' | 'plans' | 'jobs' | 'reconcile' | 'batches' | 'orders' | 'logs' | 'numbering' | 'vault' | 'handovers';
+type AdminTab = 'brand_items_paper' | 'crate_master' | 'machines' | 'scrap_yield' | 'users' | 'master_data' | 'whatsapp' | 'sequences_shifts' | 'backup_restore' | 'maintenance_master' | 'staff_escalation' | 'opening_stock_inward' | 'employee_master';
+type MasterDataSubTab = 'plans' | 'jobs' | 'reconcile' | 'batches' | 'orders' | 'logs' | 'numbering' | 'vault' | 'handovers';
 
 export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   state,
@@ -161,769 +159,6 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   const [selectedAdminScrapEvent, setSelectedAdminScrapEvent] = useState<any>(null);
   const [adminScrapEditWeight, setAdminScrapEditWeight] = useState('');
   const [isAdminEditingScrap, setIsAdminEditingScrap] = useState(false);
-
-  // Status & Pending Rights Management state
-  const [statusPlanFilter, setStatusPlanFilter] = useState<'ALL' | 'Scheduled' | 'In-Progress' | 'Completed' | 'Cancelled'>('ALL');
-  const [statusPlanSearch, setStatusPlanSearch] = useState('');
-  const [statusJobFilter, setStatusJobFilter] = useState<string>('ALL');
-  const [statusJobSearch, setStatusJobSearch] = useState('');
-  const [statusActiveSection, setStatusActiveSection] = useState<'plans' | 'jobs' | 'diagnostics'>('plans');
-
-  const handleAdminQuickPlanStatus = (planId: string, nextStatus: 'Scheduled' | 'In-Progress' | 'Completed' | 'Cancelled') => {
-    const targetPlan = (state.productionPlans || []).find((p) => p.id === planId);
-    const prevStatus = targetPlan?.status || 'N/A';
-    const updatedPlans = (state.productionPlans || []).map((p) => {
-      if (p.id !== planId) return p;
-      return { ...p, status: nextStatus };
-    });
-
-    const newLog: LogEntry = {
-      jobId: targetPlan?.jobId || planId,
-      product: targetPlan?.product || 'Spoon',
-      stage: 'Admin Master',
-      machine: 'STATUS-RIGHTS',
-      shift: 'DAY',
-      action: `⚡ Admin Status Rights Override on Plan [${planId}]: Status updated from ${prevStatus} to ${nextStatus}`,
-      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
-      user: currentUser?.username || 'admin',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
-
-    onSaveState({
-      ...state,
-      productionPlans: updatedPlans,
-      logs: [...(state.logs || []), newLog]
-    });
-    showToast(`✅ Plan [${planId}] status set to ${nextStatus}! Sidebar & Desks synchronized.`);
-  };
-
-  const handleAdminQuickJobStatus = (jobId: string, nextStage: string, nextStatus: string, rolls?: number) => {
-    const targetJob = (state.jobs || []).find((j) => j.id === jobId);
-    const updatedJobs = (state.jobs || []).map((j) => {
-      if (j.id !== jobId) return j;
-      return {
-        ...j,
-        stage: nextStage,
-        status: nextStatus,
-        availableRolls: rolls !== undefined ? Math.max(0, rolls) : j.availableRolls
-      };
-    });
-
-    const newLog: LogEntry = {
-      jobId,
-      product: targetJob?.product || 'Spoon',
-      stage: 'Admin Master',
-      machine: 'STATUS-RIGHTS',
-      shift: 'DAY',
-      action: `⚡ Admin Status Rights Override on Job [${jobId}]: Stage set to ${nextStage}, Status to ${nextStatus}${rolls !== undefined ? `, Rolls to ${rolls}` : ''}`,
-      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
-      user: currentUser?.username || 'admin',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
-
-    onSaveState({
-      ...state,
-      jobs: updatedJobs,
-      logs: [...(state.logs || []), newLog]
-    });
-    showToast(`✅ Job [${jobId}] stage and status updated!`);
-  };
-
-  const handleAdminClearJobBatches = (jobId: string) => {
-    let cleared = 0;
-    const updatedJobs = (state.jobs || []).map((j) => {
-      if (j.id !== jobId) return j;
-      cleared = (j.runningBatches || []).length;
-      return { ...j, runningBatches: [] };
-    });
-
-    const newLog: LogEntry = {
-      jobId,
-      product: 'N/A',
-      stage: 'Admin Master',
-      machine: 'BATCH-RESET',
-      shift: 'DAY',
-      action: `⚡ Admin cleared ${cleared} running/held batches on Job [${jobId}]`,
-      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
-      user: currentUser?.username || 'admin',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
-
-    onSaveState({
-      ...state,
-      jobs: updatedJobs,
-      logs: [...(state.logs || []), newLog]
-    });
-    showToast(`✅ Cleared ${cleared} active runs on Job [${jobId}]! Sidebar live indicator reset.`);
-  };
-
-  const handleAutoReconcileDiscrepancies = () => {
-    let fixedPlans = 0;
-    let fixedBatches = 0;
-    let fixedRolls = 0;
-
-    const updatedPlans = (state.productionPlans || []).map((p) => {
-      if (p.status === 'Scheduled' || p.status === 'In-Progress') {
-        const linkedJob = (state.jobs || []).find((j) => j.id === p.jobId || j.planId === p.id);
-        if (linkedJob && (linkedJob.stage === 'Cutting Completed' || linkedJob.stage === 'Forming' || linkedJob.stage === 'QC' || linkedJob.stage === 'Packing' || linkedJob.stage === 'Completed' || linkedJob.status === 'Completed' || linkedJob.status === 'CUTTING_COMPLETED')) {
-          fixedPlans++;
-          return { ...p, status: 'Completed' as const };
-        }
-      }
-      return p;
-    });
-
-    const updatedJobs = (state.jobs || []).map((j) => {
-      let nextBatches = j.runningBatches || [];
-      if (j.stage === 'Completed' || j.status === 'Completed') {
-        if (nextBatches.length > 0) {
-          fixedBatches += nextBatches.length;
-          nextBatches = [];
-        }
-      }
-      let rolls = j.availableRolls || 0;
-      if (rolls < 0) {
-        fixedRolls++;
-        rolls = 0;
-      }
-      return {
-        ...j,
-        runningBatches: nextBatches,
-        availableRolls: rolls,
-        availableCuttingCrates: Math.max(0, j.availableCuttingCrates || 0),
-        availableFormingCrates: Math.max(0, j.availableFormingCrates || 0),
-        availableQcCrates: Math.max(0, j.availableQcCrates || 0)
-      };
-    });
-
-    const newLog: LogEntry = {
-      jobId: 'SYSTEM-RECONCILE',
-      product: 'N/A',
-      stage: 'Admin Master',
-      machine: 'AUTO-DIAGNOSTIC',
-      shift: 'DAY',
-      action: `⚡ Auto-Reconciled status inconsistencies: ${fixedPlans} completed plans marked, ${fixedBatches} orphan batches cleaned, ${fixedRolls} negative balances fixed`,
-      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
-      user: currentUser?.username || 'admin',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
-
-    onSaveState({
-      ...state,
-      productionPlans: updatedPlans,
-      jobs: updatedJobs,
-      logs: [...(state.logs || []), newLog]
-    });
-
-    alert(`✅ Auto-Reconciliation Completed!\n• Synchronized ${fixedPlans} completed plans\n• Cleared ${fixedBatches} orphan running batches\n• Fixed ${fixedRolls} negative balances\nSidebar & Desk pending statuses are now 100% in sync!`);
-  };
-
-  const handleToggleUserStatusRight = (userKey: string, permKey: string) => {
-    const allUsers = { ...DEFAULT_USERS, ...(state.users || {}) };
-    const targetUser = allUsers[userKey];
-    if (!targetUser) return;
-
-    let nextPerms = [...(targetUser.perms || [])];
-    if (nextPerms.includes(permKey)) {
-      nextPerms = nextPerms.filter((p) => p !== permKey);
-    } else {
-      nextPerms.push(permKey);
-    }
-
-    const updatedUsers = {
-      ...allUsers,
-      [userKey]: {
-        ...targetUser,
-        perms: nextPerms
-      }
-    };
-
-    const newLog: LogEntry = {
-      jobId: 'USER-PERM-STATUS',
-      product: 'N/A',
-      stage: 'Admin Master',
-      machine: 'AUTH-MATRIX',
-      shift: 'DAY',
-      action: `⚡ Admin updated permissions for [${userKey}]: ${nextPerms.includes(permKey) ? `Granted ${permKey}` : `Revoked ${permKey}`}`,
-      worker: currentUser?.username?.toUpperCase() || 'ADMIN',
-      user: currentUser?.username || 'admin',
-      rawDate: new Date().toISOString().split('T')[0],
-      timestamp: new Date().toLocaleString()
-    };
-
-    onSaveState({
-      ...state,
-      users: updatedUsers,
-      logs: [...(state.logs || []), newLog]
-    });
-    showToast(`✅ Updated rights for [${targetUser.name || userKey}]!`);
-  };
-
-  const renderStatusRightsSection = () => {
-    const allPlans = state.productionPlans || [];
-    const allJobs = state.jobs || [];
-    const allUsers = { ...DEFAULT_USERS, ...(state.users || {}) };
-
-    // Real-time Pending calculations
-    const activePlansCount = allPlans.filter(p => p.status === 'Scheduled' || p.status === 'In-Progress').length;
-    const cuttingReadyCount = allJobs.filter(j => {
-      if (j.status === 'CUTTING_COMPLETED' || j.status === 'Completed') return false;
-      if (['Forming', 'QC', 'Packing', 'Dispatched', 'Cutting Completed'].includes(j.stage)) return false;
-      return (j.availableRolls || 0) > 0 || j.status === 'READY_FOR_CUTTING' || j.status === 'CUTTING_IN_PROGRESS';
-    }).length;
-    const formingReadyCrates = allJobs.reduce((acc, j) => acc + (Number(j.availableCuttingCrates) || 0), 0);
-    const qcPendingCrates = allJobs.reduce((acc, j) => acc + (Number(j.availableFormingCrates) || 0), 0);
-    const activeRunningBatchesCount = allJobs.reduce((acc, j) => acc + (j.runningBatches?.filter(b => b.status === 'Running' || b.status === 'Held').length || 0), 0);
-
-    // Filtered Plans
-    const filteredPlans = allPlans.filter(p => {
-      if (statusPlanFilter !== 'ALL' && p.status !== statusPlanFilter) return false;
-      if (statusPlanSearch.trim()) {
-        const q = statusPlanSearch.trim().toLowerCase();
-        const matchId = (p.id || '').toLowerCase().includes(q);
-        const matchProd = (p.product || '').toLowerCase().includes(q);
-        const matchMachine = (p.assignedMachine || '').toLowerCase().includes(q);
-        const matchJob = (p.jobId || '').toLowerCase().includes(q);
-        if (!matchId && !matchProd && !matchMachine && !matchJob) return false;
-      }
-      return true;
-    });
-
-    // Filtered Jobs
-    const filteredJobs = allJobs.filter(j => {
-      if (statusJobFilter !== 'ALL' && j.stage !== statusJobFilter) return false;
-      if (statusJobSearch.trim()) {
-        const q = statusJobSearch.trim().toLowerCase();
-        const matchId = (j.id || '').toLowerCase().includes(q);
-        const matchProd = (j.product || '').toLowerCase().includes(q);
-        const matchBrand = (j.paperBrand || '').toLowerCase().includes(q);
-        if (!matchId && !matchProd && !matchBrand) return false;
-      }
-      return true;
-    });
-
-    return (
-      <div className="space-y-6">
-        {/* Top Header Banner */}
-        <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-blue-700 text-white rounded-2xl p-4 sm:p-5 shadow-md flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-black shadow-xs">
-              <Zap className="w-6 h-6 text-amber-200 fill-amber-300" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-black uppercase tracking-wide m-0">
-                  ⚡ Master Status & Pending Rights Manager
-                </h3>
-                <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full uppercase">
-                  Admin Authority
-                </span>
-              </div>
-              <p className="text-xs text-amber-100 m-0 mt-0.5">
-                स्लिटिंग, प्लानिंग और साइडबार में दिखने वाले पेंडिंग स्टेटस व रोल्स को सीधे एडिट व रीकंसाइल करें
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={handleAutoReconcileDiscrepancies}
-              className="px-4 py-2.5 bg-white hover:bg-amber-50 text-amber-950 font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-2 active:scale-95"
-              title="Detect and synchronize finished batches, completed plans, and fix negative balances"
-            >
-              <RefreshCw className="w-4 h-4 text-amber-700" />
-              <span>⚡ Auto-Reconcile All Pending (ऑटो-करेक्ट)</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Live Sidebar Pending Counts Diagnostic Widget */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Live Sidebar Pending Status Diagnostics (साइडबार लाइव स्टेटस काउंट्स):</span>
-            </span>
-            <span className="text-[11px] text-slate-400 font-semibold">
-              Right-now counts reflected in navigation badges
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-950 flex flex-col justify-between">
-              <span className="text-[11px] font-extrabold uppercase text-blue-700">1. Planning / Slitting</span>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-black text-blue-900">{activePlansCount}</span>
-                <span className="text-[10px] font-bold text-blue-600">Pending Plans</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-950 flex flex-col justify-between">
-              <span className="text-[11px] font-extrabold uppercase text-indigo-700">2. Cutting Ready</span>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-black text-indigo-900">{cuttingReadyCount}</span>
-                <span className="text-[10px] font-bold text-indigo-600">Jobs with Rolls</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col justify-between">
-              <span className="text-[11px] font-extrabold uppercase text-amber-700">3. Forming Crates</span>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-black text-amber-900">{formingReadyCrates}</span>
-                <span className="text-[10px] font-bold text-amber-600">Avail Crates</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-950 flex flex-col justify-between">
-              <span className="text-[11px] font-extrabold uppercase text-purple-700">4. QC Pending</span>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-black text-purple-900">{qcPendingCrates}</span>
-                <span className="text-[10px] font-bold text-purple-600">Formed Crates</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 flex flex-col justify-between col-span-2 sm:col-span-1">
-              <span className="text-[11px] font-extrabold uppercase text-rose-700">5. Active Runs</span>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="text-2xl font-black text-rose-900">{activeRunningBatchesCount}</span>
-                <span className="text-[10px] font-bold text-rose-600">Running Batches</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Section Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-          <button
-            type="button"
-            onClick={() => setStatusActiveSection('plans')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-2 ${
-              statusActiveSection === 'plans'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span>📅 Production Plans Status ({allPlans.length})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusActiveSection('jobs')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-2 ${
-              statusActiveSection === 'jobs'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>🏭 Job Stage & Crates Overwrite ({allJobs.length})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusActiveSection('diagnostics')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-2 ${
-              statusActiveSection === 'diagnostics'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>👥 Operator Status Rights Matrix</span>
-          </button>
-        </div>
-
-        {/* SECTION 1: PRODUCTION PLANS STATUS MANAGER */}
-        {statusActiveSection === 'plans' && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide m-0">
-                  📅 Slitting & Planning Desk Status Overwrite
-                </h4>
-                <p className="text-xs text-slate-500 m-0">
-                  प्लान का स्टेटस बदलें (Scheduled / In-Progress / Completed / Cancelled)। स्टेटस 'Completed' करने पर वह तुरंत साइडबार पेंडिंग से हट जाएगा।
-                </p>
-              </div>
-
-              {/* Status Filters */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl flex-wrap">
-                {(['ALL', 'Scheduled', 'In-Progress', 'Completed', 'Cancelled'] as const).map(f => {
-                  const count = f === 'ALL' ? allPlans.length : allPlans.filter(p => p.status === f).length;
-                  return (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => setStatusPlanFilter(f)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        statusPlanFilter === f
-                          ? 'bg-amber-500 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-                      }`}
-                    >
-                      {f} ({count})
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-              <input
-                type="text"
-                value={statusPlanSearch}
-                onChange={e => setStatusPlanSearch(e.target.value)}
-                placeholder="Search Plan ID, product, machine, job ID..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
-              />
-            </div>
-
-            {/* Plans Table */}
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-bold text-[10px]">
-                    <th className="py-2.5 px-3">Plan ID & Job</th>
-                    <th className="py-2.5 px-3">Product Item</th>
-                    <th className="py-2.5 px-3">Machine & Shift</th>
-                    <th className="py-2.5 px-3">Target Layers & Length</th>
-                    <th className="py-2.5 px-3">Current Status</th>
-                    <th className="py-2.5 px-3 text-right">Admin Status Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {filteredPlans.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400 font-bold">
-                        कोई प्लान नहीं मिला (No plans match the filter)
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredPlans.map(plan => {
-                      const isPending = plan.status === 'Scheduled' || plan.status === 'In-Progress';
-                      return (
-                        <tr key={plan.id} className="hover:bg-amber-50/40 transition">
-                          <td className="py-2.5 px-3">
-                            <span className="font-extrabold text-blue-900 block">{plan.id}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">Job: {plan.jobId || 'N/A'}</span>
-                          </td>
-                          <td className="py-2.5 px-3 font-extrabold text-slate-800">
-                            {plan.product}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span className="font-bold text-slate-700 block">{plan.assignedMachine || 'Slitting-1'}</span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase">{plan.assignedShift || 'DAY'} Shift</span>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span className="font-bold text-slate-800 block">{plan.targetLayers || 8} Layers</span>
-                            <span className="text-[10px] text-slate-500 font-mono">{plan.targetLengthMeters || 4000} m</span>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <select
-                              value={plan.status}
-                              onChange={e => handleAdminQuickPlanStatus(plan.id, e.target.value as any)}
-                              className={`px-2 py-1 rounded-lg text-xs font-black uppercase border outline-none cursor-pointer transition shadow-2xs ${
-                                plan.status === 'Completed'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                  : plan.status === 'In-Progress'
-                                  ? 'bg-blue-50 text-blue-800 border-blue-300 animate-pulse'
-                                  : plan.status === 'Cancelled'
-                                  ? 'bg-slate-100 text-slate-600 border-slate-300'
-                                  : 'bg-amber-50 text-amber-800 border-amber-300'
-                              }`}
-                            >
-                              <option value="Scheduled">Scheduled (पेंडिंग)</option>
-                              <option value="In-Progress">In-Progress (प्रगति पर)</option>
-                              <option value="Completed">Completed (पूर्ण - पेंडिंग से हटेगा)</option>
-                              <option value="Cancelled">Cancelled (रद्द)</option>
-                            </select>
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {isPending ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAdminQuickPlanStatus(plan.id, 'Completed')}
-                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                                  title="Mark Completed to immediately remove from pending sidebar count"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Mark Done (हटाएं)</span>
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAdminQuickPlanStatus(plan.id, 'Scheduled')}
-                                  className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-[11px] font-black transition cursor-pointer flex items-center gap-1"
-                                  title="Re-open this plan as Scheduled"
-                                >
-                                  <RotateCcw className="w-3.5 h-3.5" />
-                                  <span>Re-Schedule</span>
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* SECTION 2: PRODUCTION JOBS STAGE & ROLLS OVERWRITE */}
-        {statusActiveSection === 'jobs' && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide m-0">
-                  🏭 Production Jobs Stage & Crates Overwrite
-                </h4>
-                <p className="text-xs text-slate-500 m-0">
-                  जॉब की स्टेज, स्टेटस, उपलब्ध स्लिट रोल्स व क्रेट्स सीधे बदलें। यदि गलत रोल्स के कारण कटिंग पेंडिंग दिखा रहा है, तो रोल्स 0 करें।
-                </p>
-              </div>
-
-              {/* Stage Filter */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl flex-wrap">
-                {['ALL', 'Slitting', 'Slitting Completed', 'Cutting', 'Cutting Completed', 'Forming', 'QC', 'Packing', 'Completed'].map(st => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setStatusJobFilter(st)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      statusJobFilter === st
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-              <input
-                type="text"
-                value={statusJobSearch}
-                onChange={e => setStatusJobSearch(e.target.value)}
-                placeholder="Search Job ID, product, paper brand..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
-              />
-            </div>
-
-            {/* Jobs Table */}
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-bold text-[10px]">
-                    <th className="py-2.5 px-3">Job ID & Item</th>
-                    <th className="py-2.5 px-3">Stage (स्टेज)</th>
-                    <th className="py-2.5 px-3">Status (स्थिति)</th>
-                    <th className="py-2.5 px-3">Avail Rolls</th>
-                    <th className="py-2.5 px-3">Cut Crates</th>
-                    <th className="py-2.5 px-3">Form Crates</th>
-                    <th className="py-2.5 px-3">Active Runs</th>
-                    <th className="py-2.5 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {filteredJobs.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400 font-bold">
-                        कोई जॉब नहीं मिला (No jobs match the filter)
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredJobs.map(job => {
-                      const activeBatches = (job.runningBatches || []).filter(b => b.status === 'Running' || b.status === 'Held');
-                      return (
-                        <tr key={job.id} className="hover:bg-blue-50/40 transition">
-                          <td className="py-2.5 px-3">
-                            <span className="font-extrabold text-blue-900 block">{job.id}</span>
-                            <span className="text-[10px] text-slate-500 font-bold">{job.product} [{job.paperBrand || 'ITC'}]</span>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <select
-                              value={job.stage}
-                              onChange={e => handleAdminQuickJobStatus(job.id, e.target.value, job.status, job.availableRolls)}
-                              className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                            >
-                              {['Planning', 'Slitting', 'Slitting Completed', 'Cutting', 'Cutting Completed', 'Forming', 'QC', 'Packing', 'Dispatched', 'Completed'].map(st => (
-                                <option key={st} value={st}>{st}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <select
-                              value={job.status}
-                              onChange={e => handleAdminQuickJobStatus(job.id, job.stage, e.target.value, job.availableRolls)}
-                              className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                            >
-                              {['PENDING', 'READY_FOR_CUTTING', 'CUTTING_IN_PROGRESS', 'CUTTING_COMPLETED', 'FORMING_IN_PROGRESS', 'Completed', 'Held'].map(st => (
-                                <option key={st} value={st}>{st}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <input
-                              type="number"
-                              min={0}
-                              value={job.availableRolls ?? 0}
-                              onChange={e => {
-                                const val = parseInt(e.target.value, 10) || 0;
-                                handleAdminQuickJobStatus(job.id, job.stage, job.status, val);
-                              }}
-                              className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-black text-blue-950 text-center"
-                              title="Available Slit Rolls for Cutting"
-                            />
-                          </td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
-                            {job.availableCuttingCrates ?? 0}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
-                            {job.availableFormingCrates ?? 0}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            {activeBatches.length > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => handleAdminClearJobBatches(job.id)}
-                                className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                                title="Clear stuck running batch so sidebar doesn't show false active run"
-                              >
-                                <XCircle className="w-3 h-3 text-rose-600" />
-                                <span>Clear ({activeBatches.length} Run)</span>
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 font-semibold">Idle</span>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleSelectJobToEdit(job.id);
-                                setMasterSubTab('jobs');
-                                setActiveTab('master_data');
-                              }}
-                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                            >
-                              Edit All Fields
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* SECTION 3: OPERATOR STATUS RIGHTS PERMISSIONS MATRIX */}
-        {statusActiveSection === 'diagnostics' && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-            <div>
-              <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide m-0">
-                👥 Operator Status Rights Delegation Matrix (ऑपरेटर स्टेटस अधिकार)
-              </h4>
-              <p className="text-xs text-slate-500 m-0">
-                तय करें कि किन-किन सुपरवाइजर व ऑपरेटरों को प्लानिंग, स्लिटिंग व साइडबार स्टेटस एडिट करने का अधिकार (Right) रहेगा।
-              </p>
-            </div>
-
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-bold text-[10px]">
-                    <th className="py-2.5 px-3">Operator Name & ID</th>
-                    <th className="py-2.5 px-3">Role</th>
-                    <th className="py-2.5 px-3 text-center">⚡ Full Status Edit (Status_Edit)</th>
-                    <th className="py-2.5 px-3 text-center">📅 Planning Status Rights (Planning_Status_Edit)</th>
-                    <th className="py-2.5 px-3 text-center">📜 Slitting Status Rights (Slitting_Status_Edit)</th>
-                    <th className="py-2.5 px-3 text-right">Master Admin</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {Object.keys(allUsers).map(userKey => {
-                    const u = allUsers[userKey];
-                    const perms = u.perms || [];
-                    const isMasterAdmin = perms.includes('*') || perms.includes('Admin') || userKey === 'admin';
-                    const hasStatusEdit = isMasterAdmin || perms.includes('Status_Edit');
-                    const hasPlanningEdit = isMasterAdmin || perms.includes('Planning_Status_Edit') || perms.includes('Status_Edit');
-                    const hasSlittingEdit = isMasterAdmin || perms.includes('Slitting_Status_Edit') || perms.includes('Status_Edit');
-
-                    return (
-                      <tr key={userKey} className="hover:bg-purple-50/30 transition">
-                        <td className="py-2.5 px-3">
-                          <span className="font-extrabold text-slate-900 uppercase block">{u.name || userKey}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">ID: {userKey}</span>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span className="px-2 py-0.5 rounded font-extrabold text-[10px] bg-slate-100 text-slate-800 border border-slate-200 uppercase">
-                            {u.role || 'Operator'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={hasStatusEdit}
-                            disabled={isMasterAdmin}
-                            onChange={() => handleToggleUserStatusRight(userKey, 'Status_Edit')}
-                            className="w-4 h-4 text-amber-600 rounded cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={hasPlanningEdit}
-                            disabled={isMasterAdmin}
-                            onChange={() => handleToggleUserStatusRight(userKey, 'Planning_Status_Edit')}
-                            className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={hasSlittingEdit}
-                            disabled={isMasterAdmin}
-                            onChange={() => handleToggleUserStatusRight(userKey, 'Slitting_Status_Edit')}
-                            className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          {isMasterAdmin ? (
-                            <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black uppercase">
-                              👑 Master Access
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 font-bold">Configurable</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const validateMatrixItem = (role: string, name: string, phone: string): boolean => {
     if (!role.trim()) {
@@ -1150,10 +385,6 @@ _If you received this message, your contact number and routing configuration are
   };
 
   const handleManualCentralSync = async () => {
-    if (IS_LIVE_SYNC_DISCONNECTED) {
-      alert('🛡️ ISOLATED DEV LAB ACTIVE:\n\nLive cloud sync is completely detached to protect live factory operations.\n\nAll your changes are safely stored in this isolated development environment.');
-      return;
-    }
     if (!isAdmin) {
       alert('⛔ Access Restricted: Only Administrators can push state to Live Cloud.');
       return;
@@ -1188,10 +419,6 @@ _If you received this message, your contact number and routing configuration are
   };
 
   const handlePullFromCloud = async () => {
-    if (IS_LIVE_SYNC_DISCONNECTED) {
-      alert('🛡️ ISOLATED DEV LAB ACTIVE:\n\nLive cloud database is detached to protect live factory operations.');
-      return;
-    }
     if (!isAdmin) {
       alert('⛔ Access Restricted: Only Administrators can pull state from Live Cloud.');
       return;
@@ -3937,15 +3164,8 @@ ${formLines.join('\n')}
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const pass = prompt('Enter Admin Master Password (MANOJ or 1811) to Confirm Restoration:');
-    const isMasterValid = pass && (
-      pass.trim().toUpperCase() === 'MANOJ' ||
-      pass.trim() === '1811' ||
-      pass.trim() === 'WKF1811' ||
-      pass.trim() === '1234' ||
-      pass.trim() === (state.adminPassword || '1234').trim()
-    );
-    if (!isMasterValid) {
+    const pass = prompt('Enter Admin Master Password to Confirm Restoration:');
+    if (pass !== (state.adminPassword || '1234')) {
       alert('❌ Access Denied: Incorrect Master Password. Restoration aborted.');
       e.target.value = '';
       return;
@@ -4114,15 +3334,23 @@ ${formLines.join('\n')}
     }
 
     onSaveState(newState);
-    try {
-      await forceSyncWithCentral(newState, true);
-    } catch (e) {
-      console.warn('Failed to force sync reset state to central server:', e);
+    if (categoryId === 'full') {
+      if (isFirebaseConfigured()) {
+        syncStateToCloud(newState).catch(() => {});
+      }
+      try {
+        const endpoint = getCentralSyncEndpoint();
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: newState, clientTimestamp: Date.now() })
+        }).catch(() => {});
+      } catch (e) {}
     }
-    alert(`✅ ${categoryName} reset successfully. All transactional entries wiped clean and live server synchronized. Backup saved in Downloads.`);
+    alert(`✅ ${categoryName} reset successfully. All transactional entries wiped clean. Backup saved in Downloads.`);
   };
 
-  const handleHardReset = async () => {
+  const handleHardReset = () => {
     if (
       !confirm(
         '⚠️ CRITICAL WARNING: This will completely wipe all current factory jobs, orders, and logs and restore clean empty factory state!\nAre you sure you want to proceed?'
@@ -4158,21 +3386,24 @@ ${formLines.join('\n')}
     };
 
     onSaveState(cleanState);
-    try {
-      await forceSyncWithCentral(cleanState, true);
-    } catch (e) {
-      console.warn('Failed to force sync hard reset cleanState:', e);
+    if (isFirebaseConfigured()) {
+      syncStateToCloud(cleanState).catch(() => {});
     }
+    try {
+      const endpoint = getCentralSyncEndpoint();
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: cleanState, clientTimestamp: Date.now() })
+      }).catch(() => {});
+    } catch (e) {}
 
-    alert('✅ Factory database has been completely wiped clean of all entries on local & live server.');
+    alert('✅ Factory database has been completely wiped clean of all entries.');
   };
 
   const AVAILABLE_PERMS = [
     { key: '*', label: '👑 FULL MASTER ACCESS (*)', desc: 'Full control over all modules & admin settings' },
     { key: 'Admin', label: '⚙️ Admin Settings & Overwrite', desc: 'Manage users, sequences & overwrite data' },
-    { key: 'Status_Edit', label: '⚡ Edit Production & Pending Status (एडमिन स्टेटस व पेंडिंग राइट्स)', desc: 'Authorized to override, fix, and edit job status, planning status, slitting status, and sidebar pending counts' },
-    { key: 'Slitting_Status_Edit', label: '📜 Slitting Status Rights (स्लिटिंग स्टेटस संपादन)', desc: 'Authorized to change slitting job status, running batches, slit rolls, and stage' },
-    { key: 'Planning_Status_Edit', label: '📅 Planning Desk Status Rights (प्लानिंग स्टेटस संपादन)', desc: 'Authorized to change production plan status (Scheduled, In-Progress, Completed, Cancelled)' },
     { key: 'Dashboard', label: '📊 Executive Dashboard', desc: 'Live Floor Pulse & Real-time Machine Status' },
     { key: 'Marketing', label: '💼 Customer Marketing & Orders', desc: 'Create and book new packing orders' },
     { key: 'Dispatch', label: '🚚 Dispatch & Gatepass Invoicing', desc: 'Process box dispatches and bills' },
@@ -4235,7 +3466,6 @@ ${formLines.join('\n')}
     {
       title: '💾 Data & Recovery',
       items: [
-        { id: 'status_rights_manager', label: '⚡ Status & Pending Rights (स्टेटस व पेंडिंग)', icon: Zap, badge: 'PPC & Slitting' },
         { id: 'master_data', label: 'Master Data Overwrite', icon: Edit, badge: null },
         { id: 'backup_restore', label: 'Backup & JSON Recovery', icon: Database, badge: null },
       ]
@@ -5589,15 +4819,6 @@ ${formLines.join('\n')}
       )}
 
       {/* ========================================================================= */}
-      {/* TAB: STATUS & PENDING RIGHTS MANAGER (⚡ Status & Pending Rights) */}
-      {/* ========================================================================= */}
-      {activeTab === 'status_rights_manager' && (
-        <div className="space-y-6">
-          {renderStatusRightsSection()}
-        </div>
-      )}
-
-      {/* ========================================================================= */}
       {/* TAB 2: 100% MASTER DATA OVERWRITE (Job, Batch, Quality, Order & Log Correction) */}
       {/* ========================================================================= */}
       {activeTab === 'master_data' && (
@@ -5613,18 +4834,6 @@ ${formLines.join('\n')}
             </div>
             {/* Sub-tabs */}
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl flex-wrap">
-              <button
-                type="button"
-                onClick={() => setMasterSubTab('status_rights')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-                  masterSubTab === 'status_rights'
-                    ? 'bg-amber-500 text-white shadow-xs ring-1 ring-amber-600'
-                    : 'text-amber-900 bg-amber-50 hover:bg-amber-100 hover:text-amber-950 font-bold border border-amber-200/80'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-300" />
-                ⚡ Status & Pending Rights (स्लिटिंग व प्लानिंग)
-              </button>
               <button
                 type="button"
                 onClick={() => setMasterSubTab('plans')}
@@ -5714,11 +4923,6 @@ ${formLines.join('\n')}
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* SUB-TAB: STATUS & PENDING RIGHTS OVERWRITE */}
-          {/* ------------------------------------------------------------- */}
-          {masterSubTab === 'status_rights' && renderStatusRightsSection()}
-
-          {/* ------------------------------------------------------------- */}
           {/* SUB-TAB A: PRODUCTION JOBS OVERWRITE */}
           {/* ------------------------------------------------------------- */}
           {masterSubTab === 'jobs' && (
@@ -5798,59 +5002,6 @@ ${formLines.join('\n')}
                           </option>
                         ))}
                       </select>
-                    </div>
-                  </div>
-
-                  {/* Job Stage & Status Overwrite Controls */}
-                  <div className="border border-amber-200 rounded-xl p-3 bg-amber-50/60 space-y-2">
-                    <label className="text-xs font-extrabold text-amber-900 uppercase block flex items-center justify-between">
-                      <span>⚡ Stage & Status Overwrite Rights (स्टेज व स्टेटस संपादन):</span>
-                      <span className="text-[10px] font-bold text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded">
-                        Admin Status Rights
-                      </span>
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-amber-900 uppercase mb-1">
-                          Current Stage (उत्पादन स्टेज):
-                        </label>
-                        <select
-                          value={jobEditForm.stage || 'Slitting'}
-                          onChange={(e) => setJobEditForm({ ...jobEditForm, stage: e.target.value })}
-                          className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                        >
-                          <option value="Planning">Planning (प्लानिंग)</option>
-                          <option value="Slitting">Slitting (स्लिटिंग चालू)</option>
-                          <option value="Slitting Completed">Slitting Completed (स्लिटिंग पूर्ण)</option>
-                          <option value="Cutting">Cutting (कटिंग चालू)</option>
-                          <option value="Cutting Completed">Cutting Completed (कटिंग पूर्ण)</option>
-                          <option value="Forming">Forming (फार्मिंग)</option>
-                          <option value="QC">QC Inspection (गुणवत्ता जांच)</option>
-                          <option value="Packing">Packing (पैकिंग)</option>
-                          <option value="Dispatched">Dispatched (डिस्पैच)</option>
-                          <option value="Completed">Completed (पूर्ण)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-amber-900 uppercase mb-1">
-                          Production Queue Status (क्यू स्टेटस):
-                        </label>
-                        <select
-                          value={jobEditForm.status || 'PENDING'}
-                          onChange={(e) => setJobEditForm({ ...jobEditForm, status: e.target.value })}
-                          className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 outline-none"
-                        >
-                          <option value="PENDING">Pending (पेंडिंग)</option>
-                          <option value="SLITTING_IN_PROGRESS">Slitting In Progress (स्लिटिंग जारी)</option>
-                          <option value="READY_FOR_CUTTING">Ready For Cutting (कटिंग के लिए तैयार)</option>
-                          <option value="CUTTING_IN_PROGRESS">Cutting In Progress (कटिंग जारी)</option>
-                          <option value="CUTTING_COMPLETED">Cutting Completed (कटिंग पूर्ण)</option>
-                          <option value="Running">Running (लाइव रनिंग)</option>
-                          <option value="Held">Held (होल्ड)</option>
-                          <option value="Completed">Completed (पूर्ण)</option>
-                          <option value="Cancelled">Cancelled (रद्द)</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
 
@@ -9703,7 +8854,7 @@ ${formLines.join('\n')}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col justify-between">
               <div>
                 <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold mb-3 shadow-xs">
@@ -9730,65 +8881,13 @@ ${formLines.join('\n')}
                 </div>
                 <h5 className="text-sm font-black text-emerald-950 uppercase m-0">Restore Factory Backup / Undo Reset</h5>
                 <p className="text-xs text-emerald-700/80 mt-1.5 leading-relaxed font-medium">
-                  Select ANY previously saved JSON backup (including pre-reset Auto-Backups). Restoring validates JSON integrity and forces live server update.
+                  Select ANY previously saved JSON backup (including pre-reset Auto-Backups). Restoring validates JSON integrity and requires the Admin Password.
                 </p>
               </div>
               <label className="mt-5 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
                 <Upload className="w-4 h-4" /> Secure JSON Upload & Restore
                 <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
               </label>
-            </div>
-
-            <div className="bg-sky-50/50 border border-sky-200 rounded-xl p-5 flex flex-col justify-between shadow-[inset_0_2px_10px_rgba(14,165,233,0.05)]">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold mb-3 shadow-xs border border-sky-200">
-                  <RefreshCw className="w-5 h-5" />
-                </div>
-                <h5 className="text-sm font-black text-sky-950 uppercase m-0">Force Server Overwrite Sync</h5>
-                <p className="text-xs text-sky-800/80 mt-1.5 leading-relaxed font-medium">
-                  Force push current local state to replace live server data immediately across all devices (overwrites old server state).
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!isAdmin) {
-                    alert('⛔ Access Restricted: Only Administrators can force overwrite server state.');
-                    return;
-                  }
-                  const pass = prompt('Enter Master Admin Password (MANOJ or 1811) to Confirm Live Server Force Overwrite:');
-                  const isMasterValid = pass && (
-                    pass.trim().toUpperCase() === 'MANOJ' ||
-                    pass.trim() === '1811' ||
-                    pass.trim() === 'WKF1811' ||
-                    pass.trim() === '1234' ||
-                    pass.trim() === (state.adminPassword || '1234').trim()
-                  );
-                  if (!isMasterValid) {
-                    alert('❌ Access Denied: Incorrect Master Password.');
-                    return;
-                  }
-                  const confirmed = window.confirm(
-                    `⚡ FORCE OVERWRITE LIVE SERVER DATABASE?\n\n` +
-                    `This will replace the live server database with your current local state (${state.jobs?.length || 0} jobs).\n` +
-                    `All connected clients will immediately receive this updated state.`
-                  );
-                  if (!confirmed) return;
-                  try {
-                    const freshState = { ...state, lastResetTimestamp: Date.now() };
-                    const result = await forceSyncWithCentral(freshState, true);
-                    if (result.syncedState) {
-                      onSaveState(result.syncedState);
-                    }
-                    alert(`✅ Live Server Database Updated!\n\n${result.message}`);
-                  } catch (e: any) {
-                    alert(`❌ Server Overwrite failed: ${e.message}`);
-                  }
-                }}
-                className="mt-5 w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-              >
-                <RefreshCw className="w-4 h-4" /> Push & Replace Live Server Data
-              </button>
             </div>
           </div>
 

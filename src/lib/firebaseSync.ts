@@ -30,19 +30,11 @@ let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 let isInitialized = false;
 
-/**
- * 🛡️ ISOLATED DEV & STAGING LAB:
- * Live cloud sync is detached so that any modifications made here
- * stay strictly local and NEVER overwrite or interfere with the live factory floor.
- */
-export const IS_LIVE_SYNC_DISCONNECTED = true;
-
 export function getFirebaseDb(): Firestore | null {
-  if (IS_LIVE_SYNC_DISCONNECTED) return null;
   if (db) return db;
   try {
     if (!firebaseConfig || !firebaseConfig.projectId || !firebaseConfig.apiKey) {
-      console.warn('[FirebaseSync] Firebase config detached for safe isolated development.');
+      console.warn('[FirebaseSync] Firebase config missing or incomplete in firebase-applet-config.json');
       return null;
     }
 
@@ -63,7 +55,6 @@ export function getFirebaseDb(): Firestore | null {
 }
 
 export function isFirebaseConfigured(): boolean {
-  if (IS_LIVE_SYNC_DISCONNECTED) return false;
   return !!(firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey);
 }
 
@@ -112,17 +103,12 @@ export function setCloudSyncMode(mode: CloudSyncMode): void {
 
 /**
  * Pushes the full consolidated state to the central Firestore cloud document.
- * In Isolated Dev / Sandbox mode, live cloud writes are completely blocked.
+ * In Manual/Safe mode (default for AI Studio), background auto-sync is skipped unless force=true.
  */
 export async function syncStateToCloud(state: FactoryState, force: boolean = false): Promise<boolean> {
-  if (IS_LIVE_SYNC_DISCONNECTED) {
-    console.info('[Sandbox] Cloud sync detached: Edits stay 100% inside this staging environment. Live factory is safe.');
-    return true;
-  }
-
   const syncMode = getCloudSyncMode();
   if (!force && syncMode === 'manual') {
-    console.info('[FirebaseSync] Auto-push skipped (Safe/Manual Mode is active in Studio).');
+    console.info('[FirebaseSync] Auto-push skipped (Safe/Manual Mode is active in Studio). Use "Push to Live Cloud" in Admin Settings to push changes.');
     return false;
   }
 
@@ -160,11 +146,6 @@ export async function syncStateToCloud(state: FactoryState, force: boolean = fal
  * Fetches the latest remote factory state from Firestore cloud.
  */
 export async function fetchStateFromCloud(): Promise<FactoryState | null> {
-  if (IS_LIVE_SYNC_DISCONNECTED) {
-    console.info('[Sandbox] Cloud fetch detached: Using local storage to protect live state.');
-    return null;
-  }
-
   const database = getFirebaseDb();
   if (!database) return null;
 
@@ -191,18 +172,14 @@ export async function fetchStateFromCloud(): Promise<FactoryState | null> {
 
 /**
  * Subscribes to live real-time state changes from Firestore.
- * In Isolated Dev / Sandbox mode, live listener is completely bypassed.
+ * In Manual/Safe mode (AI Studio), automatic live overwrite is bypassed.
  */
 export function subscribeToCloudSync(
   onRemoteStateReceived: (mergedState: FactoryState, fromDeviceId: string) => void
 ): Unsubscribe | null {
-  if (IS_LIVE_SYNC_DISCONNECTED) {
-    console.info('[Sandbox] Live listener detached: Factory changes will not interfere with this lab.');
-    return null;
-  }
-
   const syncMode = getCloudSyncMode();
   if (syncMode === 'manual') {
+    console.info('[FirebaseSync] Live auto-listener skipped because Safe/Manual Mode is active in Studio.');
     return null;
   }
 
@@ -226,7 +203,7 @@ export function subscribeToCloudSync(
         onRemoteStateReceived(remoteState, remoteDeviceId);
       },
       (error) => {
-        console.warn('[FirebaseSync] Live listener error:', error.message);
+        console.warn('[FirebaseSync] Live listener error (will retry automatically):', error.message);
       }
     );
 
@@ -242,13 +219,6 @@ export function subscribeToCloudSync(
  * is functioning reliably on GitHub Pages, mobile, and desktop.
  */
 export async function testFirestoreConnection(): Promise<{ connected: boolean; message: string }> {
-  if (IS_LIVE_SYNC_DISCONNECTED) {
-    return {
-      connected: false,
-      message: '🛡️ ISOLATED DEV LAB: Live cloud database detached (Live factory is 100% safe).'
-    };
-  }
-
   const database = getFirebaseDb();
   if (!database) {
     return { connected: false, message: 'Firebase not initialized. Check firebaseConfig.ts' };

@@ -63,37 +63,22 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white m-0 group-hover:text-blue-200 transition">
               Wünderkraf Paperware
             </h1>
             <span className="hidden sm:inline-block bg-[#2b6cb0] text-[11px] font-semibold px-2 py-0.5 rounded text-blue-100 uppercase tracking-wide">
               Enterprise v4.3
             </span>
-            <span className="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse"></span>
-              <span>LIVE SYNC ACTIVE</span>
-            </span>
           </div>
           <p className="text-xs text-slate-300 mt-0.5">
-            Master Factory ERP & Production Management Suite — Multi-Device Connected Floor
+            Master Factory ERP & Production Management Suite
           </p>
         </div>
       </div>
 
       {/* Action Hub & Control Buttons */}
       <div className="flex items-center gap-2 flex-wrap">
-        {onRefreshState && (
-          <button
-            onClick={onRefreshState}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer"
-            title="Force Live Sync across all devices"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isRefreshing ? 'Syncing...' : 'Live Sync'}</span>
-          </button>
-        )}
         {onNavigateHome && (
           <button
             onClick={onNavigateHome}

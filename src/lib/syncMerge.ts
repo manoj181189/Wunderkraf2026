@@ -29,30 +29,25 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
 
   const baseReset = base.lastResetTimestamp || 0;
   const incReset = incoming.lastResetTimestamp || 0;
-  // If incoming state is an authoritative master reset / restore with a strictly newer timestamp, replace base
   if (incReset > baseReset) {
     return JSON.parse(JSON.stringify(incoming));
   }
-  // If baseReset >= incReset, DO NOT discard incoming entries!
-  // Normal production entries (new jobs, cutting/forming batches, scrap logs) must be merged cleanly.
-  const incomingActiveJobIds = new Set((incoming.jobs || []).map((j) => j.id));
-  const incomingActivePlanIds = new Set((incoming.productionPlans || []).map((p) => p.id));
+  if (baseReset > incReset) {
+    return JSON.parse(JSON.stringify(base));
+  }
 
-  // Tombstones: do not allow old base deleted IDs to suppress freshly created incoming jobs or plans
-  const deletedJobIds = Array.from(
-    new Set([
-      ...(base.deletedJobIds || []).filter((id) => !incomingActiveJobIds.has(id)),
-      ...(incoming.deletedJobIds || [])
-    ])
-  );
-  const deletedOrderIds = Array.from(new Set([...(base.deletedOrderIds || []), ...(incoming.deletedOrderIds || [])]));
+  const incomingActiveJobIds = new Set((incoming.jobs || []).map((j) => j?.id).filter(Boolean));
+  const incomingActivePlanIds = new Set((incoming.productionPlans || []).map((p) => p?.id).filter(Boolean));
+  const incomingActiveOrderIds = new Set((incoming.packJobs || []).map((p) => p?.id).filter(Boolean));
+
+  // A job/plan/order is only considered deleted if it is NOT actively present in the incoming payload
+  const deletedJobIds = Array.from(new Set([...(base.deletedJobIds || []), ...(incoming.deletedJobIds || [])]))
+    .filter((id) => !incomingActiveJobIds.has(id));
+  const deletedOrderIds = Array.from(new Set([...(base.deletedOrderIds || []), ...(incoming.deletedOrderIds || [])]))
+    .filter((id) => !incomingActiveOrderIds.has(id));
   const deletedLogIds = Array.from(new Set([...(base.deletedLogIds || []), ...(incoming.deletedLogIds || [])]));
-  const deletedPlanIds = Array.from(
-    new Set([
-      ...(base.deletedPlanIds || []).filter((id) => !incomingActivePlanIds.has(id)),
-      ...(incoming.deletedPlanIds || [])
-    ])
-  );
+  const deletedPlanIds = Array.from(new Set([...(base.deletedPlanIds || []), ...(incoming.deletedPlanIds || [])]))
+    .filter((id) => !incomingActivePlanIds.has(id));
   const deletedWorkerIds = Array.from(new Set([...(base.deletedWorkerIds || []), ...(incoming.deletedWorkerIds || [])]));
   const deletedHandoverIds = Array.from(new Set([...(base.deletedHandoverIds || []), ...(incoming.deletedHandoverIds || [])]));
 
@@ -133,9 +128,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       // Stage progression priority
       const stagePriority: Record<string, number> = {
         'Slitting': 1,
-        'Slitting Completed': 1.5,
         'Cutting': 2,
-        'Cutting Completed': 2.5,
         'Forming': 3,
         'QC': 4,
         'Packing': 5,
@@ -170,69 +163,25 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       const resolvedReelNumbers = Array.from(new Set([...(existing.reelNumbers || []), ...(incJob.reelNumbers || [])]));
       const resolvedReelNo = resolvedReelNumbers.length > 0 ? resolvedReelNumbers.join(', ') : (preferInc ? (incJob.reelNo || existing.reelNo) : (existing.reelNo || incJob.reelNo));
 
-      const mergedBatches = Array.from(batchMap.values());
-      const cutBatches = mergedBatches.filter(b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
-      const hasCompletedCut = cutBatches.some(b => b.status === 'Completed');
-      const hasRunningCut = cutBatches.some(b => b.status === 'Running' || b.status === 'Held');
-      const totalCutRollsConsumed = cutBatches.reduce((sum, b) => sum + (b.issuedQty || b.consumedQty || 0), 0);
+      const resolvedAvailableCuttingCrates = preferInc 
+        ? (incJob.availableCuttingCrates !== undefined ? incJob.availableCuttingCrates : (existing.availableCuttingCrates || 0))
+        : (existing.availableCuttingCrates !== undefined ? existing.availableCuttingCrates : (incJob.availableCuttingCrates || 0));
 
-      const totalCutCrates = cutBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
-      const formBatches = mergedBatches.filter(b => b.stage === 'Forming' || b.machine?.startsWith('Forming'));
-      const totalFormIssued = formBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
-      const totalFormProduced = formBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
-
-      const qcBatches = mergedBatches.filter(b => b.stage === 'QC');
-      const totalQcIssued = qcBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
-      const totalQcApproved = qcBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
-
-      const packBatches = mergedBatches.filter(b => b.stage === 'Packing');
-      const totalPackIssued = packBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
-
-      const resolvedAvailableCuttingCrates = totalCutCrates > 0
-        ? Math.max(0, totalCutCrates - totalFormIssued)
-        : (totalFormIssued > 0
-            ? Math.max(0, (preferInc ? (incJob.totalCutCrates || incJob.availableCuttingCrates) : (existing.totalCutCrates || existing.availableCuttingCrates || incJob.availableCuttingCrates)) - totalFormIssued)
-            : (preferInc ? (incJob.availableCuttingCrates ?? existing.availableCuttingCrates ?? 0) : (existing.availableCuttingCrates ?? incJob.availableCuttingCrates ?? 0)));
-
-      const resolvedAvailableFormingCrates = totalFormProduced > 0
-        ? Math.max(0, totalFormProduced - totalQcIssued)
-        : (totalQcIssued > 0
-            ? Math.max(0, (preferInc ? incJob.availableFormingCrates : existing.availableFormingCrates) - totalQcIssued)
-            : (preferInc ? (incJob.availableFormingCrates ?? existing.availableFormingCrates ?? 0) : (existing.availableFormingCrates ?? incJob.availableFormingCrates ?? 0)));
+      const resolvedAvailableFormingCrates = preferInc
+        ? (incJob.availableFormingCrates !== undefined ? incJob.availableFormingCrates : (existing.availableFormingCrates || 0))
+        : (existing.availableFormingCrates !== undefined ? existing.availableFormingCrates : (incJob.availableFormingCrates || 0));
 
       const resolvedAvailableForQcCrates = preferInc
         ? (incJob.availableForQcCrates !== undefined ? incJob.availableForQcCrates : (existing.availableForQcCrates || 0))
         : (existing.availableForQcCrates !== undefined ? existing.availableForQcCrates : (incJob.availableForQcCrates || 0));
 
-      const resolvedAvailableQcCrates = totalQcApproved > 0
-        ? Math.max(0, totalQcApproved - totalPackIssued)
-        : (totalPackIssued > 0
-            ? Math.max(0, (preferInc ? incJob.availableQcCrates : existing.availableQcCrates) - totalPackIssued)
-            : (preferInc ? (incJob.availableQcCrates ?? existing.availableQcCrates ?? 0) : (existing.availableQcCrates ?? incJob.availableQcCrates ?? 0)));
+      const resolvedAvailableQcCrates = preferInc
+        ? (incJob.availableQcCrates !== undefined ? incJob.availableQcCrates : (existing.availableQcCrates || 0))
+        : (existing.availableQcCrates !== undefined ? existing.availableQcCrates : (incJob.availableQcCrates || 0));
 
       const resolvedIsReadyForQcInspection = preferInc
         ? (incJob.isReadyForQcInspection !== undefined ? incJob.isReadyForQcInspection : existing.isReadyForQcInspection)
         : (existing.isReadyForQcInspection !== undefined ? existing.isReadyForQcInspection : incJob.isReadyForQcInspection);
-      
-      const slitBatches = mergedBatches.filter(b => b.stage === 'Slitting' || b.machine?.startsWith('Slitting'));
-      const totalSlitRolls = slitBatches.reduce((sum, b) => sum + (b.producedQty || 0), 0) ||
-        (resolvedReelsList || []).reduce((sum, r) => sum + (r.rolls || 0), 0) ||
-        (incJob.targetLayers || existing.targetLayers || 8);
-
-      let mergedAvailableRolls = preferInc ? (incJob.availableRolls ?? existing.availableRolls ?? 0) : (existing.availableRolls ?? incJob.availableRolls ?? 0);
-      if (hasCompletedCut && !hasRunningCut) {
-        const remRolls = Math.max(0, totalSlitRolls - totalCutRollsConsumed);
-        mergedAvailableRolls = remRolls;
-      } else if (totalCutRollsConsumed > 0) {
-        mergedAvailableRolls = Math.min(mergedAvailableRolls, Math.max(0, totalSlitRolls - totalCutRollsConsumed));
-      }
-
-      let mergedStatus = preferInc ? (incJob.status || existing.status) : (existing.status || incJob.status);
-      if (hasActiveSlittingRun) {
-        mergedStatus = 'SLITTING_IN_PROGRESS';
-      } else if (hasCompletedCut && !hasRunningCut && (mergedAvailableRolls === 0 || resolvedAvailableCuttingCrates > 0)) {
-        mergedStatus = 'CUTTING_COMPLETED';
-      }
 
       jobMap.set(incJob.id, {
         ...existing,
@@ -243,7 +192,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         inputWeightKg: Math.max(existing.inputWeightKg || 0, incJob.inputWeightKg || 0),
         outputWeightKg: Math.max(existing.outputWeightKg || 0, incJob.outputWeightKg || 0),
         scrapKg: Math.max(existing.scrapKg || 0, incJob.scrapKg || 0),
-        status: mergedStatus,
+        status: hasActiveSlittingRun ? 'SLITTING_IN_PROGRESS' : (preferInc ? (incJob.status || existing.status) : (existing.status || incJob.status)),
         plannedGsms: preferInc ? (incJob.plannedGsms || existing.plannedGsms) : (existing.plannedGsms || incJob.plannedGsms),
         plannedLayers: preferInc ? (incJob.plannedLayers || existing.plannedLayers) : (existing.plannedLayers || incJob.plannedLayers),
         targetLayers: preferInc ? (incJob.targetLayers || existing.targetLayers) : (existing.targetLayers || incJob.targetLayers),
@@ -253,7 +202,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         printedRollDesign: preferInc ? (incJob.printedRollDesign || existing.printedRollDesign) : (existing.printedRollDesign || incJob.printedRollDesign),
         printedRollIcon: preferInc ? (incJob.printedRollIcon || existing.printedRollIcon) : (existing.printedRollIcon || incJob.printedRollIcon),
         stage: resolvedStage,
-        availableRolls: mergedAvailableRolls,
+        availableRolls: Math.max(existing.availableRolls || 0, incJob.availableRolls || 0),
         availableCuttingCrates: resolvedAvailableCuttingCrates,
         availableFormingCrates: resolvedAvailableFormingCrates,
         availableForQcCrates: resolvedAvailableForQcCrates,
@@ -266,7 +215,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
         cuttingLoosePcs: Math.max(existing.cuttingLoosePcs || 0, incJob.cuttingLoosePcs || 0),
         formingLoosePcs: Math.max(existing.formingLoosePcs || 0, incJob.formingLoosePcs || 0),
         qcLoosePcs: Math.max(existing.qcLoosePcs || 0, incJob.qcLoosePcs || 0),
-        runningBatches: mergedBatches
+        runningBatches: Array.from(batchMap.values())
       });
     }
   });
@@ -644,7 +593,6 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
       });
       return updatedDeptWorkers;
     })(),
-    lastResetTimestamp: Math.max(baseReset, incReset),
     lastUpdated: incomingIsNewer ? incoming.lastUpdated : (base.lastUpdated || new Date().toISOString()),
     targetGsmMaster: Array.from(new Set([
       ...(base.targetGsmMaster || []),
@@ -691,25 +639,7 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
     departmentHeads: incoming.departmentHeads?.length ? incoming.departmentHeads : base.departmentHeads,
     maintenanceTechniciansMaster: incoming.maintenanceTechniciansMaster?.length ? incoming.maintenanceTechniciansMaster : base.maintenanceTechniciansMaster,
     maintenanceSparePartsMaster: incoming.maintenanceSparePartsMaster?.length ? incoming.maintenanceSparePartsMaster : base.maintenanceSparePartsMaster,
-    crateCapacityMaster: { ...(base.crateCapacityMaster || {}), ...(incoming.crateCapacityMaster || {}) },
-    supervisorApprovals: Array.from(
-      new Map([
-        ...(base.supervisorApprovals || []).map((a): [string, any] => [a.id, a]),
-        ...(incoming.supervisorApprovals || []).map((a): [string, any] => [a.id, a])
-      ]).values()
-    ),
-    qcDefectRecords: Array.from(
-      new Map([
-        ...(base.qcDefectRecords || []).map((d): [string, any] => [d.id, d]),
-        ...(incoming.qcDefectRecords || []).map((d): [string, any] => [d.id, d])
-      ]).values()
-    ),
-    gatePassDispatches: Array.from(
-      new Map([
-        ...(base.gatePassDispatches || []).map((g): [string, any] => [g.id, g]),
-        ...(incoming.gatePassDispatches || []).map((g): [string, any] => [g.id, g])
-      ]).values()
-    )
+    crateCapacityMaster: { ...(base.crateCapacityMaster || {}), ...(incoming.crateCapacityMaster || {}) }
   };
 
   return merged;

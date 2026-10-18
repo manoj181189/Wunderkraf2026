@@ -103,28 +103,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ).length;
 
   const cuttingPendingCount = (state.jobs || []).filter((j) => {
-    // Exclude jobs that have already finished cutting or moved onward
-    if (j.status === 'CUTTING_COMPLETED' || j.status === 'Completed') return false;
-    if (['Forming', 'QC', 'Packing', 'Dispatched', 'Cutting Completed'].includes(j.stage)) return false;
-    if ((j.availableCuttingCrates || 0) > 0) return false;
-
-    // Check cutting batches
-    const cutBatches = (j.runningBatches || []).filter(b => b.stage === 'Cutting' || b.machine?.startsWith('Cutting'));
-    const hasCompletedCut = cutBatches.some(b => b.status === 'Completed');
-    const hasRunningCut = cutBatches.some(b => b.status === 'Running' || b.status === 'Held');
-
-    // If job has a completed cutting run and no running cut run, cutting is DONE for this job!
-    if (hasCompletedCut && !hasRunningCut) return false;
-
     const parentJob = j.parentJobId ? (state.jobs || []).find(p => p.id === j.parentJobId) : null;
-    const targetJobForRolls = parentJob || j;
-    const rollsCount = targetJobForRolls.availableRolls !== undefined ? targetJobForRolls.availableRolls : 0;
-
-    if (rollsCount <= 0 && !hasRunningCut) return false;
+    const rollsCount = parentJob ? (parentJob.availableRolls || 0) : (j.availableRolls || 0);
+    const hasRolls = rollsCount > 0;
     
     if (j.parentJobId) {
-      const parentIsReady = parentJob && (parentJob.status === 'READY_FOR_CUTTING' || parentJob.status === 'CUTTING_IN_PROGRESS' || parentJob.stage === 'Slitting Completed');
-      return Boolean(parentIsReady);
+      const parentIsReady = parentJob && (parentJob.status === 'READY_FOR_CUTTING' || parentJob.status === 'CUTTING_IN_PROGRESS');
+      return hasRolls && parentIsReady;
     }
     
     const hasChildren = (state.jobs || []).some(child => child.parentJobId === j.id);
@@ -132,58 +117,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return false;
     }
 
-    const isReadyOrInProgress = j.status === 'READY_FOR_CUTTING' || j.status === 'CUTTING_IN_PROGRESS' || j.stage === 'Slitting Completed' || j.stage === 'Cutting';
-    return isReadyOrInProgress;
+    const isReadyOrInProgress = j.status === 'READY_FOR_CUTTING' || j.status === 'CUTTING_IN_PROGRESS';
+    return hasRolls && isReadyOrInProgress;
   }).length;
 
-  const formingPendingCount = (state.jobs || []).filter((j) => {
-    if (['QC', 'Packing', 'Dispatched', 'Completed'].includes(j.stage)) return false;
-
-    const formBatches = (j.runningBatches || []).filter(
-      (b) => b.stage === 'Forming' || b.machine?.startsWith('Forming')
-    );
-    const hasActiveForming = formBatches.some((b) => b.status === 'Running' || b.status === 'Held');
-    if (hasActiveForming) return false;
-
-    const cutCrates = Number(j.availableCuttingCrates) || 0;
-    const cutBatches = (j.runningBatches || []).filter(
-      (b) => b.stage === 'Cutting' || b.machine?.startsWith('Cutting')
-    );
-    const totalCutProduced = cutBatches.reduce((sum, b) => sum + (Number(b.producedQty) || 0), 0);
-    const totalFormIssued = formBatches.reduce((sum, b) => sum + (Number(b.issuedQty) || 0), 0);
-    const unformedCrates = totalCutProduced > 0 ? Math.max(0, totalCutProduced - totalFormIssued) : cutCrates;
-
-    return unformedCrates > 0;
-  }).length;
-
-  const qcPendingCount = (state.jobs || []).filter((j) => {
-    if (['Packing', 'Dispatched', 'Completed'].includes(j.stage)) return false;
-    const qcBatches = (j.runningBatches || []).filter(
-      (b) => b.stage === 'QC' || b.machine === 'QC-Desk'
-    );
-    const hasActiveQc = qcBatches.some((b) => b.status === 'Running' || b.status === 'Held');
-    if (hasActiveQc) return false;
-
-    // Jobs actively running on a forming line are still in forming
-    const formBatches = (j.runningBatches || []).filter(
-      (b) => b.stage === 'Forming' || b.machine?.startsWith('Forming')
-    );
-    const hasActiveForming = formBatches.some((b) => b.status === 'Running' || b.status === 'Held');
-    if (hasActiveForming) return false;
-
-    return ((j.availableForQcCrates || 0) + (j.availableFormingCrates || 0)) > 0;
-  }).length;
-
-  const pendingPackOrdersCount = (state.packJobs || []).filter(
-    (pj) =>
-      pj.status === 'Pending Queue' ||
-      pj.status === 'Partially Packed' ||
-      ((pj.packedBoxes || 0) * pj.pcsPerBox < pj.orderQty && pj.status !== 'Running' && pj.status !== 'Held' && pj.status !== 'Finished Packing')
+  const formingPendingCount = (state.jobs || []).filter(
+    (j) => (j.availableCuttingCrates || 0) > 0
   ).length;
 
-  const packingPendingCount = pendingPackOrdersCount > 0
-    ? pendingPackOrdersCount
-    : (state.jobs || []).filter((j) => (j.availableQcCrates || 0) > 0).length;
+  const qcPendingCount = (state.jobs || []).filter(
+    (j) => (j.availableFormingCrates || 0) > 0
+  ).length;
+
+  const packingPendingCount = (state.jobs || []).filter(
+    (j) => (j.availableQcCrates || 0) > 0
+  ).length;
 
   // Navigation Items matching the full factory ecosystem
   const allNavItems: NavItem[] = [
@@ -265,16 +213,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       category: 'production',
       badge: packingPendingCount > 0 ? packingPendingCount : undefined,
       badgeColor: 'bg-sky-600 text-white font-extrabold shadow-3xs'
-    },
-    {
-      id: 'SUPERVISOR',
-      title: 'Supervisor Control Suite',
-      shortTitle: 'Supervisor',
-      icon: <ShieldCheck className="w-5 h-5 text-indigo-400" />,
-      perm: 'Supervisor',
-      category: 'production',
-      badge: (state.supervisorApprovals || []).length > 0 ? (state.supervisorApprovals || []).length : undefined,
-      badgeColor: 'bg-indigo-600 text-white font-extrabold shadow-3xs'
     },
     // Inventory & Orders
     {
@@ -381,13 +319,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'ADMIN',
-      title: 'Master Settings & Status Rights',
+      title: 'Master Settings',
       shortTitle: 'Settings',
       icon: <Settings className="w-5 h-5" />,
       perm: 'Admin',
-      category: 'admin',
-      badge: (isMasterAdmin || currentUser?.perms.some(p => p === 'Status_Edit')) ? '⚡ Rights' : undefined,
-      badgeColor: 'bg-amber-500 text-slate-950 font-black'
+      category: 'admin'
     }
   ];
 
@@ -395,9 +331,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const authorizedNavItems = allNavItems.filter((item) => {
     if (isMasterAdmin) return true;
     if (item.id === 'HUB') return true;
-    if (item.id === 'ADMIN') {
-      return currentUser?.perms.some(p => p === '*' || p.toLowerCase() === 'admin' || p.toLowerCase() === 'status_edit');
-    }
     if (item.id === 'WHATSAPP') {
       return currentUser?.perms.some(
         (p) => p === '*' || p.toLowerCase() === 'whatsapp' || p.toLowerCase().startsWith('wa_')

@@ -56,7 +56,6 @@ export const QCView: React.FC<QCViewProps> = ({
   const [rejectedPiecesInput, setRejectedPiecesInput] = useState('0');
   const [scrapKg, setScrapKg] = useState('0');
   const [selectedActiveBatchId, setSelectedActiveBatchId] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [tableSearch, setTableSearch] = useState('');
   const [sortColumn, setSortColumn] = useState<string>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -102,23 +101,7 @@ export const QCView: React.FC<QCViewProps> = ({
   const [genealogyModalJob, setGenealogyModalJob] = useState<Job | null>(null);
 
   // Formed crates queue: Any job with available crates waiting for QC inspection
-  let pendingFormedJobs = jobs.filter((j) => {
-    if (['Packing', 'Dispatched', 'Completed'].includes(j.stage)) return false;
-    const qcBatches = (j.runningBatches || []).filter(
-      (b) => b.stage === 'QC' || b.machine === 'QC-Desk'
-    );
-    const hasActiveQc = qcBatches.some((b) => b.status === 'Running' || b.status === 'Held');
-    if (hasActiveQc) return false;
-
-    // Jobs actively running on a forming line are still in forming!
-    const formBatches = (j.runningBatches || []).filter(
-      (b) => b.stage === 'Forming' || b.machine?.startsWith('Forming')
-    );
-    const hasActiveForming = formBatches.some((b) => b.status === 'Running' || b.status === 'Held');
-    if (hasActiveForming) return false;
-
-    return ((j.availableForQcCrates || 0) + (j.availableFormingCrates || 0)) > 0;
-  });
+  let pendingFormedJobs = jobs.filter((j) => ((j.availableForQcCrates || 0) + (j.availableFormingCrates || 0)) > 0);
   if (filterProduct) {
     pendingFormedJobs = pendingFormedJobs.filter((j) => j.product === filterProduct);
   }
@@ -786,17 +769,11 @@ export const QCView: React.FC<QCViewProps> = ({
   };
 
   const handleFinish = () => {
-    if (isSaving) return;
     if (!activeBatchObj) return alert('Select batch to pass / finish!');
     const cratesDone = parseInt(outputApprovedCrates, 10) || 0;
     const looseDone = parseInt(loosePiecesInput, 10) || 0;
     const scrap = parseFloat(scrapKg) || 0;
     const rejectedPcs = parseInt(rejectedPiecesInput, 10) || 0;
-
-    if (cratesDone <= 0 && looseDone <= 0) {
-      alert('⚠️ Cannot pass crates: Please enter Actual Passed Crates or Loose Pieces inspected (at least 1 crate or piece)!');
-      return;
-    }
 
     const { job, batch } = activeBatchObj;
     const formCrateCapacity = batch.pcsPerCrate || job.pcsPerCrateForming || state.crateCapacityMaster?.[job.product]?.formingPcs || 7000;
@@ -901,23 +878,18 @@ export const QCView: React.FC<QCViewProps> = ({
       timestamp: new Date().toLocaleString()
     };
 
-    try {
-      setIsSaving(true);
-      onSaveState({
-        ...state,
-        jobs: updatedJobs,
-        logs: [...state.logs, newLog]
-      });
+    onSaveState({
+      ...state,
+      jobs: updatedJobs,
+      logs: [...state.logs, newLog]
+    });
 
-      setOutputApprovedCrates('');
-      setLoosePiecesInput('0');
-      setRejectedPiecesInput('0');
-      setScrapKg('0');
-      setSelectedActiveBatchId('');
-      alert(`✅ QC Inspection Finished! Approved ${cratesDone} Crates (= ${approvedPcs.toLocaleString()} Pieces) into Finished Stock.`);
-    } finally {
-      setIsSaving(false);
-    }
+    setOutputApprovedCrates('');
+    setLoosePiecesInput('0');
+    setRejectedPiecesInput('0');
+    setScrapKg('0');
+    setSelectedActiveBatchId('');
+    alert(`✅ QC Inspection Finished! Approved ${cratesDone} Crates (= ${approvedPcs.toLocaleString()} Pieces) into Finished Stock.`);
   };
 
   const handleDirectQCVoucherSubmit = (e: React.FormEvent) => {
@@ -1648,10 +1620,9 @@ export const QCView: React.FC<QCViewProps> = ({
               <button
                 type="button"
                 onClick={handleFinish}
-                disabled={isSaving}
-                className="py-2.5 bg-[#2f855a] hover:bg-[#276749] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                className="py-2.5 bg-[#2f855a] hover:bg-[#276749] text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
               >
-                <Square className="w-3.5 h-3.5" /> {isSaving ? 'Processing...' : 'Pass Crates'}
+                <Square className="w-3.5 h-3.5" /> Pass Crates
               </button>
               <button
                 type="button"
@@ -2191,21 +2162,12 @@ export const QCView: React.FC<QCViewProps> = ({
           const remark = j.customRemark || 'Standard';
           const stock = approvedCrates;
 
-          // Accurate status representation
-          const formBatches = (j.runningBatches || []).filter((b) => b.stage === 'Forming' || b.machine?.startsWith('Forming'));
-          const hasActiveForming = formBatches.some((b) => b.status === 'Running' || b.status === 'Held');
-
-          let statusText = j.status || j.stage || '';
+          // Status representation
+          let statusText = j.stage || '';
           if (activeQcBatch) {
             statusText = `In Inspection (${activeQcBatch.worker})`;
-          } else if (hasActiveForming) {
-            statusText = `Forming in Progress (${j.availableFormingCrates || 0} Crates Formed)`;
           } else if ((j.availableFormingCrates || 0) > 0) {
-            statusText = `Pending QC (${j.availableFormingCrates} Crates Ready)`;
-          } else if ((j.availableQcCrates || 0) > 0) {
-            statusText = `QC Approved (${j.availableQcCrates} Crates in Stock)`;
-          } else if (j.stage === 'Completed' || j.status === 'Completed') {
-            statusText = 'Completed';
+            statusText = `Pending QC (${j.availableFormingCrates} Crates)`;
           }
 
           return {

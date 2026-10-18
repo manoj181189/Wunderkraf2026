@@ -43,10 +43,9 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   (state.jobs || []).forEach((job) => {
     (job.runningBatches || []).forEach((b) => {
       if (b.status === 'Running' || b.status === 'Held') {
-        if (b.worker) activeWorkerNames.add(b.worker.toUpperCase());
-        if (b.operator) activeWorkerNames.add(b.operator.toUpperCase());
+        if (b.worker) activeWorkerNames.add(b.worker);
         if (b.helpers) {
-          b.helpers.forEach((h) => activeWorkerNames.add(h.toUpperCase()));
+          b.helpers.forEach(h => activeWorkerNames.add(h));
         }
       }
     });
@@ -55,25 +54,20 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   // Also include Packers & Helpers from active packing jobs
   (state.packJobs || []).forEach((pj) => {
     if (pj.status === 'Running' || pj.status === 'Active') {
-      if (pj.packer) activeWorkerNames.add(pj.packer.toUpperCase());
-      if (pj.helper) activeWorkerNames.add(pj.helper.toUpperCase());
+      if (pj.packer) activeWorkerNames.add(pj.packer);
+      if (pj.helper) activeWorkerNames.add(pj.helper);
     }
   });
 
   const rawWorkers: FloorWorker[] = (state.floorWorkers !== undefined
     ? state.floorWorkers
-    : DEFAULT_FLOOR_WORKERS).filter((w) => w.status !== 'INACTIVE');
+    : DEFAULT_FLOOR_WORKERS).filter(w => w.status !== 'INACTIVE');
 
-  // Keep true attendance in isPresent, but attach isDutyActive
-  const workers = rawWorkers.map((w) => {
-    const isPresent = w.shiftStatus === 'PRESENT' || (w.shiftStatus === undefined && w.isPresent);
-    const isDutyActive = activeWorkerNames.has(w.name.toUpperCase());
-    return {
-      ...w,
-      isPresent,
-      isDutyActive
-    };
-  });
+  // Roster mapped with dynamic active status
+  const workers: FloorWorker[] = rawWorkers.map(w => ({
+    ...w,
+    isPresent: activeWorkerNames.has(w.name)
+  }));
 
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('ALL');
@@ -98,16 +92,18 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   const [newWorkerPairedOp, setNewWorkerPairedOp] = useState('Operator');
 
   // Real-time calculation from workers list
+  const presentWorkers = workers.filter((w) => w.isPresent); // Active
+  const freeWorkers = workers.filter((w) => !w.isPresent); // Free
+  
   const totalFloorCount = workers.length; // Total roster size
-  const presentCount = workers.filter((w) => w.isPresent).length; // Physically Present
-  const activeCount = workers.filter((w) => w.isDutyActive).length; // Active on machines
-  const freeCount = Math.max(0, presentCount - activeCount); // Present on floor but machine idle/free
+  const activeCount = presentWorkers.length; // Active count
+  const freeCount = freeWorkers.length; // Free count
 
-  const operatorCount = workers.filter((w) => w.isDutyActive && w.role === 'OPERATOR').length;
-  const helperCount = workers.filter((w) => w.isDutyActive && w.role === 'HELPER').length;
+  const operatorCount = presentWorkers.filter((w) => w.role === 'OPERATOR').length;
+  const helperCount = presentWorkers.filter((w) => w.role === 'HELPER').length;
   const supervisorCount = workers.filter((w) => w.role === 'SUPERVISOR').length;
   const maintenanceCount = workers.filter((w) => w.role === 'MAINTENANCE').length;
-  const qcCount = workers.filter((w) => w.isDutyActive && w.role === 'QC_INSPECTOR').length;
+  const qcCount = presentWorkers.filter((w) => w.role === 'QC_INSPECTOR').length;
 
   // Real-time Station Manpower Map (combining running batches and registered workers)
   const stationMap: Record<
@@ -235,18 +231,7 @@ export const LiveFloorManpowerTracker: React.FC<LiveFloorManpowerTrackerProps> =
   }
 
   const handleToggleAttendance = (workerId: string) => {
-    const currentList = state.floorWorkers || DEFAULT_FLOOR_WORKERS;
-    const updated = currentList.map((w) => {
-      if (w.id === workerId) {
-        const nextStatus = w.shiftStatus === 'PRESENT' ? 'ON_LEAVE' : 'PRESENT';
-        return {
-          ...w,
-          shiftStatus: nextStatus as any,
-          isPresent: nextStatus === 'PRESENT'
-        };
-      }
-      return w;
-    });
+    const updated = workers.map((w) => (w.id === workerId ? { ...w, isPresent: !w.isPresent } : w));
     onSaveState({
       ...state,
       floorWorkers: updated

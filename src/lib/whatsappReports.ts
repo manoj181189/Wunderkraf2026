@@ -1,15 +1,5 @@
 import { FactoryState } from '../types';
 
-export interface OperatorShiftSummary {
-  name: string;
-  stage: string;
-  machine: string;
-  outputCratesOrRolls: number;
-  outputPieces: number;
-  scrapKg: number;
-  defectsPcs: number;
-}
-
 export function generateShiftChangeoverReportText(
   state: FactoryState,
   targetShift: 'DAY' | 'NIGHT',
@@ -18,370 +8,163 @@ export function generateShiftChangeoverReportText(
   const today = targetDate || new Date().toISOString().split('T')[0];
   const shiftTitle = targetShift === 'DAY' ? '☀️ DAY SHIFT' : '🌙 NIGHT SHIFT';
 
-  // Helper date checker
-  const isMatchingDate = (dateVal?: string): boolean => {
-    if (!dateVal) return false;
-    const clean = dateVal.trim().split('T')[0].split(' ')[0].replace(/\//g, '-');
-    const target = today.replace(/\//g, '-');
-    return clean === target || dateVal.includes(today);
-  };
-
-  const isMatchingShift = (shiftVal?: string): boolean => {
-    if (!shiftVal) return true;
-    return shiftVal.trim().toUpperCase() === targetShift;
-  };
-
-  // Structured Operator Map
-  const operatorSummaryMap = new Map<string, OperatorShiftSummary>();
-  const addOperatorMetric = (
-    name: string,
-    stage: string,
-    machine: string,
-    cratesOrRolls: number,
-    pieces: number,
-    scrapKg: number,
-    defectsPcs: number = 0
-  ) => {
-    const cleanName = (name || 'Assigned Operator').trim().toUpperCase();
-    if (cleanName === 'UNKNOWN' || cleanName === 'ADMIN' || cleanName === 'OPERATOR') return;
-    const key = `${cleanName}_${stage}_${machine}`;
-    const existing = operatorSummaryMap.get(key) || {
-      name: cleanName,
-      stage,
-      machine,
-      outputCratesOrRolls: 0,
-      outputPieces: 0,
-      scrapKg: 0,
-      defectsPcs: 0
-    };
-    existing.outputCratesOrRolls += cratesOrRolls;
-    existing.outputPieces += pieces;
-    existing.scrapKg += scrapKg;
-    existing.defectsPcs += defectsPcs;
-    operatorSummaryMap.set(key, existing);
-  };
-
-  // 1. Slitting Structured Extraction
-  let totalSlitRollsProduced = 0;
-  let totalSlitScrapKg = 0;
-  const slittingActiveOps = new Set<string>();
-
-  (state.jobs || []).forEach((j) => {
-    (j.reelsList || []).forEach((r) => {
-      const rDate = r.startTime || j.date || j.createdAt || '';
-      if (isMatchingDate(rDate) && (!r.batchId || true)) {
-        const rolls = r.rolls || 1;
-        const scrap = r.scrapKg || 0;
-        totalSlitRollsProduced += rolls;
-        totalSlitScrapKg += scrap;
-        const op = r.worker || 'Slitting Lead';
-        slittingActiveOps.add(op);
-        addOperatorMetric(op, 'Slitting', 'Slitter-01', rolls, 0, scrap);
-      }
-    });
-
-    (j.runningBatches || []).forEach((b) => {
-      if (b.stage === 'Slitting' && isMatchingDate(b.startTime) && isMatchingShift(b.shift)) {
-        const rolls = b.producedQty || 0;
-        const scrap = b.scrapKg || 0;
-        if (rolls > 0) {
-          totalSlitRollsProduced += rolls;
-          totalSlitScrapKg += scrap;
-          const op = b.worker || b.operator || 'Slitting Operator';
-          slittingActiveOps.add(op);
-          addOperatorMetric(op, 'Slitting', b.machine || 'Slitter-01', rolls, 0, scrap);
-        }
-      }
-    });
-  });
-
-  // 2. Cutting Structured Extraction
-  let totalCutCratesProduced = 0;
-  let totalCutPiecesProduced = 0;
-  let totalCutScrapKg = 0;
-  const cuttingMachineMap = new Map<string, { ops: Set<string>; crates: number; pcs: number; scrapKg: number }>();
-
-  (state.jobs || []).forEach((j) => {
-    (j.runningBatches || []).forEach((b) => {
-      if (b.stage === 'Cutting' && isMatchingDate(b.startTime) && isMatchingShift(b.shift)) {
-        const crates = b.producedQty || 0;
-        const pcs = b.producedPieces || b.outputPieces || (crates * (j.pcsPerCrateCutting || 10000));
-        const scrap = b.scrapKg || 0;
-        const machine = b.machine || 'Cutting-1';
-        const op = b.worker || b.operator || 'Cutting Operator';
-
-        totalCutCratesProduced += crates;
-        totalCutPiecesProduced += pcs;
-        totalCutScrapKg += scrap;
-
-        const mStat = cuttingMachineMap.get(machine) || { ops: new Set<string>(), crates: 0, pcs: 0, scrapKg: 0 };
-        mStat.ops.add(op);
-        mStat.crates += crates;
-        mStat.pcs += pcs;
-        mStat.scrapKg += scrap;
-        cuttingMachineMap.set(machine, mStat);
-
-        addOperatorMetric(op, 'Cutting', machine, crates, pcs, scrap);
-      }
-
-      // Check slices
-      (b.slices || []).forEach((sl) => {
-        if (isMatchingDate(sl.handoverTime) && isMatchingShift(sl.shift)) {
-          const crates = sl.producedQty || 0;
-          const pcs = sl.producedPieces || (crates * (j.pcsPerCrateCutting || 10000));
-          const scrap = sl.scrapQty || 0;
-          const machine = b.machine || 'Cutting-1';
-          const op = sl.operator || 'Shift Operator';
-
-          totalCutCratesProduced += crates;
-          totalCutPiecesProduced += pcs;
-          totalCutScrapKg += scrap;
-
-          const mStat = cuttingMachineMap.get(machine) || { ops: new Set<string>(), crates: 0, pcs: 0, scrapKg: 0 };
-          mStat.ops.add(op);
-          mStat.crates += crates;
-          mStat.pcs += pcs;
-          mStat.scrapKg += scrap;
-          cuttingMachineMap.set(machine, mStat);
-
-          addOperatorMetric(op, 'Cutting', machine, crates, pcs, scrap);
-        }
-      });
-    });
-  });
-
-  // 3. Forming Structured Extraction
-  const formingRegistered = state.machinesMaster?.['Forming'] || ['Forming-1', 'Forming-2', 'Forming-3', 'Forming-4'];
-  const formingReportList: string[] = [];
-  let totalFormedCratesShift = 0;
-  let totalFormedPiecesShift = 0;
-  let totalFormingDefectPcs = 0;
-
-  formingRegistered.forEach((mach) => {
-    let mCrates = 0;
-    let mPcs = 0;
-    let mDefects = 0;
-    const mOps = new Set<string>();
-
-    (state.jobs || []).forEach((j) => {
-      (j.runningBatches || []).forEach((b) => {
-        if (b.stage === 'Forming' && (b.machine === mach || b.machine?.endsWith(mach.replace(/[^0-9]/g, '')))) {
-          if (isMatchingDate(b.startTime) && isMatchingShift(b.shift)) {
-            const cr = b.producedQty || 0;
-            const pcs = b.producedPieces || b.outputPieces || (cr * (j.pcsPerCrateForming || 5000));
-            const def = b.rejectedPieces || b.scrapPieces || b.scrapPcs || 0;
-            const op = b.operator || b.worker || 'Forming Op';
-
-            mCrates += cr;
-            mPcs += pcs;
-            mDefects += def;
-            mOps.add(op);
-            addOperatorMetric(op, 'Forming', mach, cr, pcs, 0, def);
-          }
-
-          (b.slices || []).forEach((sl) => {
-            if (isMatchingDate(sl.handoverTime) && isMatchingShift(sl.shift)) {
-              const cr = sl.producedQty || 0;
-              const pcs = sl.producedPieces || (cr * (j.pcsPerCrateForming || 5000));
-              const def = sl.scrapQty || 0;
-              const op = sl.operator || 'Forming Op';
-
-              mCrates += cr;
-              mPcs += pcs;
-              mDefects += def;
-              mOps.add(op);
-              addOperatorMetric(op, 'Forming', mach, cr, pcs, 0, def);
-            }
-          });
-        }
-      });
-    });
-
-    totalFormedCratesShift += mCrates;
-    totalFormedPiecesShift += mPcs;
-    totalFormingDefectPcs += mDefects;
-
-    const opDisplay = mOps.size > 0 ? Array.from(mOps).join(', ') : 'Standby / Idle';
-    const statusText = mCrates > 0
-      ? `*${mCrates} Crates* (${mPcs.toLocaleString()} Pcs)${mDefects > 0 ? ` | ⚠️ Defect: ${mDefects} Pcs` : ''}`
-      : 'Standby';
-
-    formingReportList.push(`  • *${mach}:* ${opDisplay} ➔ ${statusText}`);
-  });
-
-  // 4. QC Inspection Structured Extraction
-  let totalQcApprovedCrates = 0;
-  let totalQcDefectsPcs = 0;
-  const qcInspectors = new Set<string>();
-  const defectBreakdownMap = new Map<string, number>();
-
-  (state.qcDefectRecords || []).forEach((rec) => {
-    if (isMatchingDate(rec.timestamp)) {
-      const rej = rec.rejectedPcs || 0;
-      totalQcDefectsPcs += rej;
-      if (rec.inspector) qcInspectors.add(rec.inspector);
-      if (rec.defectCategory && rej > 0) {
-        defectBreakdownMap.set(rec.defectCategory, (defectBreakdownMap.get(rec.defectCategory) || 0) + rej);
-      }
-      if (rec.operator && rej > 0) {
-        addOperatorMetric(rec.operator, 'Forming', rec.machine || 'Forming Line', 0, 0, 0, rej);
-      }
-    }
-  });
-
-  // 5. Packing & Dispatch Structured Extraction
-  let totalBoxesPacked = 0;
-  let totalBoxesDispatched = 0;
-  const packWorkers = new Set<string>();
-
-  (state.packJobs || []).forEach((pj) => {
-    (pj.historyRuns || []).forEach((hr) => {
-      if (isMatchingDate(hr.date) && isMatchingShift(hr.shift)) {
-        const boxes = hr.boxes || hr.boxesPacked || 0;
-        totalBoxesPacked += boxes;
-        if (hr.worker) packWorkers.add(hr.worker);
-      }
-    });
-
-    (pj.dispatchLogs || []).forEach((dl) => {
-      if (isMatchingDate(dl.date)) {
-        totalBoxesDispatched += dl.boxes || 0;
-      }
-    });
-  });
-
-  (state.gatePassDispatches || []).forEach((gp) => {
-    if (isMatchingDate(gp.dispatchTimestamp)) {
-      totalBoxesDispatched += gp.boxesCount || 0;
-    }
-  });
-
-  // Fallback to shift logs if batch arrays were empty
+  // 1. Gather all logs recorded for today & targetShift
   const shiftLogs = (state.logs || []).filter((l) => {
     const logDate = l.rawDate || l.date || (l.timestamp ? l.timestamp.split('T')[0] : '');
-    return isMatchingDate(logDate) && isMatchingShift(l.shift);
+    const matchesDate = logDate === today || (l.timestamp && l.timestamp.split('T')[0] === today);
+    const matchesShift = l.shift ? l.shift.toUpperCase() === targetShift : true;
+    return matchesDate && matchesShift;
   });
 
-  if (totalSlitRollsProduced === 0) {
-    const slitLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('slit'));
-    slitLogs.forEach((l) => {
-      const match = l.action?.match(/(\d+)\s*Rolls/i) || l.details?.match(/(\d+)\s*Rolls/i);
-      if (match) totalSlitRollsProduced += parseInt(match[1], 10);
-      const scMatch = l.action?.match(/Scrap:\s*([\d.]+)\s*KG/i);
-      if (scMatch) totalSlitScrapKg += parseFloat(scMatch[1]);
-      if (l.worker || l.operator) slittingActiveOps.add(l.worker || l.operator || '');
-    });
-  }
+  // 2. Machine Operators & Output extraction
+  // Slitting
+  const slittingLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('slit') || l.jobId?.startsWith('SL-'));
+  const slittingOperators = Array.from(new Set(slittingLogs.map((l) => l.operator).filter(Boolean)));
+  const slittingRolls = slittingLogs.reduce((acc, l) => {
+    const match = l.action?.match(/(\d+)\s*Rolls/i) || l.details?.match(/(\d+)\s*Rolls/i);
+    return acc + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+  const slittingScrap = slittingLogs.reduce((acc, l) => {
+    const match = l.action?.match(/Scrap:\s*([\d.]+)\s*KG/i) || l.details?.match(/Scrap:\s*([\d.]+)\s*KG/i);
+    return acc + (match ? parseFloat(match[1]) : 0);
+  }, 0);
 
-  if (totalCutCratesProduced === 0) {
-    const cutLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('cut'));
-    cutLogs.forEach((l) => {
-      const match = l.action?.match(/(\d+)\s*(?:Cut\s*)?Crates/i);
-      if (match) totalCutCratesProduced += parseInt(match[1], 10);
-      const scMatch = l.action?.match(/Scrap:\s*([\d.]+)\s*KG/i);
-      if (scMatch) totalCutScrapKg += parseFloat(scMatch[1]);
-    });
-    totalCutPiecesProduced = totalCutCratesProduced * 10000;
-  }
+  // Cutting Machines
+  const cuttingLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('cut') || l.jobId?.startsWith('CUT-'));
+  const cutM1Logs = cuttingLogs.filter((l) => l.station === 'Cutting-01' || l.machine?.includes('01'));
+  const cutM2Logs = cuttingLogs.filter((l) => l.station === 'Cutting-02' || l.machine?.includes('02'));
+  const cutM1Ops = Array.from(new Set(cutM1Logs.map((l) => l.operator).filter(Boolean)));
+  const cutM2Ops = Array.from(new Set(cutM2Logs.map((l) => l.operator).filter(Boolean)));
+  const cutOtherOps = Array.from(
+    new Set(
+      cuttingLogs
+        .filter((l) => !cutM1Ops.includes(l.operator) && !cutM2Ops.includes(l.operator))
+        .map((l) => l.operator)
+        .filter(Boolean)
+    )
+  );
 
-  // Stock WIP Balances
-  const totalSlitRollsWip = (state.jobs || []).reduce((a, b) => a + (b.availableRolls || 0), 0);
-  const totalCutCratesWip = (state.jobs || []).reduce((a, b) => a + (b.availableCuttingCrates || 0), 0);
-  const totalFormedCratesWip = (state.jobs || []).reduce((a, b) => a + (b.availableFormingCrates || 0), 0);
-  const totalQcOkCratesWip = (state.jobs || []).reduce((a, b) => a + (b.availableQcCrates || 0), 0);
+  const cutM1Crates = cutM1Logs.reduce((acc, l) => {
+    const match = l.action?.match(/(\d+)\s*Crates/i) || l.action?.match(/(\d+)\s*Cut Crates/i) || l.details?.match(/(\d+)\s*Crates/i) || l.details?.match(/(\d+)\s*Cut Crates/i);
+    return acc + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+  const cutM2Crates = cutM2Logs.reduce((acc, l) => {
+    const match = l.action?.match(/(\d+)\s*Crates/i) || l.action?.match(/(\d+)\s*Cut Crates/i) || l.details?.match(/(\d+)\s*Crates/i) || l.details?.match(/(\d+)\s*Cut Crates/i);
+    return acc + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+
+  // Forming Machines (M1 to M8)
+  const formingLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('form') || l.jobId?.startsWith('FORM-'));
+  const formingMachineReports: string[] = [];
+  const activeMachines = ['M-01', 'M-02', 'M-03', 'M-04', 'M-05', 'M-06', 'M-07', 'M-08'];
+  
+  activeMachines.forEach((m) => {
+    const mLogs = formingLogs.filter((l) => l.station === m || l.machine === m || l.details?.includes(m));
+    const mOps = Array.from(new Set(mLogs.map((l) => l.operator).filter(Boolean)));
+    const mRunningBatches = state.jobs?.flatMap((j) =>
+      (j.runningBatches || []).filter((b) => b.machine === m && b.status === 'Running')
+    ) || [];
+
+    const opName = mOps.length > 0 ? mOps.join(', ') : (mRunningBatches[0]?.operator || 'Assigned');
+    const crates = mLogs.reduce((acc, l) => {
+      const match = l.action?.match(/(\d+)\s*Formed Crates/i) || l.action?.match(/(\d+)\s*Crates/i) || l.details?.match(/(\d+)\s*Formed Crates/i) || l.details?.match(/(\d+)\s*Crates/i);
+      return acc + (match ? parseInt(match[1], 10) : 0);
+    }, 0);
+
+    formingMachineReports.push(
+      `  • ${m}: ${opName} | ${crates > 0 ? `${crates} Crates` : `${mRunningBatches.length > 0 ? 'Active' : 'Standby'}`}`
+    );
+  });
+
+  // QC Inspection
+  const qcLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('qc') || l.details?.toLowerCase().includes('qc'));
+  const qcInspectors = Array.from(new Set(qcLogs.map((l) => l.operator).filter(Boolean)));
+  const qcOkCrates = qcLogs.reduce((acc, l) => {
+    const match = l.action?.match(/(\d+)\s*OK Crates/i) || l.action?.match(/Accepted:\s*(\d+)/i) || l.details?.match(/(\d+)\s*OK Crates/i) || l.details?.match(/Accepted:\s*(\d+)/i);
+    return acc + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+  const qcScrapCrates = qcLogs.reduce((acc, l) => {
+    const match = l.action?.match(/(\d+)\s*Scrap Crates/i) || l.action?.match(/Rejected:\s*(\d+)/i) || l.details?.match(/(\d+)\s*Scrap Crates/i) || l.details?.match(/Rejected:\s*(\d+)/i);
+    return acc + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+
+  // Packing
+  const packLogs = shiftLogs.filter((l) => l.action?.toLowerCase().includes('pack') || l.jobId?.startsWith('PKG-'));
+  const packOperators = Array.from(new Set(packLogs.map((l) => l.operator).filter(Boolean)));
+  const packedBoxes = packLogs.reduce((acc, l) => {
+    const match = l.action?.match(/(\d+)\s*Boxes/i) || l.details?.match(/(\d+)\s*Boxes/i);
+    return acc + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+
+  // WIP Stock Balance
+  const totalSlitRolls = state.jobs.reduce((a, b) => a + (b.availableRolls || 0), 0);
+  const totalCutCrates = state.jobs.reduce((a, b) => a + (b.availableCuttingCrates || 0), 0);
+  const totalFormedCrates = state.jobs.reduce((a, b) => a + (b.availableFormingCrates || 0), 0);
+  const totalQcOkCrates = state.jobs.reduce((a, b) => a + (b.availableQcCrates || 0), 0);
+  const openBreakdowns = (state.maintenanceIncidents || []).filter(
+    (i) => i.status === 'OPEN' || i.status === 'IN_PROGRESS'
+  );
 
   // Workforce Attendance
   const floorWorkers = state.floorWorkers || [];
-  const presentCount = floorWorkers.filter((w) => w.isPresent || w.shiftStatus === 'PRESENT').length;
+  const totalWorkersCount = floorWorkers.length;
+  const presentWorkersCount = floorWorkers.filter((w) => w.isPresent || w.shiftStatus === 'PRESENT').length;
 
-  // Face-to-Face Operator Scorecard Text
-  const operatorScorecardList = Array.from(operatorSummaryMap.values());
-  const operatorScorecardText = operatorScorecardList.length > 0
-    ? operatorScorecardList
-        .map((op) => {
-          const outLabel = op.stage === 'Slitting'
-            ? `${op.outputCratesOrRolls} Rolls`
-            : `${op.outputCratesOrRolls} Crates (${op.outputPieces.toLocaleString()} Pcs)`;
-          const scrapLabel = op.scrapKg > 0 ? ` | Scrap: ${op.scrapKg.toFixed(1)} KG` : '';
-          const defectLabel = op.defectsPcs > 0 ? ` | ⚠️ Defect: ${op.defectsPcs} Pcs` : ' | 0 Defect ✅';
-          return `  • *${op.name}* [${op.stage} / ${op.machine}]: ${outLabel}${scrapLabel}${defectLabel}`;
-        })
-        .join('\n')
-    : '  • Data logged via supervisor floor entries';
-
-  // Cutting Machine Breakdown Text
-  const cuttingMachineLines: string[] = [];
-  cuttingMachineMap.forEach((mStat, mach) => {
-    const ops = mStat.ops.size > 0 ? Array.from(mStat.ops).join(', ') : 'Operator';
-    cuttingMachineLines.push(
-      `  • *${mach}:* ${ops} ➔ *${mStat.crates} Crates* (${mStat.pcs.toLocaleString()} Pcs) | Scrap: ${mStat.scrapKg.toFixed(1)} KG`
-    );
-  });
-  if (cuttingMachineLines.length === 0) {
-    cuttingMachineLines.push(
-      `  • *Cutting Lines:* ${totalCutCratesProduced > 0 ? `${totalCutCratesProduced} Crates (${totalCutPiecesProduced.toLocaleString()} Pcs)` : 'Standby / Continuous Run'}`
-    );
-  }
-
-  // Defect breakdown text
-  const defectLines = Array.from(defectBreakdownMap.entries())
-    .map(([cat, qty]) => `    - ${cat}: ${qty} Pcs`)
-    .join('\n');
-
-  return `🏭 *WÜNDERKRAF PAPERWARE FACTORY ERP*
-📋 *OFFICIAL SHIFT CHANGEOVER & PRODUCTION AUDIT*
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+  return `🏭 *WÜNDERKRAF PAPERWARE ERP*
+📋 *DAILY SHIFT CHANGEOVER REPORT*
+━━━━━━━━━━━━━━━━━━━━
 📅 *Date:* ${today}
 ⏱️ *Shift:* ${shiftTitle}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━
 
-⚙️ *LINE-BY-LINE VERIFIED PRODUCTION:*
+⚙️ *ALL MACHINES & OPERATOR PERFORMANCE:*
 
 📜 *1. SLITTING DESK:*
 • Machine: Slitter-01
-• Active Operator: ${Array.from(slittingActiveOps).join(', ') || 'Floor Team'}
-• Slit Output: *${totalSlitRollsProduced} Rolls* ✅
-• Slitting Edge Scrap: *${totalSlitScrapKg.toFixed(1)} KG*
+• Operator: ${slittingOperators.join(', ') || 'Floor Team'}
+• Output: ${slittingRolls > 0 ? `${slittingRolls} Rolls` : 'Continuous Run'}
+• Scrap: ${slittingScrap.toFixed(1)} KG
 
-✂️ *2. CUTTING DESK (BLANK PRODUCTION):*
-${cuttingMachineLines.join('\n')}
-• Total Shift Cut: *${totalCutCratesProduced} Crates* (*${totalCutPiecesProduced.toLocaleString()} Blank Pieces*)
-• Total Cutting Web Scrap: *${totalCutScrapKg.toFixed(1)} KG*
+✂️ *2. CUTTING DESK:*
+• Machine C-01: ${cutM1Ops.join(', ') || 'Team A'}${cutM1Crates > 0 ? ` | Output: ${cutM1Crates} Crates` : ''}
+• Machine C-02: ${cutM2Ops.join(', ') || 'Team B'}${cutM2Crates > 0 ? ` | Output: ${cutM2Crates} Crates` : ''}
+${cutOtherOps.length > 0 ? `• Operators: ${cutOtherOps.join(', ')}` : ''}
 
-⚙️ *3. FORMING DESK (CUP & CUTLERY SPINDLES):*
-${formingReportList.join('\n')}
-• Total Shift Formed: *${totalFormedCratesShift} Crates* (*${totalFormedPiecesShift.toLocaleString()} Pieces*)
+⚙️ *3. FORMING DESK (M1 - M8):*
+${formingMachineReports.join('\n')}
 
-🔍 *4. QUALITY CONTROL (QC GATE):*
-• Certified Inspector: ${Array.from(qcInspectors).join(', ') || 'QC Lead'}
-• Approved Clean Crates: *${totalQcApprovedCrates} Crates* ✅
-• Rejected Defect Pieces: *${totalQcDefectsPcs} Pieces*
-${defectLines ? `• Defect Classification:\n${defectLines}\n` : ''}
+🔍 *4. QC INSPECTION DESK:*
+• Inspector(s): ${qcInspectors.join(', ') || 'QC Lead'}
+• Checked: ${qcOkCrates > 0 ? `${qcOkCrates} OK Crates` : 'Inspections Logged'}
+• Scrap Rejected: ${qcScrapCrates} Crates
+
 📦 *5. PACKING & DISPATCH:*
-• Packing Lead: ${Array.from(packWorkers).join(', ') || 'Packaging Line'}
-• Finished Boxes Packed: *${totalBoxesPacked} Boxes*
-• Official Outward Dispatched: *${totalBoxesDispatched} Boxes*
-• Pending Dispatch Orders: *${(state.packJobs || []).filter((o) => o.status !== 'Dispatched').length} Active*
+• Packing Team: ${packOperators.join(', ') || 'Packaging Team'}
+• Boxes Packed: ${packedBoxes > 0 ? `${packedBoxes} Boxes` : 'In Progress'}
+• Pending Dispatch Orders: ${state.packJobs.filter((o) => o.status !== 'Dispatched').length}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 *OPERATOR FACE-TO-FACE SCORECARD (आमने-सामने हिसाब):*
-${operatorScorecardText}
+━━━━━━━━━━━━━━━━━━━━
+👥 *DAILY WORKFORCE ATTENDANCE:*
+• Total Registered Employees: ${totalWorkersCount} Workers
+• Present On Floor Today: *${presentWorkersCount} Workers Present* ✅
+• On Leave/Absent: ${totalWorkersCount - presentWorkersCount} On Leave
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-👥 *FLOOR MANPOWER ATTENDANCE:*
-• Registered Workforce: *${floorWorkers.length} Employees*
-• Present on Floor: *${presentCount} Workers Present* ✅
-• Absent/On Leave: *${Math.max(0, floorWorkers.length - presentCount)} On Leave*
+━━━━━━━━━━━━━━━━━━━━
+📊 *FACTORY FLOOR WIP STOCK BALANCE:*
+• 📜 Slit Rolls: ${totalSlitRolls} Rolls
+• ✂️ Cut Crates: ${totalCutCrates} Crates
+• ⚙️ Formed Crates: ${totalFormedCrates} Crates
+• 🔍 QC OK Crates: ${totalQcOkCrates} Crates
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 *FACTORY FLOOR WIP BUFFER (LIVE BALANCE):*
-• 📜 Slit Rolls Buffer: *${totalSlitRollsWip} Rolls*
-• ✂️ Flat Blank Crates: *${totalCutCratesWip} Crates*
-• ⚙️ Formed Spindle Crates: *${totalFormedCratesWip} Crates*
-• 🔍 QC Cleared Buffer: *${totalQcOkCratesWip} Crates*
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-_Verified Enterprise ERP Automation by Wünderkraf_`;
+🛠️ *MAINTENANCE STATUS:*
+${
+  openBreakdowns.length === 0
+    ? '✅ All Machines Operational (Zero Breakdowns)'
+    : `⚠️ ${openBreakdowns.length} Machine(s) Under Maintenance:\n` +
+      openBreakdowns.map((b) => `  • ${b.machine}: ${b.issue} (${b.priority || 'Normal'})`).join('\n')
+}
+━━━━━━━━━━━━━━━━━━━━
+_Auto-generated by Wünderkraf Factory ERP_`;
 }
 
 export function triggerWhatsAppShiftNotification(

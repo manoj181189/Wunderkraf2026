@@ -235,59 +235,6 @@ export function parseAllProductionEvents(state: FactoryState): NormalizedProduct
         }
       });
     });
-
-    // 3. Structured batches (when not handled via slices)
-    (job.runningBatches || []).forEach((b) => {
-      if ((!b.slices || b.slices.length === 0) && (b.producedQty || b.producedPieces)) {
-        const date = b.startTime ? extractDateFromTimestamp(b.startTime) : (job.date || new Date().toISOString().split('T')[0]);
-        const key = `batch_${b.batchId}_${b.operator || b.worker}_${date}`;
-        if (!seenEventKeys.has(key)) {
-          seenEventKeys.add(key);
-          const pcs = b.producedPieces || b.outputPieces || (b.producedQty ? b.producedQty * (b.stage === 'Cutting' ? (job.pcsPerCrateCutting || 10000) : (job.pcsPerCrateForming || 5000)) : 0);
-          events.push({
-            id: `evt-batch-${b.batchId}`,
-            date,
-            timestamp: b.startTime || date,
-            machine: b.machine || 'Machine',
-            operator: b.operator || b.worker || 'Operator',
-            stage: b.stage,
-            product: job.product,
-            shift: b.shift || 'DAY',
-            crates: b.producedQty || 0,
-            pieces: pcs,
-            scrapKg: b.scrapKg || 0,
-            scrapPieces: b.scrapPieces || b.rejectedPieces || 0,
-            action: `${b.stage} Run [${b.batchId}]: ${b.producedQty || 0} Crates (${pcs.toLocaleString()} Pcs) | Scrap: ${b.scrapKg || 0} KG`,
-            jobId: job.id
-          });
-        }
-      }
-    });
-
-    // 4. Slitting reels
-    (job.reelsList || []).forEach((reel, rIdx) => {
-      const date = reel.startTime ? extractDateFromTimestamp(reel.startTime) : (job.date || new Date().toISOString().split('T')[0]);
-      const key = `reel_${job.id}_${reel.reelNo || rIdx}_${reel.worker}_${date}`;
-      if (!seenEventKeys.has(key)) {
-        seenEventKeys.add(key);
-        events.push({
-          id: `evt-reel-${job.id}-${reel.reelNo || rIdx}`,
-          date,
-          timestamp: reel.startTime || date,
-          machine: 'Slitter-01',
-          operator: reel.worker || 'Slitting Lead',
-          stage: 'Slitting',
-          product: job.product,
-          shift: 'DAY',
-          crates: reel.rolls || 1,
-          pieces: 0,
-          scrapKg: reel.scrapKg || 0,
-          scrapPieces: 0,
-          action: `Slit Reel Run [${reel.reelNo}]: ${reel.rolls || 1} Rolls | Scrap: ${reel.scrapKg || 0} KG`,
-          jobId: job.id
-        });
-      }
-    });
   });
 
   // Sort descending by date

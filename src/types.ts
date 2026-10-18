@@ -22,7 +22,6 @@ export type CurrentView =
   | 'MAINTENANCE'
   | 'PURCHASE'
   | 'OPENING_STOCK'
-  | 'SUPERVISOR'
   | 'WHATSAPP';
 
 export type MaterialUrgency = 'CRITICAL_BREAKDOWN' | 'URGENT' | 'NORMAL' | 'LOW';
@@ -667,49 +666,21 @@ export interface FactoryState {
   gatePassDispatches?: GatePassDispatch[];
 }
 
-export type SupervisorGateType =
-  | 'SCRAP_EXCESS'
-  | 'CRATE_RETURN'
-  | 'QC_DEFECT_ROUTING'
-  | 'GATE_PASS_DISPATCH'
-  | 'DIE_WEAR_ALERT'
-  | 'SPEED_OVERRIDE';
-
 export interface SupervisorGateApproval {
   id: string;
   timestamp: string;
-  stage: 'Slitting' | 'Cutting' | 'Forming' | 'QC' | 'Packing' | 'Dispatch';
-  type: SupervisorGateType;
+  stage: string;
+  type: string;
   jobId: string;
   product?: string;
   machine?: string;
   operator: string;
   supervisor: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  reason: string;
-  metrics: {
-    crates?: number;
-    pieces?: number;
-    scrapKg?: number;
-    scrapPct?: number;
-    toleranceThreshold?: number;
-    speedSpm?: number;
-    sourceLotId?: string;
-    targetLotId?: string;
-    defectCategory?: string;
-    grossWeightKg?: number;
-  };
+  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  reason?: string;
+  metrics?: Record<string, any>;
   notes?: string;
 }
-
-export type QcDefectCategory =
-  | 'Bottom Leakage / Pinholes'
-  | 'Top Curl Deformity'
-  | 'Side Seam Glue Failure'
-  | 'Oil / Water Spots'
-  | 'Print Smear'
-  | 'Flute Delamination'
-  | 'Rim Wrinkle';
 
 export interface QcDefectRecord {
   id: string;
@@ -717,16 +688,16 @@ export interface QcDefectRecord {
   jobId: string;
   product: string;
   formingBatchId?: string;
-  machine: string;
+  machine?: string;
   operator: string;
   inspector: string;
-  defectCategory: QcDefectCategory | string;
+  defectCategory: string;
   rejectedPcs: number;
   severity: 'CRITICAL' | 'MAJOR' | 'MINOR';
   rootCauseNotes?: string;
-  actionTaken?: 'SCRAPPED' | 'REWORK_FORMING' | 'RETURNED_TO_OPERATOR';
+  actionTaken: string;
   supervisorSignedOff: boolean;
-  supervisorName?: string;
+  supervisorName: string;
 }
 
 export interface GatePassDispatch {
@@ -740,11 +711,11 @@ export interface GatePassDispatch {
   vehicleNo?: string;
   driverName?: string;
   driverPhone?: string;
-  gs1Barcode: string;
-  lotGenealogySummary: string;
+  gs1Barcode?: string;
+  lotGenealogySummary?: string;
   issuedBySupervisor: string;
   dispatchTimestamp: string;
-  status: 'GENERATED' | 'DISPATCHED' | 'ACKNOWLEDGED';
+  status: string;
 }
 
 export interface CoordinationMatrixItem {
