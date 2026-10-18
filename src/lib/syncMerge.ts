@@ -35,11 +35,24 @@ export function mergeFactoryStates(base: FactoryState | null | undefined, incomi
   }
   // If baseReset >= incReset, DO NOT discard incoming entries!
   // Normal production entries (new jobs, cutting/forming batches, scrap logs) must be merged cleanly.
+  const incomingActiveJobIds = new Set((incoming.jobs || []).map((j) => j.id));
+  const incomingActivePlanIds = new Set((incoming.productionPlans || []).map((p) => p.id));
 
-  const deletedJobIds = Array.from(new Set([...(base.deletedJobIds || []), ...(incoming.deletedJobIds || [])]));
+  // Tombstones: do not allow old base deleted IDs to suppress freshly created incoming jobs or plans
+  const deletedJobIds = Array.from(
+    new Set([
+      ...(base.deletedJobIds || []).filter((id) => !incomingActiveJobIds.has(id)),
+      ...(incoming.deletedJobIds || [])
+    ])
+  );
   const deletedOrderIds = Array.from(new Set([...(base.deletedOrderIds || []), ...(incoming.deletedOrderIds || [])]));
   const deletedLogIds = Array.from(new Set([...(base.deletedLogIds || []), ...(incoming.deletedLogIds || [])]));
-  const deletedPlanIds = Array.from(new Set([...(base.deletedPlanIds || []), ...(incoming.deletedPlanIds || [])]));
+  const deletedPlanIds = Array.from(
+    new Set([
+      ...(base.deletedPlanIds || []).filter((id) => !incomingActivePlanIds.has(id)),
+      ...(incoming.deletedPlanIds || [])
+    ])
+  );
   const deletedWorkerIds = Array.from(new Set([...(base.deletedWorkerIds || []), ...(incoming.deletedWorkerIds || [])]));
   const deletedHandoverIds = Array.from(new Set([...(base.deletedHandoverIds || []), ...(incoming.deletedHandoverIds || [])]));
 

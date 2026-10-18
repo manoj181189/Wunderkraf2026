@@ -537,6 +537,12 @@ export const App: React.FC = () => {
         console.warn('Failed to save user session', e);
       }
       setCurrentView('HUB');
+      fetchCentralState().then((latest) => {
+        if (latest && Array.isArray(latest.jobs)) {
+          const reconciled = reconcileJobStageTransitions(latest);
+          setState(reconciled);
+        }
+      }).catch(() => {});
       return true;
     }
 
@@ -561,6 +567,12 @@ export const App: React.FC = () => {
             localStorage.setItem('wunderkraf_active_user', JSON.stringify(active));
           } catch (e) {}
           setCurrentView('HUB');
+          fetchCentralState().then((latest) => {
+            if (latest && Array.isArray(latest.jobs)) {
+              const reconciled = reconcileJobStageTransitions(latest);
+              setState(reconciled);
+            }
+          }).catch(() => {});
           return true;
         }
       }

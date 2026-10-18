@@ -60,19 +60,34 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Standard ordered user keys (clean IDs only)
+  // Ordered list of clean user IDs (case-insensitive deduplication)
   const allUserKeys = Array.from(
     new Set([
+      'admin',
+      'mac',
+      'manoj',
+      'sandip',
+      'tushar',
+      'sarang',
+      'kishan',
+      'balu',
+      'paras',
+      'amish',
+      'priti',
+      'abhay',
+      'supervisor',
       ...Object.keys(DEFAULT_USERS),
       ...Object.keys(allUsers || {})
     ])
   );
 
-  // Filter matching suggestions as user types
-  const filteredKeys = allUserKeys.filter((k) => {
-    if (!loginId.trim()) return true;
-    return k.toLowerCase().includes(loginId.trim().toLowerCase());
-  });
+  const trimmedQuery = loginId.trim().toLowerCase();
+
+  // ONLY filter and show suggestions when the user has actually typed at least 1 character!
+  // Empty input = NO popup shown, exactly as requested by user.
+  const filteredKeys = trimmedQuery.length > 0
+    ? allUserKeys.filter((k) => k.toLowerCase().includes(trimmedQuery))
+    : [];
 
   const handleSelectKey = (key: string) => {
     setLoginId(key);
@@ -80,6 +95,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
     setErrorMsg(null);
     if (passwordInputRef.current) {
       passwordInputRef.current.focus();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown' && filteredKeys.length > 0) {
+      e.preventDefault();
+      handleSelectKey(filteredKeys[0]);
+    } else if (e.key === 'Enter' && showSuggestions && filteredKeys.length > 0) {
+      e.preventDefault();
+      handleSelectKey(filteredKeys[0]);
     }
   };
 
@@ -104,7 +129,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
         setErrorMsg('Invalid Login ID or Password. Please try again.');
         setIsSubmitting(false);
       }
-    } catch (err: any) {
+    } catch {
       setErrorMsg('Login failed. Please try again.');
       setIsSubmitting(false);
     }
@@ -134,9 +159,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Login ID Input with popup suggestions */}
+        {/* Login ID Input with popup suggestions only when typing */}
         <div ref={containerRef} className="relative">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+          <label
+            htmlFor="login-id-input"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
+          >
             Login ID
           </label>
           <div className="relative">
@@ -149,26 +177,29 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
                 setShowSuggestions(true);
                 setErrorMsg(null);
               }}
-              onFocus={() => setShowSuggestions(true)}
-              placeholder="Enter Login ID"
+              onKeyDown={handleKeyDown}
+              placeholder="Login ID"
               autoComplete="off"
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-medium focus:bg-white focus:border-[#3182ce] focus:ring-2 focus:ring-blue-100 outline-none transition"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-medium focus:bg-white focus:border-[#3182ce] focus:ring-2 focus:ring-blue-100 outline-none transition"
               required
               autoFocus
             />
           </div>
 
-          {/* Clean Suggestion Popup as user types */}
-          {showSuggestions && filteredKeys.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto py-1">
+          {/* Clean Suggestion Popup - appears strictly when typing and matches exist */}
+          {showSuggestions && trimmedQuery.length > 0 && filteredKeys.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto py-1 divide-y divide-slate-100 animate-fadeIn">
               {filteredKeys.map((k) => (
                 <button
                   key={k}
                   type="button"
-                  onClick={() => handleSelectKey(k)}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-800 font-medium hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer flex items-center justify-between"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectKey(k);
+                  }}
+                  className="w-full text-left px-3.5 py-2.5 text-sm text-slate-800 font-semibold hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer flex items-center justify-between"
                 >
-                  <span>{k}</span>
+                  <span className="font-mono">{k}</span>
                 </button>
               ))}
             </div>
@@ -177,7 +208,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
 
         {/* Password Input */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+          <label
+            htmlFor="login-password-input"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
+          >
             Password
           </label>
           <div className="relative">
@@ -190,8 +224,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, brandLogoBase64, on
                 setPassword(e.target.value);
                 setErrorMsg(null);
               }}
-              placeholder="Enter Password"
-              className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-medium focus:bg-white focus:border-[#3182ce] focus:ring-2 focus:ring-blue-100 outline-none transition"
+              placeholder="Password"
+              className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-medium focus:bg-white focus:border-[#3182ce] focus:ring-2 focus:ring-blue-100 outline-none transition"
               required
             />
             <button

@@ -493,7 +493,8 @@ export const PlanningDeskView: React.FC<PlanningDeskViewProps> = ({
         formProduct,
         state.seriesConfig,
         state.productPrefixMap,
-        state.jobs || []
+        state.jobs || [],
+        state.deletedJobIds || []
       );
 
       const updatedSeriesConfig = {

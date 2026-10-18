@@ -562,27 +562,32 @@ export async function persistFactoryState(
   }
 
   // 6. Direct instant push to Central Server Bridge (for 0ms multi-device live sync)
+  let serverMergedState = stateToSave;
   if (typeof window !== 'undefined') {
     try {
       const endpoint = getCentralSyncEndpoint();
-      fetch(endpoint, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           state: stateToSave,
           clientTimestamp: Date.now()
         })
-      })
-      .then(async (res) => {
-        if (res.ok) {
-          const result = await res.json();
-          if (result && result.state) {
-            syncBus?.postMessage({ type: 'STATE_SYNCED', state: result.state });
-          }
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result && result.state && Array.isArray(result.state.jobs)) {
+          serverMergedState = result.state;
+          await saveToIndexedDB(serverMergedState);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serverMergedState));
+          } catch (e) {}
+          syncBus?.postMessage({ type: 'STATE_SYNCED', state: serverMergedState });
         }
-      })
-      .catch(() => {});
-    } catch (e) {}
+      }
+    } catch (pushErr) {
+      console.warn('[Sync Bridge] Direct push deferred, state queued for retry:', pushErr);
+    }
   }
 
   // 7. Trigger non-blocking offline queue flush fallback
@@ -592,7 +597,7 @@ export async function persistFactoryState(
     success: savedToIndexedDB || savedToLocalStorage,
     savedToIndexedDB,
     savedToLocalStorage,
-    mergedState: stateToSave
+    mergedState: serverMergedState
   };
 }
 
@@ -634,16 +639,9 @@ export async function initializeFactoryState(): Promise<FactoryState> {
   try {
     const centralState = await fetchCentralState();
     if (centralState && Array.isArray(centralState.jobs)) {
-      // Adopt central state as authoritative source of truth.
-      // If local state has a newer reset timestamp, merge them, otherwise adopt central state directly.
-      const hasNewerLocalReset = Boolean(
-        localState &&
-        localState.jobs &&
-        localState.jobs.length > 0 &&
-        (localState.lastResetTimestamp || 0) > (centralState.lastResetTimestamp || 0)
-      );
-      const merged = hasNewerLocalReset
-        ? reconcileJobStageTransitions(mergeFactoryStates(centralState, localState!))
+      // Adopt central state, but safely preserve any new local jobs or plans that were entered locally!
+      const merged = (localState && localState.jobs && localState.jobs.length > 0)
+        ? reconcileJobStageTransitions(mergeFactoryStates(centralState, localState))
         : reconcileJobStageTransitions(centralState);
 
       merged.glueBrands = ['Pidilite FS35'];
@@ -653,6 +651,11 @@ export async function initializeFactoryState(): Promise<FactoryState> {
       try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
       } catch (e) {}
+
+      // If local state had additional jobs not on server, push merged state up to server immediately
+      if (localState && localState.jobs && localState.jobs.some(lj => !centralState.jobs.some(cj => cj.id === lj.id))) {
+        persistFactoryState(merged).catch(() => {});
+      }
 
       // Flush any pending offline queue items
       flushOfflineSyncQueue().catch(() => {});
@@ -874,9 +877,13 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
   let pollTimer: any = null;
   let lastObservedRevision = 0;
   let isFetchingState = false;
+  let hasPendingFetch = false;
 
   const pullLatestState = async () => {
-    if (isFetchingState) return;
+    if (isFetchingState) {
+      hasPendingFetch = true;
+      return;
+    }
     isFetchingState = true;
     try {
       const endpoint = getCentralSyncEndpoint();
@@ -901,11 +908,18 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
       // Ignore network hiccup
     } finally {
       isFetchingState = false;
+      if (hasPendingFetch) {
+        hasPendingFetch = false;
+        pullLatestState();
+      }
     }
   };
 
   if (typeof window !== 'undefined') {
-    // 1. Establish Real-Time SSE Stream for sub-100ms multi-device updates
+    // Immediately pull latest state on mount so device is 100% in sync right away!
+    pullLatestState();
+
+    // 1. Establish Real-Time SSE Stream for instant sub-50ms multi-device updates
     try {
       const origin = window.location.origin || '';
       const streamUrl = `${origin}/api/sync/stream`;
@@ -915,9 +929,17 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
         try {
           if (!event.data || event.data.startsWith(':')) return;
           const msg = JSON.parse(event.data);
-          if (msg.type === 'CONNECTED') {
-            lastObservedRevision = msg.revision || 0;
-          } else if (msg.type === 'STATE_CHANGED') {
+          if (msg.type === 'CONNECTED' || msg.type === 'STATE_CHANGED') {
+            if (msg.state && Array.isArray(msg.state.jobs)) {
+              lastObservedRevision = msg.revision || Date.now();
+              const reconciled = reconcileJobStageTransitions(msg.state);
+              saveToIndexedDB(reconciled).catch(() => {});
+              try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reconciled));
+              } catch (e) {}
+              onUpdate(reconciled);
+              return;
+            }
             if (msg.revision && msg.revision !== lastObservedRevision) {
               lastObservedRevision = msg.revision;
               pullLatestState();
@@ -933,7 +955,7 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
       console.warn('[Sync Bridge] SSE not supported, falling back to fast ping polling:', e);
     }
 
-    // 2. Ultra-Lightweight Ping Polling (/api/sync/ping is ~100 bytes) every 2 seconds as robust backup
+    // 2. Ultra-Lightweight Ping Polling (/api/sync/ping is ~100 bytes) every 1.5 seconds as robust backup
     const checkPing = async () => {
       try {
         const origin = window.location.origin || '';
@@ -946,9 +968,7 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
         if (res.ok) {
           const data = await res.json();
           if (data && data.success && data.revision) {
-            if (lastObservedRevision === 0) {
-              lastObservedRevision = data.revision;
-            } else if (data.revision !== lastObservedRevision) {
+            if (data.revision !== lastObservedRevision) {
               lastObservedRevision = data.revision;
               pullLatestState();
             }
@@ -957,7 +977,7 @@ export function subscribeToSyncEvents(onUpdate: (newState: FactoryState) => void
       } catch (e) {}
     };
 
-    pollTimer = setInterval(checkPing, 2000);
+    pollTimer = setInterval(checkPing, 1500);
 
     // Instant check when operator switches back to this tab/window
     window.addEventListener('focus', checkPing);

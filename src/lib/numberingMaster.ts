@@ -47,10 +47,14 @@ export function generateUnifiedJobId(
   product: string,
   seriesConfig: SeriesConfig,
   productPrefixMap: Record<string, string> = {},
-  existingJobs: Job[] = []
+  existingJobs: Job[] = [],
+  deletedJobIds: string[] = []
 ): { jobId: string; updatedSeriesConfig: SeriesConfig } {
   const master = getNumberingMaster(seriesConfig);
-  const existingJobIds = new Set(existingJobs.map((j) => j.id));
+  const existingJobIds = new Set([
+    ...existingJobs.map((j) => j.id),
+    ...(deletedJobIds || [])
+  ]);
 
   let candidateId = '';
   let finalSeq = 1;
@@ -62,7 +66,19 @@ export function generateUnifiedJobId(
     let pfx = master.jobSeries.prefix.trim() || 'WK-LOT';
     if (pfx.endsWith('-')) pfx = pfx.slice(0, -1);
     const pad = master.jobSeries.paddingDigits || 3;
-    let seq = master.jobSeries.nextSeq || 1;
+    let maxExistingSeq = 0;
+    const pfxRegex = new RegExp(`^${pfx}-(\\d+)`, 'i');
+    existingJobs.forEach((j) => {
+      if (j && j.id) {
+        const match = j.id.match(pfxRegex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxExistingSeq) maxExistingSeq = num;
+        }
+      }
+    });
+
+    let seq = Math.max(master.jobSeries.nextSeq || 1, maxExistingSeq + 1);
 
     candidateId = `${pfx}-${formatPaddedNumber(seq, pad)}`;
     while (existingJobIds.has(candidateId)) {
@@ -75,12 +91,25 @@ export function generateUnifiedJobId(
       nextSeq: finalSeq
     };
   } else {
-    // Mode B: Per-Product Prefix (e.g. SPN-001, FRK-001)
+    // Mode B: Per-Product Prefix (e.g. S-001, F-001, K-001)
     const prefixMap = { ...PRODUCT_PREFIX_MAP, ...productPrefixMap };
     let pfx = prefixMap[product] || product.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || 'ITM';
     if (pfx.endsWith('-')) pfx = pfx.slice(0, -1);
     const pad = master.jobSeries.paddingDigits || 3;
-    let seq = updatedProductSeqs[product] || 1;
+
+    let maxExistingSeq = 0;
+    const pfxRegex = new RegExp(`^${pfx}-(\\d+)`, 'i');
+    existingJobs.forEach((j) => {
+      if (j && j.id) {
+        const match = j.id.match(pfxRegex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxExistingSeq) maxExistingSeq = num;
+        }
+      }
+    });
+
+    let seq = Math.max(updatedProductSeqs[product] || 1, maxExistingSeq + 1);
 
     candidateId = `${pfx}-${formatPaddedNumber(seq, pad)}`;
     while (existingJobIds.has(candidateId)) {

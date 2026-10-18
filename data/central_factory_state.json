@@ -24,7 +24,6 @@
   ],
   "deptWorkers": {
     "Slitting": [
-      "AMISHBHAI",
       "ABHAY",
       "TUSHAR"
     ],
@@ -195,9 +194,10 @@
     "EMP-1790418342331-803",
     "EMP-1790232071845-807",
     "EMP-1790232890364-162",
-    "EMP-1790232890364-781"
+    "EMP-1790232890364-781",
+    "EMP-1791164780080-781"
   ],
-  "lastUpdated": "2026-10-09T06:22:46.035Z",
+  "lastUpdated": "2026-10-18T08:26:30.557Z",
   "shiftConfig": {
     "dayStart": "08:00",
     "dayEnd": "20:00",
@@ -9213,7 +9213,7 @@
         "125 GSM",
         "120 GSM"
       ],
-      "status": "FORMING_IN_PROGRESS",
+      "status": "CUTTING_COMPLETED",
       "qcLoosePcs": 10560,
       "paperBrand": "AADHARA PAPER",
       "isReadyForQcInspection": false
@@ -9762,7 +9762,7 @@
         "Slitting": "DS-003-SLIT-01"
       },
       "totalQcPieces": 0,
-      "status": "FORMING_IN_PROGRESS",
+      "status": "CUTTING_COMPLETED",
       "targetLayers": 9,
       "cuttingRejectedPcs": 0,
       "product": "Dessert Spoon"
@@ -9828,7 +9828,7 @@
           "glueBrand": "Pidilite W-10 (Food Grade Adhesive)"
         }
       ],
-      "status": "READY_FOR_FORMING",
+      "status": "CUTTING_COMPLETED",
       "totalCutPieces": 200000,
       "reelsList": [
         {
@@ -10125,7 +10125,7 @@
       ],
       "gsmsSummary": "125 GSM",
       "totalFormedPieces": 0,
-      "status": "READY_FOR_FORMING",
+      "status": "CUTTING_COMPLETED",
       "formingLoosePcs": 0,
       "cuttingScrapKg": 190,
       "tracedLots": {
@@ -10395,7 +10395,7 @@
       "cuttingScrapKg": 420,
       "cuttingPcsPerKg": 480,
       "stage": "Forming",
-      "status": "READY_FOR_FORMING",
+      "status": "CUTTING_COMPLETED",
       "scrapPercent": 0,
       "availableCuttingCrates": 18,
       "qcLoosePcs": 0,
@@ -11283,7 +11283,7 @@
       "formingAdjustmentPcs": 4954,
       "glueBrand": "Pidilite FS35",
       "qcLoosePcs": 0,
-      "status": "READY_FOR_QC",
+      "status": "CUTTING_COMPLETED",
       "reelsList": [
         {
           "paperBrand": "AADHARA PAPER",
@@ -11360,7 +11360,7 @@
       ],
       "availableQcCrates": 4,
       "formingScrapPcs": 29,
-      "status": "READY_FOR_QC",
+      "status": "CUTTING_COMPLETED",
       "reelNumbers": [
         "5023",
         "5175",
@@ -11941,7 +11941,7 @@
       ],
       "formingRejectedPcs": 70,
       "availableQcCrates": 0,
-      "status": "READY_FOR_QC",
+      "status": "CUTTING_COMPLETED",
       "reelNumbers": [
         "5215",
         "5200"
@@ -12700,7 +12700,7 @@
       "cuttingScrapKg": 160,
       "gsm": "125 GSM",
       "availableQcCrates": 0,
-      "status": "READY_FOR_FORMING",
+      "status": "CUTTING_COMPLETED",
       "totalQcPieces": 0,
       "tracedLots": {
         "Cutting": "K-040-CUT-01",
@@ -12809,7 +12809,7 @@
       "totalQcPieces": 0,
       "targetGlueBrand": "Pidilite FS35",
       "availableQcCrates": 0,
-      "status": "FORMING_IN_PROGRESS",
+      "status": "CUTTING_COMPLETED",
       "targetGsm": "125 GSM",
       "scrapQty": 0,
       "totalFormedPieces": 145628,
@@ -13569,7 +13569,7 @@
       "updatedAt": "2026-10-10T11:58:00.023Z",
       "scrapPieces": 0,
       "totalQcPieces": 0,
-      "status": "READY_FOR_FORMING",
+      "status": "CUTTING_COMPLETED",
       "totalCutPieces": 230000,
       "availableCuttingCrates": 20,
       "cuttingScrapPcs": 0,
@@ -13646,7 +13646,7 @@
       ],
       "availableFormingCrates": 6,
       "scrapPcs": 0,
-      "status": "FORMING_IN_PROGRESS",
+      "status": "CUTTING_COMPLETED",
       "formingScrapPcs": 186,
       "paperBrand": "AADHARA PAPER",
       "availableCuttingCrates": 13,
@@ -15027,7 +15027,7 @@
           "gsm": "125 GSM"
         }
       ],
-      "status": "FORMING_IN_PROGRESS",
+      "status": "CUTTING_COMPLETED",
       "cuttingMaterialScrapKg": 547.6,
       "totalFormedPieces": 178652,
       "cuttingScrapKg": 547.6,
@@ -15244,7 +15244,7 @@
       "cuttingMaterialScrapKg": 530,
       "cuttingRejectedPcs": 0,
       "scrapPercent": 0,
-      "status": "READY_FOR_QC",
+      "status": "CUTTING_COMPLETED",
       "cuttingLoosePcs": 0,
       "totalQcPieces": 0,
       "totalCutPieces": 218500,
@@ -15796,7 +15796,7 @@
       "stage": "QC",
       "customRemark": "",
       "id": "F-068",
-      "status": "READY_FOR_QC",
+      "status": "CUTTING_COMPLETED",
       "gsmList": [
         "125 GSM"
       ],
@@ -16267,7 +16267,7 @@
           "type": "Plain"
         }
       ],
-      "status": "READY_FOR_QC",
+      "status": "CUTTING_COMPLETED",
       "totalCutPieces": 227600,
       "cuttingScrapPcs": 0,
       "cuttingRejectedPcs": 0,
@@ -17181,7 +17181,7 @@
         }
       ],
       "updatedAt": "2026-10-12T12:56:46.106Z",
-      "status": "READY_FOR_FORMING",
+      "status": "CUTTING_COMPLETED",
       "tracedLots": {
         "Slitting": "F-074-SLIT-01",
         "Cutting": "F-074-CUT-01"
@@ -17396,6 +17396,38 @@
       "targetGsm": "125 GSM",
       "status": "Pending",
       "updatedAt": "2026-10-13T14:52:04.964Z"
+    },
+    {
+      "id": "JOB-TEST-SYNC-999",
+      "product": "Spoon",
+      "stage": "Planning",
+      "status": "Pending",
+      "createdAt": "2026-10-17T02:17:01.928Z",
+      "availableCuttingCrates": 0,
+      "availableFormingCrates": 0,
+      "availableQcCrates": 0,
+      "reelNumbers": [],
+      "reelsList": [],
+      "inputWeightKg": 0,
+      "outputWeightKg": 0,
+      "scrapKg": 0,
+      "availableRolls": 0,
+      "availableForQcCrates": 0,
+      "tracedLots": {},
+      "totalCutPieces": 0,
+      "totalFormedPieces": 0,
+      "totalQcPieces": 0,
+      "cuttingLoosePcs": 0,
+      "formingLoosePcs": 0,
+      "qcLoosePcs": 0,
+      "runningBatches": []
+    },
+    {
+      "id": "S-076",
+      "product": "Spoon",
+      "stage": "Planning",
+      "status": "Pending",
+      "createdAt": "2026-10-18T08:26:30.493Z"
     }
   ],
   "paperBrands": [
@@ -17414,7 +17446,7 @@
     "nightShiftReportTime": "20:00",
     "autoSendShiftReportDay": true,
     "autoSendShiftReportNight": true,
-    "lastSentDayDate": "",
+    "lastSentDayDate": "2026-10-17",
     "lastSentNightDate": "",
     "autoNotifyMaintenanceBreakdown": true,
     "autoNotifyCriticalQcDefect": true,
@@ -17424,7 +17456,17 @@
     "autoNotifyScrapSpike": false,
     "managementContacts": [],
     "userRights": {},
-    "dispatchLogs": []
+    "dispatchLogs": [
+      {
+        "id": "AUTO-DAY-1792204210999",
+        "timestamp": "08:00 AM",
+        "category": "SHIFT_DAY",
+        "recipient": "Coordination Matrix (2 Contacts)",
+        "sender": "SYSTEM (Auto-Trigger)",
+        "preview": "🏭 *WÜNDERKRAF PAPERWARE FACTORY ERP*\n📋 *OFFICIAL SHIFT CHANGEOVER & PRODUCTION AUDI...",
+        "status": "SENT"
+      }
+    ]
   },
   "wipLots": [
     {
@@ -17985,8 +18027,6 @@
   "deletedJobIds": [
     "SPN-015",
     "SPN-070",
-    "S-072",
-    "F-070",
     "TEST-SAVE-JOB"
   ],
   "archivedJobs": [],
@@ -18208,23 +18248,37 @@
       "perms": [
         "*"
       ]
+    },
+    "supervisor": {
+      "pass": "1811",
+      "perms": [
+        "Supervisor",
+        "Cutting",
+        "Forming",
+        "QC",
+        "Packing",
+        "Stock",
+        "Planning",
+        "Status_Edit",
+        "Slitting_Status_Edit",
+        "Planning_Status_Edit"
+      ],
+      "name": "Shift Supervisor",
+      "role": "Supervisor"
+    },
+    "mac": {
+      "pass": "1118",
+      "perms": [
+        "*"
+      ],
+      "name": "MAC Administrator",
+      "role": "Administrator"
     }
   },
   "machineReadyAlerts": [],
   "strictAuditRollYield": false,
   "deletedLogIds": [],
   "floorWorkers": [
-    {
-      "role": "OPERATOR",
-      "assignedMachine": "Slitting-1",
-      "inTime": "07:16 AM",
-      "department": "Slitting",
-      "shift": "DAY",
-      "id": "EMP-1791164780080-781",
-      "isPresent": true,
-      "shiftStatus": "PRESENT",
-      "name": "AMISHBHAI"
-    },
     {
       "role": "OPERATOR",
       "shift": "DAY",
@@ -18655,7 +18709,7 @@
     8,
     9
   ],
-  "lastResetTimestamp": 1791996409064,
+  "lastResetTimestamp": 1792311289837,
   "crateCapacityMaster": {
     "Knife": {
       "cuttingPcs": 11000,
@@ -19472,10 +19526,10 @@
   "seriesConfig": {
     "orderSeq": 13,
     "productSeqs": {
-      "Fork": 72,
-      "Spoon": 72,
-      "Dessert Spoon": 3,
-      "Knife": 19
+      "Fork": 75,
+      "Spoon": 76,
+      "Dessert Spoon": 5,
+      "Knife": 45
     },
     "numberingMaster": {
       "jobSeries": {
@@ -20038,5 +20092,6 @@
   "autoNotifyDeptHeadsOnCritical": true,
   "supervisorApprovals": [],
   "qcDefectRecords": [],
-  "gatePassDispatches": []
+  "gatePassDispatches": [],
+  "lastRevision": 1792311942705
 }

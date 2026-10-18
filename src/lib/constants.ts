@@ -478,6 +478,13 @@ export const DEFAULT_USERS: Record<string, { pass: string; perms: string[]; name
     role: 'Administrator',
     phone: ''
   },
+  'mac': {
+    pass: '1118',
+    perms: ['*'],
+    name: 'MAC Administrator',
+    role: 'Administrator',
+    phone: ''
+  },
   'manoj': {
     pass: '1118',
     perms: ['*'],
