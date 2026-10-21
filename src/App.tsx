@@ -806,7 +806,10 @@ export const App: React.FC = () => {
         {currentView === 'SLITTING' && (
           <SlittingView
             state={state}
-            onBackToHub={() => setCurrentView('HUB')}
+            onBackToHub={() => {
+              setPreSelectedPlanId(undefined);
+              setCurrentView('HUB');
+            }}
             onSaveState={handleSaveState}
             onOpenHoldModal={(m) => setHoldModalStation(m)}
             onOpenVoiceModalForTarget={handleOpenVoiceForTarget}

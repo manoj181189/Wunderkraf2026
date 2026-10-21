@@ -3479,15 +3479,6 @@
       ],
       "id": "S-070",
       "updatedAt": "2026-10-05T16:34:49.601Z"
-    },
-    {
-      "id": "TEST-LIVE-SYNC-1",
-      "planId": "PLAN-TEST",
-      "product": "Spoon",
-      "stage": "Planning",
-      "status": "Pending",
-      "createdAt": "2026-10-18T11:12:38.533Z",
-      "updatedAt": "2026-10-18T11:12:38.534Z"
     }
   ],
   "scrapSales": [],

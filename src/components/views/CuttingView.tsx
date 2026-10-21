@@ -640,13 +640,12 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
 
     // Resolve where available rolls come from (Parent job handles Slitting and holds rolls)
     const rollSourceJob = job.parentJobId ? jobs.find(p => p.id === job.parentJobId) : job;
-    const targetPlannedLayers = rollSourceJob?.targetLayers || job.targetLayers || 8;
     const effectiveAvailRolls = (rollSourceJob?.availableRolls !== undefined && rollSourceJob.availableRolls > 0)
       ? rollSourceJob.availableRolls
-      : Math.max(rollSourceJob?.reelsList?.length || 0, targetPlannedLayers);
+      : 0;
 
     if (!rollSourceJob || effectiveAvailRolls < rollsCount) {
-      alert(`Insufficient slit rolls! Available: ${effectiveAvailRolls}`);
+      alert(`⚠️ Insufficient slit rolls! Available: ${effectiveAvailRolls} Rolls. Please ensure Slitting is completed first.`);
       return;
     }
 
@@ -718,7 +717,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       updatedJobs = jobs.map((j) => {
         let updatedJ = { ...j };
         if (j.id === rollSourceJob.id) {
-          updatedJ.availableRolls = (j.availableRolls || 0) - rollsCount;
+          updatedJ.availableRolls = Math.max(0, (j.availableRolls || 0) - rollsCount);
         }
         if (j.id === job.id) {
           updatedJ.tracedLots = { ...(j.tracedLots || {}), Cutting: batchId, Slitting: j.tracedLots?.Slitting || slitBatchId };
@@ -1273,7 +1272,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       const inputRolls = batch.issuedQty || 0;
 
       const maxPcsPerRoll = state.maxPiecesPerSlitRoll || 30000;
-      const totalMaxTheoreticalInputPieces = (inputRolls > 0 ? inputRolls : 1) * maxPcsPerRoll;
+      const totalMaxTheoreticalInputPieces = (inputRolls > 0 ? inputRolls : 1) * Math.max(maxPcsPerRoll, effectiveCutPcs * 10);
       const prevProducedPieces = batch.producedPieces || 0;
       const prevProducedCrates = batch.producedQty || 0;
       const cumulativeOutputPieces = prevProducedPieces + totalCutPcs;
@@ -1299,6 +1298,56 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
 
       const updatedJobs = jobs.map((j) => {
         if (j.id !== job.id) return j;
+        const updatedBatches = (j.runningBatches || []).map((b) => {
+          if (b.batchId !== batch.batchId) return b;
+          const finalSlices = [...(b.slices || [])];
+          finalSlices.push({
+            sliceId: `SLC-${Date.now()}-${finalSlices.length + 1}`,
+            operator: b.worker,
+            shift: b.shift || 'DAY',
+            date: new Date().toISOString().split('T')[0],
+            machine: b.machine,
+            stage: 'Cutting',
+            startTime: finalSlices.length > 0 ? finalSlices[finalSlices.length - 1].handoverTime : b.startTime,
+            handoverTime: stopTime,
+            producedQty: cratesDone,
+            producedPieces: totalCutPcs,
+            grossPieces: grossCutPcs,
+            scrapQty: materialScrapKgVal,
+            scrapKg: materialScrapKgVal,
+            scrapPcs: rejectedPcsVal,
+            cuttingMaterialScrapKg: materialScrapKgVal,
+            rejectedPieces: rejectedPcsVal,
+            pcsPerKg: effectivePcsPerKg,
+            helpers: b.helpers,
+            notes: finalSlices.length > 0 ? 'Incoming Shift Final Completion' : 'Single Shift Run Completion'
+          });
+          return {
+            ...b,
+            status: 'Completed',
+            endTime: stopTime,
+            producedQty: (b.producedQty || 0) + cratesDone,
+            pcsPerCrate: effectiveCutPcs,
+            producedPieces: (b.producedPieces || 0) + totalCutPcs,
+            grossPieces: (b.grossPieces || 0) + grossCutPcs,
+            loosePieces: looseDone,
+            scrapKg: (b.scrapKg || 0) + materialScrapKgVal,
+            cuttingMaterialScrapKg: (b.cuttingMaterialScrapKg || 0) + materialScrapKgVal,
+            scrapPcs: (b.scrapPcs || 0) + rejectedPcsVal,
+            rejectedPieces: (b.rejectedPieces || 0) + rejectedPcsVal,
+            pcsPerKg: effectivePcsPerKg,
+            glueBrand: brandToDeduct,
+            glueUsageKg: finalBatchGlueKg,
+            slices: finalSlices
+          };
+        });
+
+        const hasOtherCuttingRunning = updatedBatches.some(
+          (b) => (b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && (b.status === 'Running' || b.status === 'Held')
+        );
+        const remainingAvailRolls = j.availableRolls || 0;
+        const isJobCuttingDone = !hasOtherCuttingRunning && remainingAvailRolls <= 0;
+
         return {
           ...j,
           pcsPerCrateCutting: effectiveCutPcs,
@@ -1312,49 +1361,9 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
           cuttingPcsPerKg: effectivePcsPerKg,
           glueUsageKg: finalJobGlueKg,
           glueBrand: brandToDeduct,
-          runningBatches: (j.runningBatches || []).map((b) => {
-            if (b.batchId !== batch.batchId) return b;
-            const finalSlices = [...(b.slices || [])];
-            finalSlices.push({
-              sliceId: `SLC-${Date.now()}-${finalSlices.length + 1}`,
-              operator: b.worker,
-              shift: b.shift || 'DAY',
-              date: new Date().toISOString().split('T')[0],
-              machine: b.machine,
-              stage: 'Cutting',
-              startTime: finalSlices.length > 0 ? finalSlices[finalSlices.length - 1].handoverTime : b.startTime,
-              handoverTime: stopTime,
-              producedQty: cratesDone,
-              producedPieces: totalCutPcs,
-              grossPieces: grossCutPcs,
-              scrapQty: materialScrapKgVal,
-              scrapKg: materialScrapKgVal,
-              scrapPcs: rejectedPcsVal,
-              cuttingMaterialScrapKg: materialScrapKgVal,
-              rejectedPieces: rejectedPcsVal,
-              pcsPerKg: effectivePcsPerKg,
-              helpers: b.helpers,
-              notes: finalSlices.length > 0 ? 'Incoming Shift Final Completion' : 'Single Shift Run Completion'
-            });
-            return {
-              ...b,
-              status: 'Completed',
-              endTime: stopTime,
-              producedQty: (b.producedQty || 0) + cratesDone,
-              pcsPerCrate: effectiveCutPcs,
-              producedPieces: (b.producedPieces || 0) + totalCutPcs,
-              grossPieces: (b.grossPieces || 0) + grossCutPcs,
-              loosePieces: looseDone,
-              scrapKg: (b.scrapKg || 0) + materialScrapKgVal,
-              cuttingMaterialScrapKg: (b.cuttingMaterialScrapKg || 0) + materialScrapKgVal,
-              scrapPcs: (b.scrapPcs || 0) + rejectedPcsVal,
-              rejectedPieces: (b.rejectedPieces || 0) + rejectedPcsVal,
-              pcsPerKg: effectivePcsPerKg,
-              glueBrand: brandToDeduct,
-              glueUsageKg: finalBatchGlueKg,
-              slices: finalSlices
-            };
-          })
+          status: isJobCuttingDone ? 'CUTTING_COMPLETED' : 'CUTTING_IN_PROGRESS',
+          stage: isJobCuttingDone ? 'Cutting Completed' : (j.stage || 'Cutting'),
+          runningBatches: updatedBatches
         };
       });
 
@@ -1461,6 +1470,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
       setShowManualTimeOverride(false);
       setShowManualStopTimeOverride(false);
       setSelectedActiveBatchId('');
+      setSelectedPendingJobId('');
       alert(`✅ Cutting Run Finished!\nMain Counter: ${totalCutPcs.toLocaleString()} Net Flat Blanks (${cratesDone} Crates + ${looseDone} Loose - ${rejectedPcsVal.toLocaleString()} Rejected Pcs). Added to inventory.${finalBatchGlueKg > 0 ? `\n• Total Glue Consumed: ${finalBatchGlueKg} KG of ${brandToDeduct} recorded.` : ''}`);
     } catch (err: any) {
       console.error("Database Save Failed:", err);
@@ -1620,6 +1630,14 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
             slices: finalSlices
           };
         });
+        const hasOtherCuttingRunning = (updatedJ.runningBatches || []).some(
+          (b) => (b.stage === 'Cutting' || b.machine?.startsWith('Cutting')) && (b.status === 'Running' || b.status === 'Held')
+        );
+        const remainingAvailRolls = updatedJ.availableRolls || 0;
+        if (!hasOtherCuttingRunning && remainingAvailRolls <= 0) {
+          updatedJ.status = 'CUTTING_COMPLETED';
+          updatedJ.stage = 'Cutting Completed';
+        }
       }
 
       // If we transferred to a sibling job, credit its available cutting crates directly
@@ -1737,6 +1755,7 @@ export const CuttingView: React.FC<CuttingViewProps> = ({
     setGlueIssueInput('');
     setGlueSuccessMsg('');
     setSelectedActiveBatchId('');
+    setSelectedPendingJobId('');
     setShowSurplusModal(false);
     setSurplusData(null);
     alert(`✅ Option B Surplus Run Finished!\nTotal: ${totalCutPcs.toLocaleString()} Pcs\n• Current Job Got: ${currentJobCratesDelta} Crates (${currentJobPcsDelta.toLocaleString()} Pcs)\n• ${extraNotes || 'Allocated to current customer'}`);

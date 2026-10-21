@@ -959,9 +959,13 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
     const { job, batch } = activeBatchObj;
 
     // Shift from single run to cumulative job-level counting
-    const ppcPlannedTarget = job.planId
-      ? (productionPlans.find((p) => p.id === job.planId)?.targetLayers || job.targetLayers || 8)
-      : (job.targetLayers || 8);
+    const targetPlan = job.planId
+      ? productionPlans.find((p) => p.id === job.planId)
+      : null;
+    const targetLayers = targetPlan?.targetLayers || job.targetLayers || 8;
+    // Expected slit rolls target: each layer reel yields multiple rolls (e.g. 10 to 30 rolls)
+    const expectedRollsPerLayer = (targetPlan as any)?.rollsPerLayer || 20;
+    const ppcPlannedTarget = (targetPlan as any)?.plannedRolls || (targetLayers * expectedRollsPerLayer);
 
     const currentBatchId = batch.batchId;
     const currentReelNo = batch.reelNo;
@@ -1070,8 +1074,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
         reelNumbers: effectiveReelNumbers,
         reelsList: updatedReelsList,
         availableRolls: (j.availableRolls || 0) + rollsCount,
-        stage: 'Slitting Completed',
-        status: 'READY_FOR_CUTTING',
+        stage: updatedReelsList.filter((r) => (r.rolls || 0) > 0).length >= targetLayers ? 'Slitting Completed' : 'Slitting',
+        status: updatedReelsList.filter((r) => (r.rolls || 0) > 0).length >= targetLayers ? 'READY_FOR_CUTTING' : 'SLITTING_IN_PROGRESS',
         outputWeightKg: newOutKg,
         scrapKg: newScrapKg,
         scrapPercent: totalScrapPct,
@@ -3511,7 +3515,8 @@ Only one job can run at a time. Please Hold or Finish job [${otherRunning.job.id
                 const targetPlan = activeBatchObj.job.planId
                   ? productionPlans.find(p => p.id === activeBatchObj.job.planId)
                   : null;
-                const plannedOutput = targetPlan?.targetLayers || activeBatchObj.job.targetLayers || 8;
+                const targetLayers = targetPlan?.targetLayers || activeBatchObj.job.targetLayers || 8;
+                const plannedOutput = (targetPlan as any)?.plannedRolls || (targetLayers * 20);
                 const currentBatchId = activeBatchObj.batch.batchId;
                 const currentReelNo = activeBatchObj.batch.reelNo;
 
